@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DownloadSimple, UploadSimple, PencilSimple, UserPlus } from '@phosphor-icons/react';
 
 export function Interns() {
-  const [interns] = useState([
-    { id: 1, name: 'أحمد محمود', email: 'ahmed@example.com', role: 'متدرب (IT)', status: 'نشط' },
-    { id: 2, name: 'سارة خالد', email: 'sara@example.com', role: 'متدربة (HR)', status: 'قيد المراجعة' },
-  ]);
+  const [interns, setInterns] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('http://localhost:5000/api/interns')
+      .then(res => res.json())
+      .then(data => setInterns(data))
+      .catch(err => console.error("Error fetching interns:", err));
+  }, []);
 
   return (
     <div>
