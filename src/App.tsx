@@ -6,6 +6,8 @@ import { Interns } from './pages/Interns';
 import { FormBuilder } from './pages/FormBuilder';
 import { DocumentVault } from './pages/DocumentVault';
 import { Login } from './pages/Login';
+import { UsersPermissions } from './pages/UsersPermissions';
+import { InternPortal } from './pages/InternPortal';
 
 function ProtectedRoute({ children, token }: { children: React.ReactNode, token: string | null }) {
   if (!token) {
@@ -16,6 +18,10 @@ function ProtectedRoute({ children, token }: { children: React.ReactNode, token:
 
 function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const isIntern = user?.role === 'Intern';
 
   // Update token state if changed in other tabs or logged out
   useEffect(() => {
@@ -36,10 +42,20 @@ function App() {
             <Layout />
           </ProtectedRoute>
         }>
-          <Route index element={<Dashboard />} />
-          <Route path="interns" element={<Interns />} />
-          <Route path="form-builder" element={<FormBuilder />} />
-          <Route path="vault" element={<DocumentVault />} />
+          {isIntern ? (
+            <>
+              <Route index element={<InternPortal />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          ) : (
+            <>
+              <Route index element={<Dashboard />} />
+              <Route path="interns" element={<Interns />} />
+              <Route path="form-builder" element={<FormBuilder />} />
+              <Route path="vault" element={<DocumentVault />} />
+              <Route path="users" element={<UsersPermissions />} />
+            </>
+          )}
         </Route>
       </Routes>
     </BrowserRouter>

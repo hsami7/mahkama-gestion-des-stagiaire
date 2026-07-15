@@ -1,18 +1,27 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Users, FileText, SquaresFour, Gear, Archive, SignOut } from '@phosphor-icons/react';
+import { Users, FileText, SquaresFour, Gear, Archive, SignOut, ShieldCheck, House } from '@phosphor-icons/react';
 
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  
+  const isIntern = user?.role === 'Intern';
+  const isAdmin = user?.role === 'Admin';
 
-  const navItems = [
-    { name: 'لوحة القيادة', path: '/', icon: <SquaresFour size={24} /> },
-    { name: 'المتدربين', path: '/interns', icon: <Users size={24} /> },
-    { name: 'منشئ النماذج', path: '/form-builder', icon: <FileText size={24} /> },
-    { name: 'خزنة المستندات', path: '/vault', icon: <Archive size={24} /> },
-    { name: 'الإعدادات', path: '/settings', icon: <Gear size={24} /> },
+  const baseNavItems = [
+    { name: 'لوحة القيادة', path: '/', icon: <SquaresFour size={24} />, show: !isIntern },
+    { name: 'المتدربين', path: '/interns', icon: <Users size={24} />, show: !isIntern },
+    { name: 'منشئ النماذج', path: '/form-builder', icon: <FileText size={24} />, show: !isIntern },
+    { name: 'خزنة المستندات', path: '/vault', icon: <Archive size={24} />, show: !isIntern },
+    { name: 'المستخدمين والصلاحيات', path: '/users', icon: <ShieldCheck size={24} />, show: isAdmin },
+    { name: 'بوابة المتدرب', path: '/', icon: <House size={24} />, show: isIntern },
+    { name: 'الإعدادات', path: '/settings', icon: <Gear size={24} />, show: true },
   ];
+
+  const navItems = baseNavItems.filter(item => item.show);
 
   const handleLogout = () => {
     localStorage.removeItem('token');

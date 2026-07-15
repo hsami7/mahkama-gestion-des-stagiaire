@@ -77,10 +77,64 @@ def login():
     conn.close()
     
     if user and check_password_hash(user[2], password):
-        access_token = create_access_token(identity={'id': user[0], 'name': user[1], 'role': user[3]})
-        return jsonify(access_token=access_token, user={'id': user[0], 'name': user[1], 'role': user[3]}), 200
+        # include permissions in token for frontend logic
+        cursor.execute("SELECT permissions FROM users WHERE id = ?", (user[0],))
+        perms = cursor.fetchone()[0]
+        access_token = create_access_token(identity={'id': user[0], 'name': user[1], 'role': user[3], 'permissions': perms})
+        return jsonify(access_token=access_token, user={'id': user[0], 'name': user[1], 'role': user[3], 'permissions': perms}), 200
         
     return jsonify({"msg": "البريد الإلكتروني أو كلمة المرور غير صحيحة"}), 401
+
+# --- USERS ROUTES (Admin Only) ---
+@app.route('/api/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    current_user = get_jwt_identity()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, email, role, permissions FROM users")
+    users = [{"id": r[0], "name": r[1], "email": r[2], "role": r[3], "permissions": r[4]} for r in cursor.fetchall()]
+    conn.close()
+    return jsonify(users)
+
+@app.route('/api/users', methods=['POST'])
+@jwt_required()
+def add_user():
+    current_user = get_jwt_identity()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    data = request.json
+    hashed_pw = generate_password_hash(data.get('password', 'password123'))
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO users (name, email, password, role, permissions) VALUES (?, ?, ?, ?, ?)",
+                       (data.get('name'), data.get('email'), hashed_pw, data.get('role'), data.get('permissions', '')))
+        conn.commit()
+        new_id = cursor.lastrowid
+    except sqlite3.IntegrityError:
+        return jsonify({"msg": "البريد الإلكتروني موجود بالفعل"}), 400
+    finally:
+        conn.close()
+    return jsonify({"success": True, "id": new_id})
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@jwt_required()
+def delete_user(user_id):
+    current_user = get_jwt_identity()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
 
 # --- INTERN ROUTES ---
 @app.route('/api/interns', methods=['GET'])
