@@ -106,6 +106,37 @@ export function InternPortal() {
     }
   };
 
+  const handleProactiveUpload = async (docType: string, file: File) => {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showToast('يجب أن يكون الملف بصيغة PDF', 'error');
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      showToast('حجم الملف يجب أن لا يتجاوز 15 ميجابايت', 'error');
+      return;
+    }
+
+    setUploading(docType as any);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('document_type', docType);
+
+    try {
+      await api.post(`/intern/upload_unrequested`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      showToast('تم رفع المستند بنجاح!', 'success');
+      fetchProfile();
+    } catch (err) {
+      showToast('حدث خطأ أثناء الرفع', 'error');
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const totalRequests = requests.length;
   // Let's pretend all requests that are fetched are "missing". If we fetch from /requests, we only get 'pending' ones.
   // We can't dynamically count "done" here easily without a better endpoint, so we will show pending count.
@@ -271,24 +302,27 @@ export function InternPortal() {
                       </div>
                     </div>
                     <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
-                      {uploaded && uploaded.file_path && (
+                      {uploaded && uploaded.file_path ? (
                         <a href={uploaded.file_path.startsWith('http') ? uploaded.file_path : `http://127.0.0.1:5000${uploaded.file_path.startsWith('/api/uploads/') ? uploaded.file_path : uploaded.file_path.startsWith('/') ? '/api/uploads' + uploaded.file_path : '/api/uploads/' + uploaded.file_path}`} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
                           <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> عرض
                         </a>
-                      )}
-                      {!uploaded && req && (
+                      ) : (
                         <>
                           <input 
                             type="file" 
-                            id={`f-${req.id}`} 
+                            id={req ? `f-${req.id}` : `f-proactive-${docItem.key}`} 
                             onChange={e => {
                               if (e.target.files && e.target.files[0]) {
-                                handleUpload(req.id, e.target.files[0]);
+                                if (req) {
+                                  handleUpload(req.id, e.target.files[0]);
+                                } else {
+                                  handleProactiveUpload(docItem.key, e.target.files[0]);
+                                }
                               }
                             }}
                           />
-                          <button className="btn btn-ink" style={{padding:'8px 14px', fontSize:12.5}} onClick={() => document.getElementById(`f-${req.id}`)?.click()} disabled={uploading === req.id}>
-                            {uploading === req.id ? 'جاري...' : 'رفع الآن'}
+                          <button className="btn btn-ink" style={{padding:'8px 14px', fontSize:12.5}} onClick={() => document.getElementById(req ? `f-${req.id}` : `f-proactive-${docItem.key}`)?.click()} disabled={uploading === (req ? req.id : docItem.key)}>
+                            {uploading === (req ? req.id : docItem.key) ? 'جاري...' : 'رفع الآن'}
                           </button>
                         </>
                       )}
