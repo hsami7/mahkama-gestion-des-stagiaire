@@ -92,11 +92,7 @@ export function InternPortal() {
     formData.append('file', file);
 
     try {
-      await api.post(`/intern/requests/${requestId}/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.post(`/intern/requests/${requestId}/upload`, formData);
       showToast('تم رفع المستند بنجاح!', 'success');
       fetchRequests();
     } catch (err) {
@@ -123,11 +119,7 @@ export function InternPortal() {
     formData.append('document_type', docType);
 
     try {
-      await api.post(`/intern/upload_unrequested`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.post(`/intern/upload_unrequested`, formData);
       showToast('تم رفع المستند بنجاح!', 'success');
       fetchProfile();
     } catch (err) {
@@ -340,6 +332,17 @@ export function InternPortal() {
                     <div className="ds" style={{ color: 'var(--danger)' }}>مطلوبة — بانتظار الرفع</div>
                   </div>
                   <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
+                    {req.template_path && (
+                      <a 
+                        href={`http://127.0.0.1:5000${req.template_path.startsWith('/') ? '' : '/'}${req.template_path}`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="btn btn-ghost sm" 
+                        style={{color:'var(--gold-dark)', border: '1px solid var(--gold-border)'}}
+                      >
+                        <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M12 15V3M7 10l5 5 5-5"/><path d="M4 21h16"/></svg> تحميل النموذج
+                      </a>
+                    )}
                     <input 
                       type="file" 
                       id={`f-${req.id}`} 
