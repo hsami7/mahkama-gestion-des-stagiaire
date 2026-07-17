@@ -1,67 +1,108 @@
-import sqlite3
 import os
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)
 
 # Configurations
 app.config['JWT_SECRET_KEY'] = 'mahkama-secret-key-2026' # Change in production
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16MB max upload
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024 # 20MB max upload
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.sqlite'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 jwt = JWTManager(app)
-DB_PATH = 'database.sqlite'
+db = SQLAlchemy(app)
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+# --- MODELS ---
+class User(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(150), nullable=False)
+    email = db.Column(db.String(150), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    role = db.Column(db.String(50), nullable=False)
+    permissions = db.Column(db.Text, nullable=True)
+
+class Intern(db.Model):
+    __tablename__ = 'interns'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(150), nullable=False)
+    name_fr = db.Column(db.String(150), nullable=True)
+    email = db.Column(db.String(150), nullable=True)
+    national_id = db.Column(db.String(50), nullable=True)
+    department = db.Column(db.String(100), nullable=True)
+    encadrant = db.Column(db.String(150), nullable=True)
+    status = db.Column(db.String(50), default='قيد المراجعة')
+    photo_path = db.Column(db.String(255), nullable=True)
+    phone = db.Column(db.String(50), nullable=True)
+    start_date = db.Column(db.String(50), nullable=True)
+    end_date = db.Column(db.String(50), nullable=True)
+    date_of_birth = db.Column(db.String(50), nullable=True)
+    university = db.Column(db.String(150), nullable=True)
+    address = db.Column(db.Text, nullable=True)
+    documents = db.Column(db.Text, nullable=True)
+
+class Attendance(db.Model):
+    __tablename__ = 'attendance'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
+    date = db.Column(db.String(20), nullable=False)
+    status = db.Column(db.String(20), nullable=False)
+
+class DocumentRequest(db.Model):
+    __tablename__ = 'document_requests'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
+    document_type = db.Column(db.String(50), nullable=False) # e.g. 'resume', 'id', 'other'
+    custom_title = db.Column(db.String(150), nullable=True)  # Title if document_type == 'other'
+    note = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='pending') # 'pending' or 'fulfilled'
+    created_at = db.Column(db.String(50), nullable=False)
+    template_path = db.Column(db.String(255), nullable=True)
+
+class Form(db.Model):
+    __tablename__ = 'forms'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    form_data = db.Column(db.Text, nullable=False)
+
+class SystemLog(db.Model):
+    __tablename__ = 'system_logs'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.Column(db.String(150), nullable=True)
+    action = db.Column(db.Text, nullable=False)
+
+def log_action(user, action):
+    try:
+        new_log = SystemLog(user=user, action=action)
+        db.session.add(new_log)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Failed to log action: {e}")
+
+
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    # Users/Roles
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT UNIQUE,
-            password TEXT,
-            role TEXT,
-            permissions TEXT
-        )
-    ''')
-    # Interns
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS interns (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT,
-            department TEXT,
-            status TEXT DEFAULT 'قيد المراجعة',
-            photo_path TEXT
-        )
-    ''')
-    # Custom Forms
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS forms (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            form_data TEXT
-        )
-    ''')
-    
-    # Create default Admin user if none exists
-    cursor.execute("SELECT * FROM users WHERE email='admin@mahkama.ma'")
-    if not cursor.fetchone():
-        hashed_pw = generate_password_hash('admin123')
-        cursor.execute("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
-                       ('مدير النظام', 'admin@mahkama.ma', hashed_pw, 'Admin'))
-                       
-    conn.commit()
-    conn.close()
+    with app.app_context():
+        db.create_all()
+        # Create default Admin user if none exists
+        admin = User.query.filter_by(email='admin@mahkama.ma').first()
+        if not admin:
+            hashed_pw = generate_password_hash('admin123')
+            admin = User(name='مدير النظام', email='admin@mahkama.ma', password=hashed_pw, role='Admin')
+            db.session.add(admin)
+            db.session.commit()
 
 # --- AUTHENTICATION ROUTES ---
 @app.route('/api/login', methods=['POST'])
@@ -70,104 +111,513 @@ def login():
     email = data.get('email')
     password = data.get('password')
     
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, password, role FROM users WHERE email = ?", (email,))
-    user = cursor.fetchone()
-    conn.close()
+    user = User.query.filter_by(email=email).first()
     
-    if user and check_password_hash(user[2], password):
+    if user and check_password_hash(user.password, password):
         # include permissions in token for frontend logic
-        cursor.execute("SELECT permissions FROM users WHERE id = ?", (user[0],))
-        perms = cursor.fetchone()[0]
-        access_token = create_access_token(identity={'id': user[0], 'name': user[1], 'role': user[3], 'permissions': perms})
-        return jsonify(access_token=access_token, user={'id': user[0], 'name': user[1], 'role': user[3], 'permissions': perms}), 200
+        access_token = create_access_token(
+            identity=str(user.id),
+            additional_claims={
+                'name': user.name, 
+                'role': user.role, 
+                'permissions': user.permissions
+            }
+        )
+        log_action(user.name, "قام بتسجيل الدخول إلى النظام")
+        return jsonify(
+            access_token=access_token, 
+            user={'id': user.id, 'name': user.name, 'role': user.role, 'permissions': user.permissions}
+        ), 200
         
     return jsonify({"msg": "البريد الإلكتروني أو كلمة المرور غير صحيحة"}), 401
+
 
 # --- USERS ROUTES (Admin Only) ---
 @app.route('/api/users', methods=['GET'])
 @jwt_required()
 def get_users():
-    current_user = get_jwt_identity()
+    current_user = get_jwt()
     if current_user.get('role') != 'Admin':
         return jsonify({"msg": "Unauthorized"}), 403
         
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, email, role, permissions FROM users")
-    users = [{"id": r[0], "name": r[1], "email": r[2], "role": r[3], "permissions": r[4]} for r in cursor.fetchall()]
-    conn.close()
-    return jsonify(users)
+    users = User.query.all()
+    return jsonify([{"id": u.id, "name": u.name, "email": u.email, "role": u.role, "permissions": u.permissions} for u in users])
 
 @app.route('/api/users', methods=['POST'])
 @jwt_required()
 def add_user():
-    current_user = get_jwt_identity()
+    current_user = get_jwt()
     if current_user.get('role') != 'Admin':
         return jsonify({"msg": "Unauthorized"}), 403
         
     data = request.json
-    hashed_pw = generate_password_hash(data.get('password', 'password123'))
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO users (name, email, password, role, permissions) VALUES (?, ?, ?, ?, ?)",
-                       (data.get('name'), data.get('email'), hashed_pw, data.get('role'), data.get('permissions', '')))
-        conn.commit()
-        new_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+    
+    # Check if email exists
+    if User.query.filter_by(email=data.get('email')).first():
         return jsonify({"msg": "البريد الإلكتروني موجود بالفعل"}), 400
-    finally:
-        conn.close()
-    return jsonify({"success": True, "id": new_id})
+
+    hashed_pw = generate_password_hash(data.get('password', 'password123'))
+    new_user = User(
+        name=data.get('name'), 
+        email=data.get('email'), 
+        password=hashed_pw, 
+        role=data.get('role'), 
+        permissions=data.get('permissions', '')
+    )
+    
+    db.session.add(new_user)
+    db.session.commit()
+    
+    log_action(current_user.get('name', 'Admin'), f"قام بإضافة مستخدم جديد: {new_user.name}")
+    
+    return jsonify({"success": True, "id": new_user.id})
+
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+@jwt_required()
+def update_user(user_id):
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+        
+    data = request.json
+    user.name = data.get('name', user.name)
+    user.email = data.get('email', user.email)
+    user.role = data.get('role', user.role)
+    if 'permissions' in data:
+        import json
+        user.permissions = data.get('permissions')
+        
+    if data.get('password'):
+        user.password = generate_password_hash(data.get('password'))
+        
+    db.session.commit()
+    log_action(current_user.get('name', 'Admin'), f"قام بتحديث بيانات المستخدم: {user.name}")
+    return jsonify({"success": True})
+
+@app.route('/api/users/password', methods=['PUT'])
+@jwt_required()
+def change_password():
+    current_user = get_jwt()
+    user_id = current_user.get('sub')
+    data = request.json
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+        
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+    
+    if not old_password or not new_password:
+        return jsonify({"msg": "Old and new password required"}), 400
+        
+    from werkzeug.security import check_password_hash
+    if not check_password_hash(user.password, old_password):
+        return jsonify({"msg": "كلمة المرور القديمة غير صحيحة"}), 400
+        
+    hashed_pw = generate_password_hash(new_password)
+    user.password = hashed_pw
+    db.session.commit()
+    
+    log_action(user.name, "قام بتغيير كلمة المرور الخاصة به")
+    return jsonify({"success": True})
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 def delete_user(user_id):
-    current_user = get_jwt_identity()
+    current_user = get_jwt()
     if current_user.get('role') != 'Admin':
         return jsonify({"msg": "Unauthorized"}), 403
         
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    user = User.query.get(user_id)
+    if user:
+        name_deleted = user.name
+        db.session.delete(user)
+        db.session.commit()
+        log_action(current_user.get('name', 'Admin'), f"قام بحذف المستخدم: {name_deleted}")
     return jsonify({"success": True})
+
 
 # --- INTERN ROUTES ---
 @app.route('/api/interns', methods=['GET'])
+@jwt_required()
 def get_interns():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, email, department, status FROM interns")
-    rows = cursor.fetchall()
-    interns = [{"id": r[0], "name": r[1], "email": r[2], "department": r[3], "status": r[4]} for r in rows]
-    conn.close()
-    return jsonify(interns)
+    interns = Intern.query.all()
+    return jsonify([{
+        "id": i.id, 
+        "name": i.name, 
+        "email": i.email, 
+        "encadrant": i.encadrant, 
+        "status": i.status,
+        "photo_path": i.photo_path,
+        "start_date": i.start_date,
+        "end_date": i.end_date
+    } for i in interns])
+
+@app.route('/api/interns/<int:intern_id>', methods=['GET'])
+@jwt_required()
+def get_intern(intern_id):
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+        
+    import json
+    docs = {}
+    if intern.documents:
+        try:
+            docs = json.loads(intern.documents)
+        except:
+            pass
+            
+    return jsonify({
+        "id": intern.id, 
+        "name": intern.name,
+        "name_fr": intern.name_fr,
+        "email": intern.email, 
+        "national_id": intern.national_id,
+        "department": intern.department, 
+        "encadrant": intern.encadrant,
+        "status": intern.status,
+        "photo_path": intern.photo_path,
+        "phone": intern.phone,
+        "start_date": intern.start_date,
+        "end_date": intern.end_date,
+        "date_of_birth": intern.date_of_birth,
+        "university": intern.university,
+        "address": intern.address,
+        "documents": docs
+    })
 
 @app.route('/api/interns', methods=['POST'])
 @jwt_required()
 def add_intern():
     data = request.json
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO interns (name, email, department) VALUES (?, ?, ?)", 
-                   (data.get('name'), data.get('email'), data.get('department')))
-    conn.commit()
-    intern_id = cursor.lastrowid
-    conn.close()
-    return jsonify({"success": True, "id": intern_id})
+    import json
+    new_intern = Intern(
+        name=data.get('name'), 
+        name_fr=data.get('name_fr'),
+        email=data.get('email'), 
+        national_id=data.get('national_id'),
+        department=data.get('department'),
+        encadrant=data.get('encadrant'),
+        phone=data.get('phone'),
+        start_date=data.get('start_date'),
+        end_date=data.get('end_date'),
+        date_of_birth=data.get('date_of_birth'),
+        university=data.get('university'),
+        address=data.get('address'),
+        photo_path=data.get('photo_path'),
+        documents=json.dumps(data.get('documents', {}))
+    )
+    db.session.add(new_intern)
+    db.session.commit()
+    
+    # Create user account automatically
+    if new_intern.email:
+        existing_user = User.query.filter_by(email=new_intern.email).first()
+        if not existing_user:
+            from werkzeug.security import generate_password_hash
+            hashed_pw = generate_password_hash('password123')
+            new_user = User(
+                name=new_intern.name,
+                email=new_intern.email,
+                password=hashed_pw,
+                role='Intern',
+                permissions=''
+            )
+            db.session.add(new_user)
+            db.session.commit()
 
-# --- DOCUMENT VAULT ROUTES ---
-@app.route('/api/documents', methods=['GET'])
+    current_user = get_jwt()
+    user_name = current_user.get('name') if current_user else 'Unknown'
+    log_action(user_name, f"قام بإضافة متدرب جديد: {new_intern.name}")
+    
+    return jsonify({"success": True, "id": new_intern.id})
+
+@app.route('/api/interns/<int:intern_id>', methods=['PUT'])
 @jwt_required()
-def list_documents():
+def update_intern(intern_id):
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+        
+    data = request.json
+    import json
+    
+    intern.name = data.get('name', intern.name)
+    if 'name_fr' in data:
+        intern.name_fr = data.get('name_fr')
+    intern.email = data.get('email', intern.email)
+    intern.national_id = data.get('national_id', intern.national_id)
+    intern.department = data.get('department', intern.department)
+    if 'encadrant' in data:
+        intern.encadrant = data.get('encadrant')
+    intern.phone = data.get('phone', intern.phone)
+    intern.start_date = data.get('start_date', intern.start_date)
+    intern.end_date = data.get('end_date', intern.end_date)
+    intern.date_of_birth = data.get('date_of_birth', intern.date_of_birth)
+    intern.university = data.get('university', intern.university)
+    intern.address = data.get('address', intern.address)
+    
+    if 'photo_path' in data:
+        intern.photo_path = data.get('photo_path')
+    if 'documents' in data:
+        intern.documents = json.dumps(data.get('documents'))
+        
+    db.session.commit()
+    
+    current_user = get_jwt()
+    user_name = current_user.get('name') if current_user else 'Unknown'
+    log_action(user_name, f"قام بتعديل بيانات المتدرب: {intern.name}")
+    
+    return jsonify({"success": True})
+
+@app.route('/api/interns/<int:intern_id>/attendance', methods=['GET'])
+@jwt_required()
+def get_attendance(intern_id):
+    records = Attendance.query.filter_by(intern_id=intern_id).order_by(Attendance.date.desc()).all()
+    return jsonify([{"id": r.id, "date": r.date, "status": r.status} for r in records])
+
+@app.route('/api/interns/<int:intern_id>/attendance', methods=['POST'])
+@jwt_required()
+def mark_attendance(intern_id):
+    data = request.json
+    date = data.get('date')
+    status = data.get('status')
+    
+    if not date or not status:
+        return jsonify({"msg": "Date and status required"}), 400
+        
+    # Check if record exists for this date
+    record = Attendance.query.filter_by(intern_id=intern_id, date=date).first()
+    if record:
+        record.status = status
+    else:
+        record = Attendance(intern_id=intern_id, date=date, status=status)
+        db.session.add(record)
+        
+    db.session.commit()
+    return jsonify({"success": True, "id": record.id})
+
+@app.route('/api/attendance/by-date', methods=['GET'])
+@jwt_required()
+def get_attendance_by_date():
+    from datetime import date as dt_date
+    date_str = request.args.get('date')
+    if not date_str:
+        date_str = dt_date.today().isoformat()
+    records = Attendance.query.filter_by(date=date_str).all()
+    # return a dict mapping intern_id to status
+    att_dict = {r.intern_id: r.status for r in records}
+    return jsonify(att_dict)
+
+import io
+from flask import send_file
+
+@app.route('/api/interns/<int:intern_id>/attestation', methods=['GET'])
+@jwt_required()
+def generate_attestation(intern_id):
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import bidi.algorithm as bidi
+        import arabic_reshaper
+    except ImportError:
+        return jsonify({"msg": "PDF generation library not installed"}), 500
+        
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+        
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    # Try to load a font that supports Arabic if available, else fallback
+    # For a real production app, we would bundle a font like Amiri or Tahoma.
+    # We will use default Helvetica for French, and try to draw Arabic if possible.
+    
+    c.setFont("Helvetica-Bold", 24)
+    c.drawCentredString(width/2.0, height - 100, "ATTESTATION DE STAGE")
+    
+    c.setFont("Helvetica", 14)
+    text = f"Nous soussignes, certifions que Monsieur/Madame:"
+    c.drawString(50, height - 200, text)
+    
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, height - 230, f"{intern.name_fr or '__________________'}")
+    
+    c.setFont("Helvetica", 14)
+    c.drawString(50, height - 280, f"A effectue un stage au sein de notre departement:")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(50, height - 310, f"{intern.department or '__________________'}")
+    
+    c.setFont("Helvetica", 14)
+    c.drawString(50, height - 360, f"Encadre(e) par:")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(50, height - 390, f"{intern.encadrant or '__________________'}")
+    
+    c.setFont("Helvetica", 14)
+    c.drawString(50, height - 440, f"Période: du {intern.start_date or '___'} au {intern.end_date or '___'}")
+    
+    c.drawString(50, height - 500, "Cette attestation est delivree pour servir et valoir ce que de droit.")
+    
+    c.drawString(width - 200, 150, "Signature et Cachet:")
+    
+    c.showPage()
+    c.save()
+    
+    buffer.seek(0)
+    filename = f"Attestation_{intern.id}.pdf"
+    return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
+@app.route('/api/interns/<int:intern_id>', methods=['DELETE'])
+@jwt_required()
+def delete_intern(intern_id):
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+        
+    name = intern.name
+    db.session.delete(intern)
+    db.session.commit()
+    
+    current_user = get_jwt()
+    user_name = current_user.get('name') if current_user else 'Unknown'
+    log_action(user_name, f"قام بحذف المتدرب: {name}")
+    
+    return jsonify({"success": True})
+
+# --- FORM BUILDER ROUTES ---
+@app.route('/api/forms', methods=['GET'])
+@jwt_required()
+def get_form():
+    form = Form.query.first()
+    if form:
+        return jsonify({"success": True, "form_data": form.form_data})
+    return jsonify({"success": True, "form_data": "[]"})
+
+@app.route('/api/forms', methods=['POST'])
+@jwt_required()
+def save_form():
+    data = request.json
+    import json
+    form_data = json.dumps(data.get('form_data', []))
+    
+    form = Form.query.first()
+    if not form:
+        form = Form(form_data=form_data)
+        db.session.add(form)
+    else:
+        form.form_data = form_data
+        
+    db.session.commit()
+    
+    current_user = get_jwt()
+    user_name = current_user.get('name') if current_user else 'Unknown'
+    log_action(user_name, "قام بتحديث نموذج التسجيل")
+    
+    return jsonify({"success": True})
+
+# --- PUBLIC FORM ROUTES ---
+@app.route('/api/public-form', methods=['GET'])
+def get_public_form():
+    form = Form.query.first()
+    if form:
+        return jsonify({"success": True, "form_data": form.form_data})
+    return jsonify({"success": True, "form_data": "[]"})
+
+@app.route('/api/public-upload', methods=['POST'])
+def public_upload():
+    if 'file' not in request.files:
+        return jsonify({"msg": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "No selected file"}), 400
+        
+    if file:
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        file.seek(0)
+        if size > 15 * 1024 * 1024:
+            return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 15 ميجابايت"}), 400
+            
+        import uuid
+        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'bin'
+        filename = f"public_{uuid.uuid4().hex[:8]}.{ext}"
+        
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        return jsonify({"msg": "تم الرفع بنجاح", "filename": filename, "path": f"/api/uploads/{filename}"}), 201
+
+@app.route('/api/public-submit', methods=['POST'])
+def public_submit():
+    data = request.json
+    import json
+    
+    # Try to find name and email in the dynamic fields
+    name = "متدرب جديد (من الاستمارة)"
+    email = ""
+    phone = ""
+    photo_path = None
+    
+    for key, val in data.items():
+        key_lower = key.lower()
+        if "اسم" in key_lower or "name" in key_lower:
+            name = val
+        elif "بريد" in key_lower or "email" in key_lower:
+            email = val
+        elif "هاتف" in key_lower or "phone" in key_lower:
+            phone = val
+        elif isinstance(val, str) and val.startswith('/api/uploads/') and not photo_path:
+            # First uploaded image goes to photo_path
+            photo_path = val
+
+    new_intern = Intern(
+        name=name,
+        email=email,
+        phone=phone,
+        photo_path=photo_path,
+        status='قيد المراجعة',
+        documents=json.dumps(data)
+    )
+    db.session.add(new_intern)
+    db.session.commit()
+
+    # Create user account automatically
+    if email:
+        existing_user = User.query.filter_by(email=email).first()
+        if not existing_user:
+            from werkzeug.security import generate_password_hash
+            hashed_pw = generate_password_hash('password123')
+            new_user = User(
+                name=name,
+                email=email,
+                password=hashed_pw,
+                role='Intern',
+                permissions=''
+            )
+            db.session.add(new_user)
+            db.session.commit()
+
+    return jsonify({"success": True, "id": new_intern.id})
+
+# --- DOCUMENT VAULT ROUTES (separate from intern profile documents) ---
+VAULT_FOLDER = os.path.join(os.path.dirname(__file__), 'vault')
+os.makedirs(VAULT_FOLDER, exist_ok=True)
+
+@app.route('/api/vault', methods=['GET'])
+@jwt_required()
+def list_vault_documents():
     files = []
-    if os.path.exists(app.config['UPLOAD_FOLDER']):
-        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(VAULT_FOLDER):
+        for filename in os.listdir(VAULT_FOLDER):
+            filepath = os.path.join(VAULT_FOLDER, filename)
             if os.path.isfile(filepath):
                 files.append({
                     "name": filename,
@@ -175,6 +625,59 @@ def list_documents():
                 })
     return jsonify(files)
 
+@app.route('/api/vault', methods=['POST'])
+@jwt_required()
+def upload_vault_document():
+    if 'file' not in request.files:
+        return jsonify({"msg": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "No selected file"}), 400
+        
+    if file:
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({"msg": "عذراً، يُسمح فقط برفع ملفات PDF"}), 400
+            
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        file.seek(0)
+        if size > 5 * 1024 * 1024:
+            return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 5 ميجابايت"}), 400
+            
+        custom_name = request.form.get('custom_name')
+        if custom_name:
+            filename = custom_name.replace('/', '_').replace('\\', '_')
+            if not filename.lower().endswith('.pdf'):
+                filename += '.pdf'
+        else:
+            filename = secure_filename(file.filename)
+            if not filename:
+                filename = "vault_" + file.filename.replace('/', '_').replace('\\', '_')
+        file.save(os.path.join(VAULT_FOLDER, filename))
+        
+        current_user = get_jwt()
+        user_name = current_user.get('name') if current_user else 'Unknown'
+        log_action(user_name, f"قام برفع مستند للخزنة: {filename}")
+        
+        return jsonify({"msg": "تم رفع الملف بنجاح", "filename": filename}), 201
+
+@app.route('/api/vault/<filename>', methods=['GET'])
+def download_vault_document(filename):
+    return send_from_directory(VAULT_FOLDER, filename)
+
+@app.route('/api/vault/<filename>', methods=['DELETE'])
+@jwt_required()
+def delete_vault_document(filename):
+    filepath = os.path.join(VAULT_FOLDER, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        current_user = get_jwt()
+        user_name = current_user.get('name') if current_user else 'Unknown'
+        log_action(user_name, f"قام بحذف مستند من الخزنة: {filename}")
+        return jsonify({"success": True})
+    return jsonify({"msg": "File not found"}), 404
+
+# --- INTERN PROFILE DOCUMENT UPLOADS ---
 @app.route('/api/documents', methods=['POST'])
 @jwt_required()
 def upload_document():
@@ -185,27 +688,292 @@ def upload_document():
         return jsonify({"msg": "No selected file"}), 400
         
     if file:
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({"msg": "عذراً، يُسمح فقط برفع ملفات PDF"}), 400
+            
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        file.seek(0)
+        if size > 5 * 1024 * 1024:
+            return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 5 ميجابايت"}), 400
+            
         filename = secure_filename(file.filename)
-        # Fallback if secure_filename strips Arabic chars completely
-        if not filename:
-            filename = "doc_" + file.filename
+        if not filename or not filename.lower().endswith('.pdf'):
+            import uuid
+            filename = f"doc_{uuid.uuid4().hex[:8]}.pdf"
             
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         return jsonify({"msg": "تم رفع الملف بنجاح", "filename": filename}), 201
+
+@app.route('/api/upload_photo', methods=['POST'])
+@jwt_required()
+def upload_photo():
+    if 'file' not in request.files:
+        return jsonify({"msg": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "No selected file"}), 400
+        
+    if file:
+        if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+            return jsonify({"msg": "عذراً، يُسمح فقط برفع الصور (png, jpg, jpeg)"}), 400
+            
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        file.seek(0)
+        if size > 15 * 1024 * 1024:  # 15MB limit
+            return jsonify({"msg": "عذراً، حجم الصورة يجب أن لا يتجاوز 15 ميجابايت"}), 400
+            
+        filename = secure_filename(file.filename)
+        if not filename:
+            import uuid
+            filename = f"photo_{uuid.uuid4().hex}.jpg"
+            
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        return jsonify({"msg": "تم رفع الصورة بنجاح", "photo_path": f"/api/uploads/{filename}"}), 201
 
 @app.route('/api/documents/<filename>', methods=['GET'])
 def download_document(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-if __name__ == '__main__':
-    if not os.path.exists(DB_PATH):
-        init_db()
+@app.route('/api/uploads/<filename>', methods=['GET'])
+def serve_upload(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# --- SYSTEM LOGS ROUTE ---
+@app.route('/api/logs', methods=['GET'])
+@jwt_required()
+def get_logs():
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    logs = SystemLog.query.order_by(SystemLog.timestamp.desc()).limit(50).all()
+    return jsonify([{
+        "id": l.id, 
+        "timestamp": l.timestamp.isoformat(), 
+        "user": l.user, 
+        "action": l.action
+    } for l in logs])
+
+# --- DOCUMENT REQUESTS ROUTES ---
+@app.route('/api/interns/<int:intern_id>/requests', methods=['POST'])
+@jwt_required()
+def create_document_request(intern_id):
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    if request.is_json:
+        data = request.json
     else:
-        # Run init_db anyway to ensure new columns/admin user exist if we modified schema
+        data = request.form
+
+    doc_type = data.get('document_type')
+    custom_title = data.get('custom_title')
+    note = data.get('note')
+    
+    if not doc_type:
+        return jsonify({"msg": "Document type is required"}), 400
+        
+    template_path = None
+    if 'file' in request.files:
+        file = request.files['file']
+        if file and file.filename != '':
+            if file.filename.lower().endswith('.pdf'):
+                import uuid
+                filename = f"tpl_{uuid.uuid4().hex}.pdf"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                template_path = f"/api/uploads/{filename}"
+        
+    new_request = DocumentRequest(
+        intern_id=intern_id,
+        document_type=doc_type,
+        custom_title=custom_title,
+        note=note,
+        status='pending',
+        created_at=datetime.utcnow().isoformat(),
+        template_path=template_path
+    )
+    db.session.add(new_request)
+    db.session.commit()
+    
+    intern = Intern.query.get(intern_id)
+    title_str = custom_title if doc_type == 'other' else doc_type
+    log_action(current_user.get('name'), f"طلب مستند ({title_str}) من المتدرب {intern.name if intern else ''}")
+    
+    return jsonify({"msg": "Request created successfully", "request_id": new_request.id}), 201
+
+@app.route('/api/intern/profile', methods=['GET'])
+@jwt_required()
+def get_my_intern_profile():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+        
+    user_email = user.email
+    intern = Intern.query.filter_by(email=user_email).first()
+    if not intern:
+        return jsonify({"msg": "Intern not found for this account"}), 404
+        
+    import json
+    docs = {}
+    if intern.documents:
         try:
-            init_db()
-        except sqlite3.OperationalError:
-            # Table already exists but might need migration, doing simple ignore for now
+            docs = json.loads(intern.documents)
+        except:
             pass
             
+    return jsonify({
+        "id": intern.id, 
+        "name": intern.name,
+        "name_fr": intern.name_fr,
+        "email": intern.email, 
+        "national_id": intern.national_id,
+        "department": intern.department, 
+        "encadrant": intern.encadrant,
+        "status": intern.status,
+        "photo_path": intern.photo_path,
+        "phone": intern.phone,
+        "start_date": intern.start_date,
+        "end_date": intern.end_date,
+        "date_of_birth": intern.date_of_birth,
+        "university": intern.university,
+        "address": intern.address,
+        "documents": docs
+    }), 200
+
+@app.route('/api/intern/requests', methods=['GET'])
+@jwt_required()
+def get_my_requests():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+        
+    user_email = user.email
+    intern = Intern.query.filter_by(email=user_email).first()
+    if not intern:
+        return jsonify({"msg": "Intern not found for this account"}), 404
+        
+    reqs = DocumentRequest.query.filter_by(intern_id=intern.id, status='pending').all()
+    
+    result = []
+    for r in reqs:
+        result.append({
+            "id": r.id,
+            "document_type": r.document_type,
+            "custom_title": r.custom_title,
+            "note": r.note,
+            "created_at": r.created_at,
+            "template_path": r.template_path
+        })
+        
+    return jsonify(result), 200
+
+@app.route('/api/intern/requests/<int:request_id>/upload', methods=['POST'])
+@jwt_required()
+def upload_requested_document(request_id):
+    current_user = get_jwt()
+    user_email = current_user.get('email')
+    
+    intern = Intern.query.filter_by(email=user_email).first()
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+        
+    doc_request = DocumentRequest.query.get(request_id)
+    if not doc_request or doc_request.intern_id != intern.id:
+        return jsonify({"msg": "Request not found"}), 404
+        
+    if 'file' not in request.files:
+        return jsonify({"msg": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "No selected file"}), 400
+        
+    if file and file.filename.lower().endswith('.pdf'):
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        file.seek(0)
+        if size > 15 * 1024 * 1024:
+            return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 15 ميجابايت"}), 400
+            
+        filename = secure_filename(file.filename)
+        if not filename:
+            import uuid
+            filename = f"req_{uuid.uuid4().hex}.pdf"
+            
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        file_url = f"/api/uploads/{filename}"
+        
+        import json
+        docs = json.loads(intern.documents or "{}")
+        
+        if doc_request.document_type == 'other':
+            if 'others' not in docs:
+                docs['others'] = []
+            docs['others'].append({"name": doc_request.custom_title or 'مستند إضافي', "file": file_url})
+        else:
+            docs[doc_request.document_type] = file_url
+            
+        intern.documents = json.dumps(docs)
+        doc_request.status = 'fulfilled'
+        
+        db.session.commit()
+        log_action(current_user.get('name'), f"قام برفع مستند ({doc_request.custom_title or doc_request.document_type}) استجابة لطلب")
+        
+        return jsonify({"msg": "تم رفع المستند بنجاح"}), 200
+        
+    return jsonify({"msg": "Invalid file. Only PDF is allowed."}), 400
+
+@app.route('/api/intern/upload_unrequested', methods=['POST'])
+@jwt_required()
+def upload_unrequested_document():
+    current_user = get_jwt()
+    user_email = current_user.get('email')
+    
+    intern = Intern.query.filter_by(email=user_email).first()
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+        
+    doc_type = request.form.get('document_type')
+    if not doc_type:
+        return jsonify({"msg": "Document type is required"}), 400
+        
+    if 'file' not in request.files:
+        return jsonify({"msg": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "No selected file"}), 400
+        
+    if file and file.filename.lower().endswith('.pdf'):
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        file.seek(0)
+        if size > 15 * 1024 * 1024:
+            return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 15 ميجابايت"}), 400
+            
+        filename = secure_filename(file.filename)
+        if not filename:
+            import uuid
+            filename = f"doc_{uuid.uuid4().hex}.pdf"
+            
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        file_url = f"/api/uploads/{filename}"
+        
+        import json
+        docs = json.loads(intern.documents or "{}")
+        docs[doc_type] = file_url
+            
+        intern.documents = json.dumps(docs)
+        db.session.commit()
+        
+        log_action(current_user.get('name'), f"قام برفع مستند إضافي ({doc_type})")
+        return jsonify({"msg": "تم رفع المستند بنجاح"}), 200
+        
+    return jsonify({"msg": "Invalid file. Only PDF is allowed."}), 400
+
+if __name__ == '__main__':
+    init_db()
     app.run(port=5000, debug=True)
