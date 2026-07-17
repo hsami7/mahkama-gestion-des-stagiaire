@@ -44,7 +44,7 @@ export function InternSidebar({ activeTab, setActiveTab, internData, user, missi
                 {item.icon}
                 {item.name}
               </div>
-              {item.badge && <span className="badge-dot" style={{ marginLeft: 'auto' }}></span>}
+              {item.badge && <span className="badge-dot" style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', display: 'inline-block' }}></span>}
             </button>
           );
         })}

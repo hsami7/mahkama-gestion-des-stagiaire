@@ -155,7 +155,7 @@ export function InternPortal() {
         onLogout={handleLogout} 
       />
       <div className="main">
-        <Header title={getPageTitle(activeTab)} />
+        <Header title={getPageTitle(activeTab)} missingCount={missingCount} />
 
         <div className="view on">
           {/* STATUS */}
