@@ -875,8 +875,12 @@ def get_my_requests():
 @app.route('/api/intern/requests/<int:request_id>/upload', methods=['POST'])
 @jwt_required()
 def upload_requested_document(request_id):
-    current_user = get_jwt()
-    user_email = current_user.get('email')
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+        
+    user_email = user.email
     
     intern = Intern.query.filter_by(email=user_email).first()
     if not intern:
@@ -930,8 +934,12 @@ def upload_requested_document(request_id):
 @app.route('/api/intern/upload_unrequested', methods=['POST'])
 @jwt_required()
 def upload_unrequested_document():
-    current_user = get_jwt()
-    user_email = current_user.get('email')
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+        
+    user_email = user.email
     
     intern = Intern.query.filter_by(email=user_email).first()
     if not intern:
