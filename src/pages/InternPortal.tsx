@@ -375,10 +375,10 @@ export function InternPortal() {
               <div className="info-row"><div className="k">الاسم الكامل</div><div className="v">{internData?.name || user?.name}</div></div>
               <div className="info-row"><div className="k">البريد الإلكتروني</div><div className="v">{internData?.email || user?.email}</div></div>
               <div className="info-row"><div className="k">رقم الهاتف</div><div className="v">{internData?.phone || 'غير محدد'}</div></div>
-              <div className="info-row"><div className="k">تاريخ البدء</div><div className="v">{internData?.start_date ? new Date(internData.start_date).toLocaleDateString('ar-EG') : 'غير محدد'}</div></div>
-              <div className="info-row"><div className="k">تاريخ الانتهاء</div><div className="v">{internData?.end_date ? new Date(internData.end_date).toLocaleDateString('ar-EG') : 'غير محدد'}</div></div>
+              <div className="info-row"><div className="k">تاريخ البدء</div><div className="v">{(internData?.start_date && internData.start_date.trim() !== '') ? new Date(internData.start_date).toLocaleDateString('ar-EG') : 'غير محدد'}</div></div>
+              <div className="info-row"><div className="k">تاريخ الانتهاء</div><div className="v">{(internData?.end_date && internData.end_date.trim() !== '') ? new Date(internData.end_date).toLocaleDateString('ar-EG') : 'غير محدد'}</div></div>
               <div className="info-row"><div className="k">الجامعة أو المعهد</div><div className="v">{internData?.university || 'غير محدد'}</div></div>
-              <div className="info-row"><div className="k">تغيير كلمة المرور</div><div className="v">يرجى الذهاب إلى الإعدادات لتغيير كلمة المرور</div></div>
+              <div className="info-row" style={{ borderBottom: 'none', paddingBottom: 0 }}><div className="k">تغيير كلمة المرور</div><div className="v" style={{ paddingLeft: '8px' }}>يرجى الذهاب إلى الإعدادات لتغيير كلمة المرور</div></div>
             </div>
           </div>
 
