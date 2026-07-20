@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, WarningCircle, DownloadSimple, Certificate, CalendarCheck, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple } from '@phosphor-icons/react';
+import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -26,6 +26,18 @@ function toDateInputValue(value?: string): string {
   return '';
 }
 
+function formatDate(d: string | undefined | null): string {
+  if (!d) return '—';
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return d;
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const yyyy = dt.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  } catch { return d || '—'; }
+}
+
 export function Profile() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -35,20 +47,15 @@ export function Profile() {
   const [loading, setLoading] = useState(true);
   const [editingEncadrant, setEditingEncadrant] = useState(false);
   const [encadrantInput, setEncadrantInput] = useState('');
-  const [showRequestModal, setShowRequestModal] = useState(false);
-  const [requestTitle, setRequestTitle] = useState('');
-  const [requestNote, setRequestNote] = useState('');
-  const [requestDocType, setRequestDocType] = useState('other');
-  const [requestFile, setRequestFile] = useState<File | null>(null);
 
   // Document Lifecycle Center
   const [docsLifecycle, setDocsLifecycle] = useState<any[]>([]);
   const [assignDocType, setAssignDocType] = useState('CONVENTION_SIGNED');
   const [assignFile, setAssignFile] = useState<File | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [rejectDocId, setRejectDocId] = useState<number | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [revisionDocId, setRevisionDocId] = useState<number | null>(null);
+  const [revisionReason, setRevisionReason] = useState('');
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
 
   const DOC_TYPE_LABELS: Record<string, string> = {
     CIN: 'بطاقة التعريف الوطنية (CIN)',
@@ -59,14 +66,6 @@ export function Profile() {
     FINAL_REPORT: 'التقرير النهائي',
     ATTESTATION_SIGNED: 'شهادة التدريب الموقعة',
     OTHER: 'مستند إضافي',
-  };
-  
-  const openRequestModal = (docType: string, title: string) => {
-    setRequestDocType(docType);
-    setRequestTitle(title);
-    setRequestNote('');
-    setRequestFile(null);
-    setShowRequestModal(true);
   };
   
   // Approval Modal State
@@ -158,27 +157,6 @@ export function Profile() {
       setDurationStr('');
     }
   }, [approveStartDate, approveEndDate]);
-
-  const handleRequestDocument = async (docType: string, customTitle?: string) => {
-    try {
-      const formData = new FormData();
-      formData.append('document_type', docType);
-      formData.append('custom_title', customTitle || '');
-      formData.append('note', requestNote || '');
-      if (requestFile) {
-        formData.append('file', requestFile);
-      }
-
-      await api.post(`/interns/${id}/requests`, formData);
-      toast.success('تم إرسال الطلب بنجاح للمتدرب!');
-      setShowRequestModal(false);
-      setRequestTitle('');
-      setRequestNote('');
-      setRequestFile(null);
-    } catch (err) {
-      toast.error('حدث خطأ أثناء إرسال الطلب');
-    }
-  };
 
   const fetchInternAndAttendance = async () => {
     try {
@@ -473,17 +451,15 @@ export function Profile() {
           <h3><FileText weight="bold" className="icon" /> مركز المستندات</h3>
 
           <div style={{marginBottom: 12, display:'flex', gap: 8}}>
-            <button className={`btn btn-ghost sm`} onClick={() => { setAssignDocType('CONVENTION_SIGNED'); setAssignFile(null); setShowAssignModal(true); }} style={{fontSize:12, padding:'6px 12px'}}>
-              + رفع نسخة موقعة
-            </button>
-            <button className="btn btn-ghost sm" onClick={() => openRequestModal('other', '')} style={{fontSize:12, padding:'6px 12px'}}>
-              + طلب مستند
+            <button className="btn btn-ghost sm" onClick={() => { setAssignDocType('CONVENTION_SIGNED'); setAssignFile(null); setShowAssignModal(true); }} style={{fontSize:12, padding:'6px 12px'}}>
+              + رفع وثيقة موقعة
             </button>
           </div>
 
-          {/* Section 1: Incoming from Intern */}
+          {/* Section 1: المستندات المطلوبة من المتدرب (Incoming) */}
           <div style={{marginBottom:16}}>
-            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--gold-dark)'}}>الواردة من المتدرب</h4></div>
+            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--gold-dark)'}}>المستندات المطلوبة من المتدرب</h4></div>
+            {['CIN','CV','INSURANCE','DEMANDE','FINAL_REPORT'].filter(t => !['CONVENTION_SIGNED','ATTESTATION_SIGNED'].includes(t)).length === 0 && <div/>}
             <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
               <thead>
                 <tr style={{borderBottom:'1px solid var(--line)'}}>
@@ -494,78 +470,79 @@ export function Profile() {
                 </tr>
               </thead>
               <tbody>
-                {docsLifecycle.filter(d => d.uploaded_by !== 'ADMIN' || !d.uploaded_by).length === 0 && (
-                  <tr><td colSpan={4} style={{textAlign:'center', padding:'16px 4px', color:'var(--slate-light)'}}>لا توجد مستندات واردة</td></tr>
-                )}
-                {docsLifecycle.filter(d => d.uploaded_by !== 'ADMIN' || !d.uploaded_by).map(d => (
-                  <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
-                    <td style={{padding:'8px 4px'}}>
-                      <div style={{fontWeight:600, color:'var(--ink)'}}>{d.label}</div>
-                      {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
-                        <div style={{fontSize:11, color:'var(--danger)', marginTop:2}}>{d.rejection_reason}</div>
-                      )}
-                    </td>
-                    <td style={{textAlign:'center', padding:'8px 4px'}}>
-                      {d.status === 'PENDING_REVIEW' && <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span>}
-                      {d.status === 'APPROVED_AND_SIGNED' && <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>}
-                      {d.status === 'REVISION_REQUESTED' && <span className="badge badge-danger" style={{fontSize:11}}>مرفوض</span>}
-                      {d.status === 'MISSING' && <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>غير مرفوع</span>}
-                    </td>
-                    <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
-                      {d.created_at ? new Date(d.created_at).toLocaleDateString('fr-FR') : '—'}
-                    </td>
-                    <td style={{textAlign:'left', padding:'8px 4px'}}>
-                      <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                        {d.file_path && (
-                          <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            <DownloadSimple size={14} />
-                          </button>
+                {['CIN','CV','INSURANCE','DEMANDE','FINAL_REPORT'].map(dt => {
+                  const d = docsLifecycle.find(x => x.doc_type === dt);
+                  if (!d && dt !== 'FINAL_REPORT') return null;
+                  return (
+                    <tr key={dt} style={{borderBottom:'1px solid var(--line)'}}>
+                      <td style={{padding:'8px 4px'}}>
+                        <div style={{fontWeight:600, color:'var(--ink)'}}>{DOC_TYPE_LABELS[dt]}</div>
+                        {d?.rejection_reason && d.status === 'REVISION_REQUESTED' && (
+                          <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
+                            <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
+                          </div>
                         )}
-                        {d.status === 'PENDING_REVIEW' && (
-                          <>
+                      </td>
+                      <td style={{textAlign:'center', padding:'8px 4px'}}>
+                        {!d || d.status === 'MISSING' ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>غير مرفوع</span> :
+                         d.status === 'PENDING_REVIEW' ? <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span> :
+                         d.status === 'APPROVED_AND_SIGNED' ? <span className="badge badge-success" style={{fontSize:11}}>مقبول</span> :
+                         d.status === 'REVISION_REQUESTED' ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> : null}
+                      </td>
+                      <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
+                        {d?.created_at ? formatDate(d.created_at) : '—'}
+                      </td>
+                      <td style={{textAlign:'left', padding:'8px 4px'}}>
+                        <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                          {d?.file_path && (
+                            <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <DownloadSimple size={14} />
+                            </button>
+                          )}
+                          {d && d.status !== 'MISSING' && (
+                            <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                              🔄
+                            </button>
+                          )}
+                          {d?.status === 'PENDING_REVIEW' && (
                             <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                               <CheckCircle size={14} />
                             </button>
-                            <button className="btn btn-ghost sm" onClick={() => { setRejectDocId(d.id); setRejectReason(''); setShowRejectModal(true); }} title="رفض" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
-                              <WarningCircle size={14} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Section 2: Outgoing Signed Documents */}
+          {/* Section 2: الوثائق الموقعة من الإدارة (Outgoing Signed Docs) */}
           <div style={{marginBottom:16}}>
-            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--success)'}}>الصادرة (النسخ الموقعة)</h4></div>
+            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--success)'}}>الوثائق الموقعة من الإدارة</h4></div>
             <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
               <thead>
                 <tr style={{borderBottom:'1px solid var(--line)'}}>
-                  <th style={{textAlign:'right', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
+                  <th style={{textAlign:'right', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>الوثيقة</th>
                   <th style={{textAlign:'center', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>تاريخ الإرسال</th>
                   <th style={{textAlign:'left', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
                 </tr>
               </thead>
               <tbody>
-                {docsLifecycle.filter(d => d.uploaded_by === 'ADMIN' && d.status === 'APPROVED_AND_SIGNED').length === 0 && (
+                {docsLifecycle.filter(d => (d.uploaded_by === 'ADMIN' || d.doc_type === 'CONVENTION_SIGNED') && d.status === 'APPROVED_AND_SIGNED').length === 0 && (
                   <tr><td colSpan={3} style={{textAlign:'center', padding:'16px 4px', color:'var(--slate-light)'}}>لم يتم إصدار أي وثائق موقعة بعد</td></tr>
                 )}
-                {docsLifecycle.filter(d => d.uploaded_by === 'ADMIN' && d.status === 'APPROVED_AND_SIGNED').map(d => (
+                {docsLifecycle.filter(d => (d.uploaded_by === 'ADMIN' || d.doc_type === 'CONVENTION_SIGNED') && d.status === 'APPROVED_AND_SIGNED').map(d => (
                   <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
                     <td style={{padding:'8px 4px', fontWeight:600}}>{d.label}</td>
                     <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
-                      {d.updated_at ? new Date(d.updated_at).toLocaleDateString('fr-FR') : '—'}
+                      {formatDate(d.updated_at)}
                     </td>
                     <td style={{textAlign:'left', padding:'8px 4px'}}>
-                      {d.file_path && (
-                        <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          <DownloadSimple size={14} />
-                        </button>
-                      )}
+                      <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <DownloadSimple size={14} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -573,36 +550,48 @@ export function Profile() {
             </table>
           </div>
 
-          {/* Section 3: Exit Docs & Export */}
+          {/* Section 3: ختام التدريب والأرشيف (Exit Docs) */}
           <div style={{marginBottom:8}}>
-            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--brand)'}}>وثائق الخروج والتصدير</h4></div>
+            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--brand)'}}>ختام التدريب والأرشيف</h4></div>
             <div style={{display:'flex', flexDirection:'column', gap:8}}>
-              {[
-                { docType: 'FINAL_REPORT', label: 'التقرير النهائي' },
-                { docType: 'ATTESTATION_SIGNED', label: 'شهادة التدريب الموقعة' },
-              ].map(item => {
-                const doc = docsLifecycle.find(d => d.doc_type === item.docType);
-                const isDone = doc?.status === 'APPROVED_AND_SIGNED';
-                return (
-                  <div key={item.docType} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 6px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
-                    <div style={{display:'flex', alignItems:'center', gap:8}}>
-                      {isDone ? <CheckCircle weight="fill" style={{color:'var(--success)', width:16}} /> : <WarningCircle weight="fill" style={{color:'var(--slate-light)', width:16}} />}
-                      <span style={{fontWeight:600, fontSize:12.5}}>{item.label}</span>
-                      {isDone && <span className="badge badge-success" style={{fontSize:10}}>مكتمل</span>}
-                    </div>
-                    <div style={{display:'flex', gap:4}}>
-                      {doc?.file_path && (
-                        <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(doc.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0}}>
+              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 6px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
+                <div style={{display:'flex', alignItems:'center', gap:8}}>
+                  <Certificate weight="fill" style={{color:'var(--gold-dark)', width:16}} />
+                  <span style={{fontWeight:600, fontSize:12.5}}>شهادة التدريب</span>
+                </div>
+                <div style={{display:'flex', gap:4}}>
+                  {(() => {
+                    const att = docsLifecycle.find(d => d.doc_type === 'ATTESTATION_SIGNED');
+                    const final = docsLifecycle.find(d => d.doc_type === 'FINAL_REPORT');
+                    return <>
+                      {att?.file_path && (
+                        <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(att.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0}}>
                           <DownloadSimple size={14} />
                         </button>
                       )}
-                      <button className="btn btn-ghost sm" onClick={() => { setAssignDocType(item.docType); setAssignFile(null); setShowAssignModal(true); }} title="رفع" style={{width:28,height:28,padding:0,color:'var(--gold-dark)'}}>
+                      <button className="btn btn-ghost sm" onClick={() => { setAssignDocType('ATTESTATION_SIGNED'); setAssignFile(null); setShowAssignModal(true); }} title="رفع نسخة موقعة" style={{width:28,height:28,padding:0,color:'var(--gold-dark)'}}>
                         <UploadSimple size={14} />
                       </button>
-                    </div>
-                  </div>
-                );
-              })}
+                    </>;
+                  })()}
+                </div>
+              </div>
+              <button className="btn btn-ghost" style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:12.5, border:'1.5px dashed var(--line)', borderRadius:8, color:'var(--slate)'}} onClick={async () => {
+                if (!id) return;
+                try {
+                  const res = await fetch(`${API_BASE}/interns/${id}/export-zip?token=${sessionStorage.getItem('token')}`);
+                  if (!res.ok) throw new Error('Export failed');
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = `Intern_${id}_Archive.zip`; a.click();
+                  URL.revokeObjectURL(url);
+                } catch (e) {
+                  toast.error('فشل إنشاء الأرشيف');
+                }
+              }}>
+                <DownloadSimple weight="bold" size={16} style={{marginLeft:6}} />
+                📦 تحميل أرشيف الملفات ZIP
+              </button>
             </div>
           </div>
         </div>
@@ -764,72 +753,6 @@ export function Profile() {
         </div>
       )}
 
-      {showRequestModal && (
-        <div className="overlay on" style={{ display: 'flex' }}>
-          <div className="modal">
-            <div className="modal-head">
-              <h3>{requestDocType === 'other' ? 'طلب مستند جديد' : 'طلب إعادة رفع مستند'}</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowRequestModal(false)}>
-                ✕
-              </button>
-            </div>
-            
-            <div className="modal-body">
-              <div className="form-group">
-                <label>اسم المستند المطلوب</label>
-                <input 
-                  type="text" 
-                  className="input" 
-                  placeholder="مثال: شهادة طبية" 
-                  value={requestTitle}
-                  onChange={e => setRequestTitle(e.target.value)}
-                  disabled={requestDocType !== 'other'}
-                  style={requestDocType !== 'other' ? { background: 'var(--paper-2)', color: 'var(--slate)', border: 'none', fontWeight: 'bold' } : {}}
-                />
-              </div>
-              
-              <div className="form-group">
-                <label>ملاحظة للمتدرب (اختياري)</label>
-                <textarea 
-                  className="input" 
-                  style={{ width: '100%', padding: '11px 13px', border: '1px solid var(--line)', borderRadius: '8px', fontFamily: 'inherit', fontSize: '13.5px', background: 'var(--paper)', minHeight: '80px', resize: 'vertical' }}
-                  placeholder="أضف أي تفاصيل أو تعليمات..." 
-                  rows={3}
-                  value={requestNote}
-                  onChange={e => setRequestNote(e.target.value)}
-                ></textarea>
-              </div>
-
-              <div className="form-group">
-                <label>إرفاق نموذج (اختياري)</label>
-                <input 
-                  type="file" 
-                  className="input" 
-                  accept=".pdf"
-                  onChange={e => {
-                    if (e.target.files && e.target.files[0]) {
-                      setRequestFile(e.target.files[0]);
-                    } else {
-                      setRequestFile(null);
-                    }
-                  }}
-                />
-                <small style={{ color: 'var(--slate-light)', display: 'block', marginTop: '4px' }}>بصيغة PDF فقط - يمكن للمتدرب تحميله، تعبئته، ثم إعادة رفعه</small>
-              </div>
-            </div>
-            
-            <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={() => setShowRequestModal(false)}>
-                إلغاء
-              </button>
-              <button className="btn btn-gold" onClick={() => handleRequestDocument(requestDocType, requestTitle)} disabled={!requestTitle.trim()}>
-                إرسال الطلب
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showApproveModal && (
         <div className="overlay on" style={{ display: 'flex' }}>
           <div className="modal">
@@ -891,16 +814,21 @@ export function Profile() {
         <div className="overlay on" style={{ display: 'flex' }}>
           <div className="modal">
             <div className="modal-head">
-              <h3>رفع نسخة موقعة</h3>
+              <h3>رفع وثيقة موقعة</h3>
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowAssignModal(false)}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>نوع المستند</label>
+                <label>نوع الوثيقة</label>
                 <select className="input" value={assignDocType} onChange={e => setAssignDocType(e.target.value)}>
-                  {Object.entries(DOC_TYPE_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
+                  <option value="CONVENTION_SIGNED">اتفاقية التدريب الموقعة</option>
+                  <option value="CIN">بطاقة التعريف الوطنية (CIN)</option>
+                  <option value="CV">السيرة الذاتية (CV)</option>
+                  <option value="INSURANCE">التأمين (Assurance)</option>
+                  <option value="DEMANDE">طلب التدريب (Demande)</option>
+                  <option value="FINAL_REPORT">التقرير النهائي</option>
+                  <option value="ATTESTATION_SIGNED">شهادة التدريب الموقعة</option>
+                  <option value="OTHER">مستند إضافي</option>
                 </select>
               </div>
               <div className="form-group">
@@ -915,50 +843,51 @@ export function Profile() {
                 if (!assignFile) return;
                 try {
                   await api.uploadSignedDocument(Number(id), assignDocType, assignFile);
-                  toast.success('تم رفع النسخة الموقعة بنجاح');
+                  toast.success('تم رفع الوثيقة الموقعة بنجاح');
                   setShowAssignModal(false);
                   setAssignFile(null);
                   fetchDocsLifecycle();
                 } catch (err) {
-                  toast.error('فشل رفع النسخة الموقعة');
+                  toast.error('فشل رفع الوثيقة الموقعة');
                 }
               }}>
-                رفع النسخة الموقعة
+                رفع الوثيقة الموقعة
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {showRejectModal && (
+      {showRevisionModal && (
         <div className="overlay on" style={{ display: 'flex' }}>
           <div className="modal">
             <div className="modal-head">
-              <h3>رفض المستند</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowRejectModal(false)}>✕</button>
+              <h3>طلب إعادة رفع المستند</h3>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowRevisionModal(false)}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>سبب الرفض</label>
-                <textarea className="input" rows={4} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="يرجى توضيح سبب الرفض للمتدرب..." style={{resize:'vertical'}} />
+                <label>سبب طلب إعادة الرفع</label>
+                <textarea className="input" rows={4} value={revisionReason} onChange={e => setRevisionReason(e.target.value)} placeholder="يرجى توضيح سبب طلب إعادة الرفع للمتدرب..." style={{resize:'vertical'}} />
+                <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>سيظهر السبب للمتدرب في لوحة المستندات الخاصة به</small>
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={() => setShowRejectModal(false)}>إلغاء</button>
-              <button className="btn btn-danger" style={{background:'var(--danger)',color:'#fff',border:'none'}} disabled={!rejectReason.trim() || !rejectDocId} onClick={async () => {
-                if (!rejectDocId) return;
+              <button className="btn btn-ghost" onClick={() => setShowRevisionModal(false)}>إلغاء</button>
+              <button className="btn btn-danger" style={{background:'var(--danger)',color:'#fff',border:'none'}} disabled={!revisionReason.trim() || !revisionDocId} onClick={async () => {
+                if (!revisionDocId) return;
                 try {
-                  await api.rejectDocument(Number(id), rejectDocId, rejectReason);
-                  toast.success('تم رفض المستند');
-                  setShowRejectModal(false);
-                  setRejectReason('');
-                  setRejectDocId(null);
+                  await api.rejectDocument(Number(id), revisionDocId, revisionReason);
+                  toast.success('تم إرسال طلب إعادة الرفع');
+                  setShowRevisionModal(false);
+                  setRevisionReason('');
+                  setRevisionDocId(null);
                   fetchDocsLifecycle();
                 } catch (err) {
-                  toast.error('فشل رفض المستند');
+                  toast.error('فشل إرسال الطلب');
                 }
               }}>
-                تأكيد الرفض
+                إرسال طلب إعادة الرفع
               </button>
             </div>
           </div>

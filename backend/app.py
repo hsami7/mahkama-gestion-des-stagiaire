@@ -1784,5 +1784,35 @@ def list_my_documents():
         }
         result.append(entry)
     return jsonify(result), 200
+
+
+# --- ZIP ARCHIVE EXPORT ---
+
+@app.route('/api/interns/<int:intern_id>/export-zip', methods=['GET'])
+@jwt_required()
+def export_intern_zip(intern_id):
+    current_user = get_jwt()
+    if current_user.get('role') not in ('Admin', 'Manager'):
+        return jsonify({"msg": "Unauthorized"}), 403
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+    import tempfile, zipfile
+    docs = DocumentLifecycle.query.filter_by(intern_id=intern_id).filter(
+        DocumentLifecycle.file_path.isnot(None)
+    ).all()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+    with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for d in docs:
+            fname = d.file_path.replace('/api/uploads/', '').replace('/', '')
+            fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+            if os.path.exists(fpath):
+                arcname = f"{d.doc_type or 'doc'}_{d.id}_{fname}"
+                zf.write(fpath, arcname)
+    tmp.close()
+    return send_file(tmp.name, as_attachment=True, download_name=f"Intern_{intern_id}_Archive.zip", mimetype='application/zip')
+
+
+if __name__ == '__main__':
     init_db()
     app.run(port=5055, debug=True)

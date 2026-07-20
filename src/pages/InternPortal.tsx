@@ -16,6 +16,18 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   OTHER: 'مستند إضافي',
 };
 
+function formatDate(d: string | undefined | null): string {
+  if (!d) return '—';
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return d;
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const yyyy = dt.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  } catch { return d || '—'; }
+}
+
 export function InternPortal() {
   const [activeTab, setActiveTab] = useState('status');
   const [bellOpen, setBellOpen] = useState(false);
@@ -28,13 +40,6 @@ export function InternPortal() {
 
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
-
-  const buildFileUrl = (path: string) => {
-    if (!path) return '';
-    if (path.startsWith('http')) return path;
-    const name = path.replace(/^\/api\/uploads\//, '').replace(/^\//, '');
-    return `http://127.0.0.1:5055/api/uploads/${name}`;
-  };
 
   const seenRequests = useRef<Set<number>>(new Set());
 
@@ -313,48 +318,59 @@ export function InternPortal() {
 
           {/* DOCUMENTS — unified view */}
           <div className={`view ${activeTab === 'documents' ? 'on' : ''}`}>
-            <div className="section-title"><h2 style={{fontSize:19, margin:0}}>المستندات</h2></div>
-            <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>المستندات المستلمة من الإدارة والملفات التي قمت برفعها</p>
+            <div className="section-title"><h2 style={{fontSize:19, margin:0}}>المستندات والوثائق</h2></div>
+            <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>الوثائق الرسمية الموقعة من الإدارة والمستندات المطلوب منك رفعها</p>
 
-            {/* Card 1: Received from Admin */}
-            <div className="card" style={{padding:24, marginBottom: 18}}>
+            {/* Card 1: الوثائق الرسمية الموقعة */}
+            <div className="card" style={{padding:24, marginBottom: 18, borderTop:'3px solid var(--success)'}}>
               <div className="section-title" style={{marginBottom:16}}>
-                <h3 style={{fontSize:15, margin:0, color:'var(--success)'}}>المستندات المستلمة من الإدارة</h3>
+                <h3 style={{fontSize:15, margin:0, color:'var(--success)'}}>الوثائق الرسمية الموقعة</h3>
               </div>
-              {lifecycleDocs.filter(d => d.uploaded_by === 'ADMIN' || d.status === 'APPROVED_AND_SIGNED').length === 0 && (
-                <div style={{textAlign:'center', padding:'20px', color:'var(--slate-light)', fontSize:13}}>لا توجد مستندات مستلمة بعد من الإدارة</div>
+              {lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED').length === 0 && (
+                <div style={{textAlign:'center', padding:'20px', color:'var(--slate-light)', fontSize:13}}>لا توجد وثائق رسمية موقعة بعد</div>
               )}
-              {lifecycleDocs.filter(d => d.uploaded_by === 'ADMIN' || d.status === 'APPROVED_AND_SIGNED').map(d => (
+              {lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED').map(d => (
                 <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)'}}>
                   <div className="di"><CheckCircle weight="fill" style={{color:'var(--success)', width:18}} /></div>
                   <div>
                     <div className="dn">{d.label}</div>
-                    <div className="ds" style={{color:'var(--success)'}}>تم الاستلام — {d.updated_at ? new Date(d.updated_at).toLocaleDateString('fr-FR') : ''}</div>
+                    <div className="ds" style={{color:'var(--success)'}}>
+                      تم التوقيع — {formatDate(d.updated_at)}
+                    </div>
                   </div>
                   <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
                     {d.file_path && (
-                      <a href={api.downloadDocument(d.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
-                        <DownloadSimple size={14} /> تحميل
-                      </a>
+                      <>
+                        <a href={api.downloadDocument(d.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm">
+                          معاينة
+                        </a>
+                        <a href={api.downloadDocument(d.id)} download className="btn btn-ink sm" style={{padding:'6px 14px'}}>
+                          <DownloadSimple size={14} /> تحميل
+                        </a>
+                      </>
                     )}
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Card 2: Upload Your Files */}
-            <div className="card" style={{padding:24}}>
+            {/* Card 2: المستندات المطلوبة مني */}
+            <div className="card" style={{padding:24, borderTop:'3px solid var(--gold-dark)'}}>
               <div className="section-title" style={{marginBottom:16}}>
-                <h3 style={{fontSize:15, margin:0, color:'var(--gold-dark)'}}>رفع ملفاتك</h3>
+                <h3 style={{fontSize:15, margin:0, color:'var(--gold-dark)'}}>المستندات المطلوبة مني</h3>
               </div>
-              {requests.filter(r => !isRequestUploaded(r)).length > 0 && (
-                <div style={{background:'#FFF6E5', border:'1px solid #F2D49B', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:12.5, color:'#9A6B00'}}>
-                  لديك طلبات مستندات من الإدارة بانتظار الرفع
-                  {requests.filter(r => !isRequestUploaded(r)).map(r => (
-                    <div key={r.id} style={{marginTop:6, fontWeight:600}}>• {r.custom_title || r.document_type}{r.note ? `: ${r.note}` : ''}</div>
+
+              {/* Revision requests banner */}
+              {lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length > 0 && (
+                <div style={{background:'#FFF6E5', border:'1.5px solid #F2D49B', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:12.5, color:'#9A6B00', fontWeight:600}}>
+                  {lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).map(d => (
+                    <div key={d.id} style={{marginTop:d.rejection_reason ? 6 : 0}}>
+                      ⚠️ ملاحظة الإدارة: {d.label} — {d.rejection_reason}
+                    </div>
                   ))}
                 </div>
               )}
+
               <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
                 <thead>
                   <tr style={{borderBottom:'1px solid var(--line)'}}>
@@ -364,18 +380,20 @@ export function InternPortal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {['CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED'].map(docType => {
+                  {['CIN','CV','INSURANCE','DEMANDE','FINAL_REPORT'].map(docType => {
                     const doc = lifecycleDocs.find(d => d.doc_type === docType);
                     const req = requests.find(r => r.document_type === docType);
-                    const status = doc?.status === 'APPROVED_AND_SIGNED' ? 'approved' : doc?.status === 'REVISION_REQUESTED' ? 'rejected' : doc?.file_path ? 'uploaded' : 'missing';
-                    const statusLabel = status === 'approved' ? 'مقبول' : status === 'rejected' ? 'مطلوب إعادة الرفع' : status === 'uploaded' ? 'قيد المراجعة' : 'غير مرفوع';
-                    const statusColor = status === 'approved' ? 'var(--success)' : status === 'rejected' ? 'var(--danger)' : status === 'uploaded' ? 'var(--gold)' : 'var(--slate-light)';
+                    const status = doc?.status === 'APPROVED_AND_SIGNED' ? 'approved' : doc?.status === 'REVISION_REQUESTED' ? 'rejected' : doc?.file_path ? 'pending' : 'missing';
+                    const statusLabel = status === 'approved' ? 'مقبول ✓' : status === 'rejected' ? 'مطلوب إعادة الرفع' : status === 'pending' ? 'قيد المراجعة' : 'غير مرفوع';
+                    const statusColor = status === 'approved' ? 'var(--success)' : status === 'rejected' ? 'var(--danger)' : status === 'pending' ? 'var(--gold)' : 'var(--slate-light)';
                     return (
                       <tr key={docType} style={{borderBottom:'1px solid var(--line)'}}>
                         <td style={{padding:'10px 4px', fontWeight:600}}>
                           {DOC_TYPE_LABELS[docType]}
                           {doc?.rejection_reason && status === 'rejected' && (
-                            <div style={{fontSize:11, color:'var(--danger)', marginTop:2}}>{doc.rejection_reason}</div>
+                            <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
+                              <span style={{fontWeight:600}}>⚠️ ملاحظة الإدارة:</span> {doc.rejection_reason}
+                            </div>
                           )}
                         </td>
                         <td style={{textAlign:'center', padding:'10px 4px', color: statusColor, fontWeight:600, fontSize:12}}>{statusLabel}</td>
@@ -390,39 +408,7 @@ export function InternPortal() {
                               <>
                                 <input type="file" id={`doc-upload-${docType}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleProactiveUpload(docType, e.target.files[0]); }} />
                                 <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`doc-upload-${docType}`)?.click()} disabled={uploading === docType}>
-                                  {uploading === docType ? 'جاري...' : 'رفع'}
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {/* Custom requests from admin */}
-                  {requests.filter(r => !['CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED', 'FINAL_REPORT', 'ATTESTATION_SIGNED'].includes(r.document_type)).map(req => {
-                    const uploaded = lifecycleDocs.find(d => d.custom_title === req.custom_title && d.file_path);
-                    return (
-                      <tr key={req.id} style={{borderBottom:'1px solid var(--line)'}}>
-                        <td style={{padding:'10px 4px', fontWeight:600}}>
-                          {req.custom_title || req.document_type}
-                          {req.note && <div style={{fontSize:11, color:'var(--slate)', marginTop:2}}>{req.note}</div>}
-                        </td>
-                        <td style={{textAlign:'center', padding:'10px 4px'}}>
-                          {uploaded ? <span style={{color:'var(--gold)', fontWeight:600, fontSize:12}}>قيد المراجعة</span> : <span style={{color:'var(--danger)', fontWeight:600, fontSize:12}}>مطلوب</span>}
-                        </td>
-                        <td style={{textAlign:'left', padding:'10px 4px'}}>
-                          <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                            {uploaded?.file_path && (
-                              <a href={api.downloadDocument(uploaded.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                <DownloadSimple size={14} />
-                              </a>
-                            )}
-                            {!uploaded && (
-                              <>
-                                <input type="file" id={`req-upload-${req.id}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleUpload(req.id, e.target.files[0]); }} />
-                                <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`req-upload-${req.id}`)?.click()} disabled={uploading === req.id}>
-                                  {uploading === req.id ? 'جاري...' : 'رفع'}
+                                  📤 {uploading === docType ? 'جاري...' : 'رفع نسخة معدلة'}
                                 </button>
                               </>
                             )}
@@ -451,8 +437,8 @@ export function InternPortal() {
               <div className="info-row"><div className="k">الاسم الكامل</div><div className="v">{internData?.name || user?.name}</div></div>
               <div className="info-row"><div className="k">البريد الإلكتروني</div><div className="v">{internData?.email || user?.email}</div></div>
               <div className="info-row"><div className="k">رقم الهاتف</div><div className="v">{internData?.phone || 'غير محدد'}</div></div>
-              <div className="info-row"><div className="k">تاريخ البدء</div><div className="v">{(internData?.start_date && internData.start_date.trim() !== '') ? new Date(internData.start_date).toLocaleDateString('ar-EG') : 'غير محدد'}</div></div>
-              <div className="info-row"><div className="k">تاريخ الانتهاء</div><div className="v">{(internData?.end_date && internData.end_date.trim() !== '') ? new Date(internData.end_date).toLocaleDateString('ar-EG') : 'غير محدد'}</div></div>
+              <div className="info-row"><div className="k">تاريخ البدء</div><div className="v">{formatDate(internData?.start_date)}</div></div>
+              <div className="info-row"><div className="k">تاريخ الانتهاء</div><div className="v">{formatDate(internData?.end_date)}</div></div>
               <div className="info-row"><div className="k">الجامعة أو المعهد</div><div className="v">{internData?.university || 'غير محدد'}</div></div>
               <div className="info-row" style={{ borderBottom: 'none', paddingBottom: 0 }}><div className="k">تغيير كلمة المرور</div><div className="v" style={{ paddingLeft: '8px' }}>يرجى الذهاب إلى الإعدادات لتغيير كلمة المرور</div></div>
             </div>
