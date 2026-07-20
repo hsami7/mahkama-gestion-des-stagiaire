@@ -40,9 +40,22 @@ export function InternPortal() {
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
 
-  const fetchRequests = async () => {
+  const seenRequests = useRef<Set<number>>(new Set());
+
+  const fetchRequests = async (notifyNew: boolean = false) => {
     try {
       const data = await api.get('/intern/requests');
+      if (notifyNew) {
+        data.forEach((r: any) => {
+          if (!seenRequests.current.has(r.id)) {
+            seenRequests.current.add(r.id);
+            const title = r.custom_title || r.document_type;
+            showToast(`طلب جديد: يرجى إعادة رفع "${title}"${r.note ? ' — ' + r.note : ''}`, 'warning');
+          }
+        });
+      } else {
+        data.forEach((r: any) => seenRequests.current.add(r.id));
+      }
       setRequests(data);
     } catch (err) {
       console.error(err);
@@ -63,6 +76,14 @@ export function InternPortal() {
   useEffect(() => {
     fetchRequests();
     fetchProfile();
+  }, []);
+
+  // Poll for newly created document requests and notify the intern
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchRequests(true);
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = () => {
@@ -95,8 +116,9 @@ export function InternPortal() {
       await api.post(`/intern/requests/${requestId}/upload`, formData);
       showToast('تم رفع المستند بنجاح!', 'success');
       fetchRequests();
-    } catch (err) {
-      showToast('حدث خطأ أثناء الرفع', 'error');
+      fetchProfile();
+    } catch (err: any) {
+      showToast(err?.message || 'حدث خطأ أثناء الرفع', 'error');
     } finally {
       setUploading(null);
     }
@@ -122,17 +144,25 @@ export function InternPortal() {
       await api.post(`/intern/upload_unrequested`, formData);
       showToast('تم رفع المستند بنجاح!', 'success');
       fetchProfile();
-    } catch (err) {
-      showToast('حدث خطأ أثناء الرفع', 'error');
+    } catch (err: any) {
+      showToast(err?.message || 'حدث خطأ أثناء الرفع', 'error');
     } finally {
       setUploading(null);
     }
   };
 
   const totalRequests = requests.length;
-  // Let's pretend all requests that are fetched are "missing". If we fetch from /requests, we only get 'pending' ones.
-  // We can't dynamically count "done" here easily without a better endpoint, so we will show pending count.
-  const missingCount = requests.length;
+  // A request is only "missing" if the corresponding document is not yet uploaded.
+  const missingCount = useMemo(() => {
+    const docs = internData?.documents;
+    const others = (docs && Array.isArray(docs.others)) ? docs.others : [];
+    return requests.filter((r: any) => {
+      if (r.document_type === 'other') {
+        return !others.some((o: any) => o.name === r.custom_title && o.file && o.file.trim() !== '');
+      }
+      return !(docs && typeof docs[r.document_type] === 'string' && docs[r.document_type].trim() !== '');
+    }).length;
+  }, [requests, internData?.documents]);
 
   const getPageTitle = (tab: string) => {
     switch (tab) {
@@ -292,6 +322,11 @@ export function InternPortal() {
                       <div className="ds" style={{ color: req && !uploaded ? 'var(--danger)' : '' }}>
                         {uploaded ? 'مرفق متوفر' : req ? 'مطلوبة — بانتظار الرفع' : 'غير متوفر'}
                       </div>
+                      {req?.note && req.note.trim() !== '' && !uploaded && (
+                        <div className="req-note" style={{ fontSize: 12, color: 'var(--slate)', marginTop: 6, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', lineHeight: 1.6 }}>
+                          <b style={{ color: 'var(--ink)' }}>ملاحظة: </b>{req.note}
+                        </div>
+                      )}
                     </div>
                     <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
                       {uploaded && uploaded.file_path ? (
@@ -324,12 +359,20 @@ export function InternPortal() {
               })}
 
               {/* Render Custom Requests */}
-              {requests.filter(r => !['cin', 'convention', 'demande', 'insurance', 'cv'].includes(r.document_type)).map(req => (
+              {requests.filter(r => !['cin', 'convention', 'demande', 'insurance', 'cv'].includes(r.document_type)).filter(req => {
+                const others = (internData?.documents && Array.isArray(internData.documents.others)) ? internData.documents.others : [];
+                return !(req.document_type === 'other' && others.some((o: any) => o.name === req.custom_title && o.file && o.file.trim() !== ''));
+              }).map(req => (
                 <div className="doc-item missing" key={req.id}>
                   <div className="di"><svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></div>
                   <div>
                     <div className="dn">{req.custom_title || req.document_type}</div>
                     <div className="ds" style={{ color: 'var(--danger)' }}>مطلوبة — بانتظار الرفع</div>
+                    {req.note && req.note.trim() !== '' && (
+                      <div className="req-note" style={{ fontSize: 12, color: 'var(--slate)', marginTop: 6, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', lineHeight: 1.6 }}>
+                        <b style={{ color: 'var(--ink)' }}>ملاحظة: </b>{req.note}
+                      </div>
+                    )}
                   </div>
                   <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
                     {req.template_path && (
