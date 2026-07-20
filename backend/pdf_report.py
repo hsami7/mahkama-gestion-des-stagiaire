@@ -261,8 +261,9 @@ def _fallback_avatar(side):
 def _thumbnail_square(data, px=400):
     """Center-crop to a square and downscale to px, returning small JPEG bytes."""
     try:
-        from PIL import Image as PILImage
+        from PIL import Image as PILImage, ImageOps
         img = PILImage.open(io.BytesIO(data))
+        img = ImageOps.exif_transpose(img)
         if img.mode not in ("RGB", "L"):
             img = img.convert("RGB")
         w, h = img.size
