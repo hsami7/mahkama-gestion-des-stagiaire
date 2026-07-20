@@ -56,6 +56,8 @@ export function Profile() {
   const [revisionDocId, setRevisionDocId] = useState<number | null>(null);
   const [revisionReason, setRevisionReason] = useState('');
   const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [vaultDocs, setVaultDocs] = useState<any[]>([]);
+  const [showVaultModal, setShowVaultModal] = useState(false);
 
   const DOC_TYPE_LABELS: Record<string, string> = {
     CIN: 'بطاقة التعريف الوطنية (CIN)',
@@ -453,6 +455,9 @@ export function Profile() {
           <div style={{marginBottom: 12, display:'flex', gap: 8}}>
             <button className="btn btn-ghost sm" onClick={() => { setAssignDocType('CONVENTION_SIGNED'); setAssignFile(null); setShowAssignModal(true); }} style={{fontSize:12, padding:'6px 12px'}}>
               + رفع وثيقة موقعة
+            </button>
+            <button className="btn btn-ghost sm" onClick={async () => { try { const d = await api.get('/vault'); setVaultDocs(d); setShowVaultModal(true); } catch {} }} style={{fontSize:12, padding:'6px 12px'}}>
+              📄 إضافة من الخزنة
             </button>
           </div>
 
@@ -889,6 +894,40 @@ export function Profile() {
               }}>
                 إرسال طلب إعادة الرفع
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showVaultModal && (
+        <div className="overlay on" style={{ display: 'flex' }}>
+          <div className="modal" style={{maxWidth:500}}>
+            <div className="modal-head">
+              <h3>📁 إضافة من خزنة المستندات</h3>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowVaultModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {vaultDocs.length === 0 && <div style={{textAlign:'center',padding:20,color:'var(--slate-light)'}}>الخزنة فارغة</div>}
+              {vaultDocs.map((vd: any) => (
+                <div key={vd.name} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 4px',borderBottom:'1px solid var(--line)'}}>
+                  <div style={{fontWeight:600,fontSize:13,flex:1}}>{vd.name}</div>
+                  <button className="btn btn-ghost sm" style={{padding:'4px 10px',fontSize:11}} onClick={async () => {
+                    try {
+                      await api.post(`/interns/${id}/vault-attach`, { vault_name: vd.name, doc_type: 'OTHER' });
+                      toast.success('تمت إضافة المستند من الخزنة');
+                      setShowVaultModal(false);
+                      fetchDocsLifecycle();
+                    } catch (err) {
+                      toast.error('فشلت الإضافة من الخزنة');
+                    }
+                  }}>
+                    إضافة للمتدرب
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-ghost" onClick={() => setShowVaultModal(false)}>إغلاق</button>
             </div>
           </div>
         </div>

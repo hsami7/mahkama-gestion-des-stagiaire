@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Users, SquaresFour, Gear, SignOut, ShieldCheck, House, CalendarCheck, ChartLine } from '@phosphor-icons/react';
+import { Users, FileText, SquaresFour, Gear, Archive, SignOut, ShieldCheck, House, CalendarCheck, ChartLine } from '@phosphor-icons/react';
 
 export function Sidebar() {
   const location = useLocation();
@@ -13,25 +13,32 @@ export function Sidebar() {
   
   let canViewAttendance = isAdmin;
   let canViewInterns = isAdmin;
+  let canViewForms = isAdmin;
+  let canViewVault = isAdmin;
 
   if (!isAdmin && user?.permissions) {
     try {
       const perms = JSON.parse(user.permissions);
-      if (perms?.attendance?.view !== false) canViewAttendance = true; // default true for non-interns unless explicitly false
+      if (perms?.attendance?.view !== false) canViewAttendance = true;
       if (perms?.interns?.view !== false) canViewInterns = true;
+      if (perms?.forms?.view !== false) canViewForms = true;
+      if (perms?.vault?.view !== false) canViewVault = true;
     } catch (e) {}
   }
 
-  // If role is manager, give them access by default if permissions are not set
   if (user?.role === 'Manager') {
     if (!user?.permissions) {
       canViewAttendance = true;
       canViewInterns = true;
+      canViewForms = true;
+      canViewVault = true;
     } else {
       try {
         const perms = JSON.parse(user.permissions);
         canViewAttendance = perms?.attendance?.view === true;
         canViewInterns = perms?.interns?.view === true;
+        canViewForms = perms?.forms?.view === true;
+        canViewVault = perms?.vault?.view === true;
       } catch (e) {}
     }
   }
@@ -39,6 +46,8 @@ export function Sidebar() {
   const baseNavItems = [
     { name: 'لوحة القيادة', path: '/', icon: <SquaresFour size={24} />, show: !isIntern },
     { name: 'المتدربين', path: '/interns', icon: <Users size={24} />, show: !isIntern && canViewInterns },
+    { name: '≡ منشئ النماذج', path: '/form-builder', icon: <FileText size={24} />, show: !isIntern && canViewForms },
+    { name: '📁 خزنة المستندات', path: '/vault', icon: <Archive size={24} />, show: !isIntern && canViewVault },
     { name: 'سجل الحضور اليومي', path: '/attendance', icon: <CalendarCheck size={24} />, show: !isIntern && canViewAttendance },
     { name: 'مخطط التغطية', path: '/timeline', icon: <ChartLine size={24} />, show: !isIntern },
     { name: 'المستخدمين والصلاحيات', path: '/users', icon: <ShieldCheck size={24} />, show: isAdmin },

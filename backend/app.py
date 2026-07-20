@@ -57,8 +57,9 @@ def safe_filename(prefix: str, original: str) -> str:
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
     name = db.Column(db.String(150), nullable=False)
-    email = db.Column(db.String(150), unique=True, nullable=False)
+    email = db.Column(db.String(150), unique=True, nullable=True)
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(50), nullable=False)
     permissions = db.Column(db.Text, nullable=True)
@@ -171,17 +172,41 @@ def init_db():
         except Exception as e:
             db.session.rollback()
             print(f"Migration check failed: {e}")
+        # Auto-add username column to users table
+        try:
+            ucols = [c['name'] for c in db.inspect(db.engine).get_columns('users')]
+            if 'username' not in ucols:
+                db.session.execute(db.text('ALTER TABLE users ADD COLUMN username VARCHAR(80)'))
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"User migration failed: {e}")
+        # Populate username from email for existing users
+        try:
+            for u in User.query.filter_by(username=None).all():
+                if u.email:
+                    u.username = u.email
+                else:
+                    u.username = f"user_{u.id}"
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         # Migrate legacy doc JSON to DocumentLifecycle
         try:
             _migrate_legacy_documents()
         except Exception as e:
             print(f"Document migration skipped: {e}")
         # Create default Admin user if none exists
-        admin = User.query.filter_by(email='admin@mahkama.ma').first()
+        admin = User.query.filter_by(username='admin').first()
         if not admin:
-            hashed_pw = generate_password_hash('admin123')
-            admin = User(name='مدير النظام', email='admin@mahkama.ma', password=hashed_pw, role='Admin')
-            db.session.add(admin)
+            # Check if there's an admin by email for backward compat
+            admin = User.query.filter_by(email='admin@mahkama.ma').first()
+            if admin:
+                admin.username = 'admin'
+            else:
+                hashed_pw = generate_password_hash('admin123')
+                admin = User(username='admin', name='مدير النظام', password=hashed_pw, role='Admin')
+                db.session.add(admin)
             db.session.commit()
 
 
@@ -250,13 +275,12 @@ def _migrate_legacy_documents():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
-    email = data.get('email')
+    username = data.get('username', '').strip()
     password = data.get('password')
     
-    user = User.query.filter_by(email=email).first()
+    user = User.query.filter_by(username=username).first()
     
     if user and check_password_hash(user.password, password):
-        # include permissions in token for frontend logic
         access_token = create_access_token(
             identity=str(user.id),
             additional_claims={
@@ -271,7 +295,7 @@ def login():
             user={'id': user.id, 'name': user.name, 'role': user.role, 'permissions': user.permissions}
         ), 200
         
-    return jsonify({"msg": "البريد الإلكتروني أو كلمة المرور غير صحيحة"}), 401
+    return jsonify({"msg": "اسم المستخدم أو كلمة المرور غير صحيحة"}), 401
 
 
 # --- USERS ROUTES (Admin Only) ---
@@ -283,7 +307,7 @@ def get_users():
         return jsonify({"msg": "Unauthorized"}), 403
         
     users = User.query.all()
-    return jsonify([{"id": u.id, "name": u.name, "email": u.email, "role": u.role, "permissions": u.permissions} for u in users])
+    return jsonify([{"id": u.id, "name": u.name, "username": u.username, "email": u.email, "role": u.role, "permissions": u.permissions} for u in users])
 
 @app.route('/api/users', methods=['POST'])
 @jwt_required()
@@ -294,14 +318,15 @@ def add_user():
         
     data = request.json
     
-    # Check if email exists
-    if User.query.filter_by(email=data.get('email')).first():
-        return jsonify({"msg": "البريد الإلكتروني موجود بالفعل"}), 400
+    # Check if username exists
+    if User.query.filter_by(username=data.get('username')).first():
+        return jsonify({"msg": "اسم المستخدم موجود بالفعل"}), 400
 
     hashed_pw = generate_password_hash(data.get('password', 'password123'))
     new_user = User(
+        username=data.get('username'),
         name=data.get('name'), 
-        email=data.get('email'), 
+        email=data.get('email', ''), 
         password=hashed_pw, 
         role=data.get('role'), 
         permissions=data.get('permissions', '')
@@ -327,6 +352,7 @@ def update_user(user_id):
         
     data = request.json
     user.name = data.get('name', user.name)
+    user.username = data.get('username', user.username)
     user.email = data.get('email', user.email)
     user.role = data.get('role', user.role)
     if 'permissions' in data:
@@ -474,6 +500,7 @@ def add_intern():
             from werkzeug.security import generate_password_hash
             hashed_pw = generate_password_hash('password123')
             new_user = User(
+                username=new_intern.email,
                 name=new_intern.name,
                 email=new_intern.email,
                 password=hashed_pw,
@@ -775,6 +802,7 @@ def public_submit():
             from werkzeug.security import generate_password_hash
             hashed_pw = generate_password_hash('password123')
             new_user = User(
+                username=email,
                 name=name,
                 email=email,
                 password=hashed_pw,
@@ -855,6 +883,41 @@ def delete_vault_document(filename):
         log_action(user_name, f"قام بحذف مستند من الخزنة: {filename}")
         return jsonify({"success": True})
     return jsonify({"msg": "File not found"}), 404
+
+
+@app.route('/api/interns/<int:intern_id>/vault-attach', methods=['POST'])
+@jwt_required()
+def attach_vault_to_intern(intern_id):
+    current_user = get_jwt()
+    if current_user.get('role') not in ('Admin', 'Manager'):
+        return jsonify({"msg": "Unauthorized"}), 403
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+    data = request.json or {}
+    vault_name = data.get('vault_name')
+    doc_type = data.get('doc_type', 'OTHER')
+    if not vault_name:
+        return jsonify({"msg": "vault_name required"}), 400
+    src = os.path.join(VAULT_FOLDER, vault_name)
+    if not os.path.exists(src):
+        return jsonify({"msg": "Vault file not found"}), 404
+    import shutil
+    dst_name = f"vault_{intern_id}_{vault_name}"
+    dst = os.path.join(app.config['UPLOAD_FOLDER'], dst_name)
+    shutil.copy2(src, dst)
+    file_url = f"/api/uploads/{dst_name}"
+    now = datetime.utcnow().isoformat()
+    record = DocumentLifecycle(
+        intern_id=intern.id, doc_type=doc_type, file_path=file_url,
+        uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
+        is_visible_to_intern=True, custom_title=f'نموذج: {vault_name}',
+        created_at=now, updated_at=now
+    )
+    db.session.add(record)
+    db.session.commit()
+    log_action(current_user.get('name'), f"أضاف مستند من الخزنة ({vault_name}) للمتدرب {intern.name}")
+    return jsonify({"msg": "تمت الإضافة من الخزنة", "doc_id": record.id}), 200
 
 # --- INTERN PROFILE DOCUMENT UPLOADS ---
 @app.route('/api/documents', methods=['POST'])

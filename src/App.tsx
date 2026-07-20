@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Interns } from './pages/Interns';
+import { FormBuilder } from './pages/FormBuilder';
+import { DocumentVault } from './pages/DocumentVault';
 import { Login } from './pages/Login';
 import { UsersPermissions } from './pages/UsersPermissions';
 import { InternPortal } from './pages/InternPortal';
@@ -56,6 +58,8 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="interns" element={<Interns />} />
           <Route path="interns/:id" element={<Profile />} />
+          <Route path="form-builder" element={<FormBuilder />} />
+          <Route path="vault" element={<DocumentVault />} />
           <Route path="attendance" element={<Attendance />} />
           <Route path="timeline" element={<Timeline />} />
           <Route path="users" element={<UsersPermissions />} />
