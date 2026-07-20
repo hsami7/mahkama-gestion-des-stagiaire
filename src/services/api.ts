@@ -1,4 +1,5 @@
 export const API_BASE = '/api';
+import { notify } from '../components/Toast';
 
 function getAuthHeaders(isFormData: boolean = false) {
   const token = sessionStorage.getItem('token');
@@ -25,7 +26,7 @@ export const api = {
       } catch (e) {}
       
       if (response.status === 401 || response.status === 422) {
-        alert(`Backend returned ${response.status}: ${errMsg}. Logging out.`);
+        notify(`Backend returned ${response.status}: ${errMsg}. Logging out.`, 'error');
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
         window.dispatchEvent(new Event('storage'));

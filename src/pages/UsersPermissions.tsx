@@ -1,19 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, ShieldCheck, Trash } from '@phosphor-icons/react';
+import { UserPlus, Trash, PencilSimple, UserList } from '@phosphor-icons/react';
+import { api } from '../services/api';
+import { useToast } from '../components/Toast';
 
 export function UsersPermissions() {
+  const toast = useToast();
+  const defaultPermissions = {
+    interns: { view: true, add: true, edit: true, delete: false },
+    forms: { view: true, add: true, edit: true, delete: false },
+    vault: { view: true, add: true, edit: true, delete: false },
+    roles: { view: false, add: false, edit: false, delete: false },
+    assign_encadrant: { view: true, add: true, edit: true, delete: false },
+    attendance: { view: true, add: true, edit: true, delete: false },
+    approve_interns: { view: true, add: true, edit: true, delete: false }
+  };
+
   const [users, setUsers] = useState<any[]>([]);
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'Manager', permissions: '' });
-  const token = localStorage.getItem('token');
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [newUser, setNewUser] = useState({ 
+    name: '', email: '', role: 'Manager', password: 'password123',
+    permissions: JSON.stringify(defaultPermissions) 
+  });
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/users', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setUsers(await res.json());
-      }
+      const data = await api.get('/users');
+      setUsers(data);
     } catch (err) {
       console.error(err);
     }
@@ -23,146 +35,261 @@ export function UsersPermissions() {
     fetchUsers();
   }, []);
 
-  const handleAddUser = async (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:5000/api/users', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify(newUser)
-      });
-      if (res.ok) {
-        setNewUser({ name: '', email: '', role: 'Manager', permissions: '' });
-        fetchUsers();
+      if (editingUserId) {
+        await api.put(`/users/${editingUserId}`, newUser);
       } else {
-        alert('فشل إضافة المستخدم');
+        await api.post('/users', newUser);
       }
-    } catch (err) {
-      console.error(err);
+      setEditingUserId(null);
+      setNewUser({ name: '', email: '', role: 'Manager', password: 'password123', permissions: JSON.stringify(defaultPermissions) });
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.message || 'فشل حفظ المستخدم');
     }
+  };
+
+  const handleEdit = (user: any) => {
+    setEditingUserId(user.id);
+    setNewUser({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      password: '',
+      permissions: user.permissions || JSON.stringify(defaultPermissions)
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingUserId(null);
+    setNewUser({ name: '', email: '', role: 'Manager', password: 'password123', permissions: JSON.stringify(defaultPermissions) });
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) fetchUsers();
+      await api.delete(`/users/${id}`);
+      fetchUsers();
     } catch (err) {
       console.error(err);
     }
   };
 
-  const togglePermission = (perm: string) => {
-    const currentPerms = newUser.permissions.split(',').filter(Boolean);
-    if (currentPerms.includes(perm)) {
-      setNewUser({ ...newUser, permissions: currentPerms.filter(p => p !== perm).join(',') });
-    } else {
-      setNewUser({ ...newUser, permissions: [...currentPerms, perm].join(',') });
-    }
+  let currentPerms = defaultPermissions;
+  try {
+    currentPerms = newUser.role === 'Admin' 
+      ? {
+          interns: { view: true, add: true, edit: true, delete: true },
+          forms: { view: true, add: true, edit: true, delete: true },
+          vault: { view: true, add: true, edit: true, delete: true },
+          roles: { view: true, add: true, edit: true, delete: true },
+          assign_encadrant: { view: true, add: true, edit: true, delete: true },
+          attendance: { view: true, add: true, edit: true, delete: true },
+          approve_interns: { view: true, add: true, edit: true, delete: true }
+        }
+      : JSON.parse(newUser.permissions || JSON.stringify(defaultPermissions));
+  } catch (e) {}
+
+  const handlePermChange = (module: string, action: string, checked: boolean) => {
+    if (newUser.role === 'Admin') return;
+    const updated = { ...currentPerms } as any;
+    if (!updated[module]) updated[module] = { view: false, add: false, edit: false, delete: false };
+    updated[module][action] = checked;
+    setNewUser({ ...newUser, permissions: JSON.stringify(updated) });
+  };
+
+  const moduleNames: Record<string, string> = {
+    interns: 'ملفات المتدربين',
+    forms: 'نماذج التسجيل',
+    vault: 'خزنة الوثائق',
+    roles: 'الأدوار والصلاحيات',
+    assign_encadrant: 'تعيين المؤطر (المشرف)',
+    attendance: 'سجل الحضور اليومي',
+    approve_interns: 'قبول ورفض المتدربين'
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div>
+      <div className="section-head" style={{ marginBottom: '24px' }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">المستخدمين والصلاحيات</h1>
-          <p className="text-gray-500 mt-1">إدارة حسابات المدراء والمتدربين</p>
+          <h1 style={{ marginTop: 0, fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '4px' }}>المستخدمين والصلاحيات</h1>
+          <p style={{ color: 'var(--slate)' }}>إدارة حسابات المدراء والمتدربين وتحديد صلاحياتهم</p>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
-        <h2 className="text-lg font-semibold mb-4 text-gray-800 flex items-center gap-2">
-          <UserPlus size={20} />
-          إضافة مستخدم جديد
+      <div className="card" style={{ padding: '28px', marginBottom: '32px', borderTop: '4px solid var(--gold)' }}>
+        <h2 style={{ marginTop: 0, fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <UserPlus size={24} color="var(--gold)" />
+          {editingUserId ? 'تعديل بيانات المستخدم' : 'إضافة مستخدم جديد'}
         </h2>
-        <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input 
-            type="text" placeholder="الاسم الكامل" required
-            value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})}
-            className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-blue-500"
-          />
-          <input 
-            type="email" placeholder="البريد الإلكتروني" required
-            value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})}
-            className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-blue-500"
-          />
-          <select 
-            value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}
-            className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-blue-500"
-          >
-            <option value="Admin">مدير نظام (Admin)</option>
-            <option value="Manager">مشرف (Manager)</option>
-            <option value="Intern">متدرب (Intern)</option>
-          </select>
-          
-          <div className="md:col-span-2 space-y-2">
-            <label className="text-sm text-gray-600 font-medium">الصلاحيات (للمشرفين فقط):</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={newUser.permissions.includes('can_add')} onChange={() => togglePermission('can_add')} className="w-4 h-4 text-blue-600" />
-                <span className="text-sm">إضافة متدربين</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={newUser.permissions.includes('can_edit')} onChange={() => togglePermission('can_edit')} className="w-4 h-4 text-blue-600" />
-                <span className="text-sm">تعديل المتدربين</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={newUser.permissions.includes('can_delete')} onChange={() => togglePermission('can_delete')} className="w-4 h-4 text-blue-600" />
-                <span className="text-sm">حذف متدربين</span>
-              </label>
+        
+        <form onSubmit={handleSaveUser}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>الاسم الكامل</label>
+              <input 
+                type="text" placeholder="الاسم الكامل" required
+                value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})}
+                className="input"
+              />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>البريد الإلكتروني</label>
+              <input 
+                type="email" placeholder="البريد الإلكتروني" required={!editingUserId}
+                value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})}
+                className="input"
+              />
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>الدور</label>
+              <select 
+                value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}
+                className="input"
+              >
+                <option value="Admin">مدير نظام (Admin)</option>
+                <option value="Manager">مشرف (Manager)</option>
+                <option value="Intern">متدرب (Intern)</option>
+              </select>
             </div>
           </div>
 
-          <button type="submit" className="md:col-span-2 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl transition-colors">
-            حفظ المستخدم
-          </button>
+          <div style={{ marginTop: '32px', marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '8px' }}>
+              مصفوفة الصلاحيات التفصيلية — {newUser.role === 'Admin' ? 'مدير نظام' : newUser.role === 'Manager' ? 'مشرف' : 'متدرب'}
+            </h3>
+            <p style={{ color: 'var(--slate)', fontSize: '0.9rem', marginBottom: '16px' }}>
+              {newUser.role === 'Admin' ? 'المدير يملك كل الصلاحيات بشكل افتراضي.' : 'يمكنك تعديل الصلاحيات الخاصة بهذا المستخدم بشكل فردي.'}
+            </p>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table className="matrix">
+                <thead>
+                  <tr>
+                    <th>الوحدة</th>
+                    <th>عرض</th>
+                    <th>إضافة</th>
+                    <th>تعديل</th>
+                    <th>حذف</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.keys(defaultPermissions).map((mod) => (
+                    <tr key={mod}>
+                      <td style={{ fontWeight: 600 }}>{moduleNames[mod]}</td>
+                      <td>
+                        <input 
+                          type="checkbox" className="chk" 
+                          checked={(currentPerms as any)[mod]?.view || false} 
+                          disabled={newUser.role === 'Admin'}
+                          onChange={(e) => handlePermChange(mod, 'view', e.target.checked)}
+                        />
+                      </td>
+                      <td>
+                        <input 
+                          type="checkbox" className="chk" 
+                          checked={(currentPerms as any)[mod]?.add || false} 
+                          disabled={newUser.role === 'Admin'}
+                          onChange={(e) => handlePermChange(mod, 'add', e.target.checked)}
+                        />
+                      </td>
+                      <td>
+                        <input 
+                          type="checkbox" className="chk" 
+                          checked={(currentPerms as any)[mod]?.edit || false} 
+                          disabled={newUser.role === 'Admin'}
+                          onChange={(e) => handlePermChange(mod, 'edit', e.target.checked)}
+                        />
+                      </td>
+                      <td>
+                        <input 
+                          type="checkbox" className="chk" 
+                          checked={(currentPerms as any)[mod]?.delete || false} 
+                          disabled={newUser.role === 'Admin'}
+                          onChange={(e) => handlePermChange(mod, 'delete', e.target.checked)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--line)', paddingTop: '24px' }}>
+            {editingUserId && (
+              <button type="button" onClick={handleCancelEdit} className="btn btn-ghost">
+                إلغاء التعديل
+              </button>
+            )}
+            <button type="submit" className="btn btn-ink">
+              {editingUserId ? 'حفظ التعديلات' : 'حفظ المستخدم'}
+            </button>
+          </div>
         </form>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-right">
-          <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 text-sm">
-            <tr>
-              <th className="px-6 py-4 font-medium">الاسم</th>
-              <th className="px-6 py-4 font-medium">البريد الإلكتروني</th>
-              <th className="px-6 py-4 font-medium">الدور</th>
-              <th className="px-6 py-4 font-medium">الصلاحيات</th>
-              <th className="px-6 py-4 font-medium">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {users.map(u => (
-              <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4 font-medium text-gray-900">{u.name}</td>
-                <td className="px-6 py-4 text-gray-500">{u.email}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    u.role === 'Admin' ? 'bg-purple-50 text-purple-600' :
-                    u.role === 'Manager' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'
-                  }`}>
-                    {u.role}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-gray-500 text-sm">
-                  {u.role === 'Admin' ? 'كامل الصلاحيات' : (u.permissions || 'لا توجد')}
-                </td>
-                <td className="px-6 py-4">
-                  {u.email !== 'admin@mahkama.ma' && (
-                    <button onClick={() => handleDelete(u.id)} className="text-red-500 hover:text-red-700 p-1">
-                      <Trash size={20} />
-                    </button>
-                  )}
-                </td>
+      <div className="section-head" style={{ marginTop: '48px', marginBottom: '24px' }}>
+        <div>
+          <h2 style={{ marginTop: 0, fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <UserList size={24} />
+            قائمة المستخدمين
+          </h2>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead style={{ backgroundColor: 'var(--paper)' }}>
+              <tr>
+                <th>الاسم</th>
+                <th>البريد الإلكتروني</th>
+                <th>الدور</th>
+                <th>إجراءات</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id}>
+                  <td style={{ fontWeight: 'bold' }}>{u.name}</td>
+                  <td style={{ color: 'var(--slate)' }}>{u.email}</td>
+                  <td>
+                    <span className={`badge ${
+                      u.role === 'Admin' ? 'badge-info' :
+                      u.role === 'Manager' ? 'badge-success' : 'badge-warning'
+                    }`}>
+                      {u.role}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleEdit(u)} style={{ background: 'var(--gold-light)', border: 'none', color: 'var(--gold-dark)', cursor: 'pointer', padding: '6px', borderRadius: '6px' }} title="تعديل">
+                        <PencilSimple size={18} weight="bold" />
+                      </button>
+                      {u.email !== 'admin@mahkama.ma' && (
+                        <button onClick={() => handleDelete(u.id)} style={{ background: 'var(--danger-bg)', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '6px', borderRadius: '6px' }} title="حذف">
+                          <Trash size={18} weight="bold" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {users.length === 0 && (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--slate)', padding: '32px' }}>
+                    لا يوجد مستخدمين
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash, Check, X } from '@phosphor-icons/react';
+import { api } from '../services/api';
+import { useToast } from '../components/Toast';
 
-type FieldType = 'text' | 'email' | 'number' | 'photo';
+type FieldType = 'text' | 'email' | 'number' | 'photo' | 'date' | 'pdf';
 
 interface FormField {
   id: string;
@@ -11,10 +13,31 @@ interface FormField {
 }
 
 export function FormBuilder() {
+  const toast = useToast();
   const [fields, setFields] = useState<FormField[]>([]);
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<FieldType>('text');
   const [newRequired, setNewRequired] = useState(false);
+
+  useEffect(() => {
+    api.get('/forms').then(data => {
+      try {
+        setFields(JSON.parse(data.form_data));
+      } catch (e) {
+        setFields([]);
+      }
+    }).catch(console.error);
+  }, []);
+
+  const saveForm = async () => {
+    try {
+      await api.post('/forms', { form_data: fields });
+      toast.success('تم حفظ النموذج بنجاح!');
+    } catch (err) {
+      console.error(err);
+      toast.error('فشل حفظ النموذج');
+    }
+  };
 
   const addField = () => {
     if (!newLabel) return;
@@ -31,8 +54,8 @@ export function FormBuilder() {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
       
       {/* Builder Side */}
-      <div className="card">
-        <h2 style={{ marginBottom: '16px', fontSize: '1.2rem' }}>إضافة حقل جديد</h2>
+      <div className="card" style={{ padding: '22px' }}>
+        <h2 style={{ marginTop: 0, marginBottom: '24px', fontSize: '1.2rem' }}>إضافة حقل جديد</h2>
         
         <div className="form-group">
           <label className="form-label">اسم السؤال / الحقل</label>
@@ -51,18 +74,27 @@ export function FormBuilder() {
             <option value="text">نص (Text)</option>
             <option value="email">بريد إلكتروني (Email)</option>
             <option value="number">رقم (Number)</option>
+            <option value="date">تاريخ (Date)</option>
             <option value="photo">صورة (Photo)</option>
+            <option value="pdf">مستند (PDF)</option>
           </select>
         </div>
 
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-start', marginBottom: '20px' }}>
           <input 
             type="checkbox" 
             id="required-chk" 
             checked={newRequired} 
             onChange={(e) => setNewRequired(e.target.checked)} 
+            style={{ 
+              accentColor: 'var(--gold)', 
+              width: '18px', 
+              height: '18px', 
+              cursor: 'pointer',
+              margin: 0
+            }}
           />
-          <label htmlFor="required-chk">حقل مطلوب (Required)</label>
+          <label htmlFor="required-chk" style={{ cursor: 'pointer', margin: 0, fontWeight: 'bold' }}>حقل مطلوب (Required)</label>
         </div>
 
         <button className="btn" onClick={addField} style={{ width: '100%', justifyContent: 'center' }}>
@@ -71,8 +103,8 @@ export function FormBuilder() {
       </div>
 
       {/* Preview Side */}
-      <div className="card" style={{ backgroundColor: 'var(--bg-color)' }}>
-        <h2 style={{ marginBottom: '16px', fontSize: '1.2rem', display: 'flex', justifyContent: 'space-between' }}>
+      <div className="card" style={{ backgroundColor: 'var(--bg-color)', padding: '22px' }}>
+        <h2 style={{ marginTop: 0, marginBottom: '24px', fontSize: '1.2rem', display: 'flex', justifyContent: 'space-between' }}>
           <span>معاينة النموذج</span>
           <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{fields.length} حقول</span>
         </h2>
@@ -94,24 +126,34 @@ export function FormBuilder() {
                 <label className="form-label">
                   {field.label} {field.required && <span style={{ color: 'var(--danger)' }}>*</span>}
                 </label>
-                {field.type === 'photo' ? (
-                  <div style={{ border: '2px dashed var(--border-color)', padding: '24px', textAlign: 'center', borderRadius: '8px', color: 'var(--text-secondary)' }}>
-                    انقر لرفع صورة
-                  </div>
-                ) : (
-                  <input 
-                    type={field.type} 
-                    className="input" 
-                    placeholder={`أدخل ${field.label}...`} 
-                    disabled 
-                  />
-                )}
+                {field.type === 'text' && <input type="text" className="input" placeholder="نص..." disabled />}
+                {field.type === 'email' && <input type="email" className="input" placeholder="email@example.com" disabled />}
+                {field.type === 'number' && <input type="number" className="input" placeholder="0" disabled />}
+                {field.type === 'date' && <input type="date" className="input" disabled />}
+                {field.type === 'photo' && <input type="file" className="input" accept="image/*" disabled />}
+                {field.type === 'pdf' && <input type="file" className="input" accept=".pdf" disabled />}
               </div>
             ))
           )}
           
           {fields.length > 0 && (
-            <button className="btn" style={{ justifyContent: 'center', marginTop: '16px' }}>إرسال الطلب</button>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              <button className="btn btn-ink" onClick={saveForm} style={{ flex: 1, justifyContent: 'center' }}>
+                <Check size={18} />
+                حفظ النموذج
+              </button>
+              <button 
+                className="btn btn-gold" 
+                onClick={() => {
+                  const url = `${window.location.origin}/apply`;
+                  navigator.clipboard.writeText(url);
+                  toast.success('تم نسخ رابط النموذج العام: ' + url);
+                }} 
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                نسخ رابط النشر
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, Printer, PencilSimple, Trash, FileText, CheckCircle, WarningCircle, DownloadSimple, Certificate, CalendarCheck } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
+import { useToast } from '../components/Toast';
 
 export function Profile() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const toast = useToast();
   const [intern, setIntern] = useState<any>(null);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,13 +67,13 @@ export function Profile() {
       }
 
       await api.post(`/interns/${id}/requests`, formData);
-      alert('تم إرسال الطلب بنجاح للمتدرب!');
+      toast.success('تم إرسال الطلب بنجاح للمتدرب!');
       setShowRequestModal(false);
       setRequestTitle('');
       setRequestNote('');
       setRequestFile(null);
     } catch (err) {
-      alert('حدث خطأ أثناء إرسال الطلب');
+      toast.error('حدث خطأ أثناء إرسال الطلب');
     }
   };
 
@@ -107,7 +109,7 @@ export function Profile() {
       setIntern({ ...intern, encadrant: encadrantInput });
       setEditingEncadrant(false);
     } catch (err) {
-      alert("فشل في حفظ المؤطر");
+      toast.error("فشل في حفظ المؤطر");
     }
   };
 
@@ -121,7 +123,7 @@ export function Profile() {
       await api.post(`/interns/${id}/attendance`, { date: today, status });
       fetchInternAndAttendance();
     } catch (err) {
-      alert("فشل في تسجيل الحضور");
+      toast.error("فشل في تسجيل الحضور");
     }
   };
 
@@ -155,7 +157,7 @@ export function Profile() {
         navigate('/interns');
       } catch (err) {
         console.error(err);
-        alert('فشل الحذف');
+        toast.error('فشل الحذف');
       }
     }
   };
@@ -163,11 +165,11 @@ export function Profile() {
   const handleApproveClick = () => {
     const missingDocs = Object.keys(docNames).filter(key => !intern.documents?.[key]);
     if (missingDocs.length > 0) {
-      alert('لا يمكن قبول المتدرب. يرجى التأكد من رفع جميع المستندات المطلوبة أولاً.');
+      toast.warning('لا يمكن قبول المتدرب. يرجى التأكد من رفع جميع المستندات المطلوبة أولاً.');
       return;
     }
     if (!intern.encadrant || intern.encadrant.trim() === '') {
-      alert('لا يمكن قبول المتدرب. يرجى تعيين المؤطر (المشرف) أولاً.');
+      toast.warning('لا يمكن قبول المتدرب. يرجى تعيين المؤطر (المشرف) أولاً.');
       return;
     }
 
@@ -178,13 +180,13 @@ export function Profile() {
 
   const confirmApprove = async () => {
     if (!approveStartDate || !approveEndDate) {
-      alert('يرجى تحديد تاريخ البداية والنهاية.');
+      toast.warning('يرجى تحديد تاريخ البداية والنهاية.');
       return;
     }
     const end = new Date(approveEndDate);
     const start = new Date(approveStartDate);
     if (end < start) {
-      alert('تاريخ النهاية يجب أن يكون بعد تاريخ البداية.');
+      toast.warning('تاريخ النهاية يجب أن يكون بعد تاريخ البداية.');
       return;
     }
 
@@ -197,9 +199,9 @@ export function Profile() {
       });
       setShowApproveModal(false);
       fetchInternAndAttendance();
-      alert('تم قبول المتدرب وتنشيط حسابه بنجاح!');
+      toast.success('تم قبول المتدرب وتنشيط حسابه بنجاح!');
     } catch (err) {
-      alert('فشل القبول');
+      toast.error('فشل القبول');
     }
   };
 
@@ -209,7 +211,7 @@ export function Profile() {
         await api.put(`/interns/${id}`, { ...intern, status: 'مرفوض' });
         fetchInternAndAttendance();
       } catch (err) {
-        alert('فشل الرفض');
+        toast.error('فشل الرفض');
       }
     }
   };
