@@ -1311,12 +1311,18 @@ def download_profile_pdf(intern_id):
     intern = Intern.query.get(intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
+    mode = request.args.get('mode', 'summary').lower()
+    if mode not in ('summary', 'full'):
+        mode = 'summary'
+    disposition = request.args.get('disposition', 'attachment').lower()
+    as_attachment = disposition != 'inline'
     try:
-        from pdf_report import build_intern_pdf
-        buffer = build_intern_pdf([intern])
+        from pdf_report import build_intern_pdf, build_filename
+        buffer = build_intern_pdf([intern], mode=mode)
+        filename = build_filename(intern)
     except ImportError:
         return jsonify({"msg": "PDF generation library not installed"}), 500
-    return send_file(buffer, as_attachment=True, download_name=f"Profil_{intern.id}.pdf", mimetype='application/pdf')
+    return send_file(buffer, as_attachment=as_attachment, download_name=filename, mimetype='application/pdf')
 
 @app.route('/api/interns/export', methods=['GET'])
 @jwt_required()
@@ -1378,11 +1384,12 @@ def export_interns():
 
     # Default: PDF (one formal profile per page)
     try:
-        from pdf_report import build_intern_pdf
+        from pdf_report import build_intern_pdf, build_filename
         buffer = build_intern_pdf(interns)
+        filename = build_filename(interns[0]) if len(interns) == 1 else "Interns_Export.pdf"
     except ImportError:
         return jsonify({"msg": "PDF generation library not installed"}), 500
-    return send_file(buffer, as_attachment=True, download_name="Interns_Export.pdf", mimetype='application/pdf')
+    return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
 
 
 if __name__ == '__main__':
