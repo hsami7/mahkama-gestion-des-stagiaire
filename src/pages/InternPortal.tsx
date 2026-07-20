@@ -49,8 +49,8 @@ export function InternPortal() {
         data.forEach((r: any) => {
           if (!seenRequests.current.has(r.id)) {
             seenRequests.current.add(r.id);
-            const title = r.custom_title || r.document_type;
-            showToast(`طلب جديد: يرجى إعادة رفع "${title}"${r.note ? ' — ' + r.note : ''}`, 'warning');
+            const docName = r.custom_title || r.document_type;
+            showToast(`طلب إعادة رفع مستند: ${docName}${r.note ? ' — ' + r.note : ''}`, 'warning');
           }
         });
       } else {
