@@ -1308,116 +1308,14 @@ def download_profile_md(intern_id):
 @app.route('/api/interns/<int:intern_id>/profile-pdf', methods=['GET'])
 @jwt_required()
 def download_profile_pdf(intern_id):
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.units import cm
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-        from reportlab.lib.enums import TA_RIGHT
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
-        import bidi.algorithm as bidi
-        import arabic_reshaper
-    except ImportError:
-        return jsonify({"msg": "PDF generation library not installed"}), 500
-
     intern = Intern.query.get(intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
-
-    # Load an Arabic-capable font if available, else fall back to default
-    font_name = "Helvetica"
-    candidates = [
-        "C:/Windows/Fonts/arial.ttf",
-        "C:/Windows/Fonts/tahoma.ttf",
-        os.path.join(os.path.dirname(__file__), "fonts", "arial.ttf"),
-    ]
-    for c in candidates:
-        if os.path.exists(c):
-            try:
-                pdfmetrics.registerFont(TTFont("Arabic", c))
-                font_name = "Arabic"
-                break
-            except Exception:
-                pass
-
-    def ar(text: str) -> str:
-        if not text:
-            return ""
-        if font_name == "Helvetica":
-            return text
-        try:
-            return bidi.get_display(arabic_reshaper.reshape(text))
-        except Exception:
-            return text
-
-    styles = getSampleStyleSheet()
-    base_style = ParagraphStyle('Ar', fontName=font_name, fontSize=11, alignment=TA_RIGHT, leading=18)
-    title_style = ParagraphStyle('ArTitle', fontName=font_name, fontSize=18, alignment=TA_RIGHT, leading=24, spaceAfter=10)
-
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-    elements: list = []
-    elements.append(Paragraph(ar(f"ملف المتدرب: {intern.name}"), title_style))
-    if intern.name_fr:
-        elements.append(Paragraph(ar(intern.name_fr), base_style))
-    elements.append(Spacer(1, 12))
-
-    data = [
-        [ar("الحقل"), ar("القيمة")],
-        [ar("رقم التسجيل"), ar(f"INT-{intern.id:04d}")],
-        [ar("رقم الهوية الوطنية"), ar(intern.national_id or "—")],
-        [ar("البريد الإلكتروني"), ar(intern.email or "—")],
-        [ar("رقم الهاتف"), ar(intern.phone or "—")],
-        [ar("تاريخ الازدياد"), ar(intern.date_of_birth or "—")],
-        [ar("تاريخ البدء"), ar(intern.start_date or "—")],
-        [ar("تاريخ الانتهاء"), ar(intern.end_date or "—")],
-        [ar("الجامعة أو المعهد"), ar(intern.university or "—")],
-        [ar("القسم"), ar(intern.department or "—")],
-        [ar("المؤطر"), ar(intern.encadrant or "—")],
-        [ar("الحالة"), ar(intern.status or "—")],
-        [ar("العنوان"), ar(intern.address or "—")],
-    ]
-    table = Table(data, colWidths=[6*cm, 10*cm])
-    table.setStyle(TableStyle([
-        ('FONT', (0, 0), (-1, -1), font_name, 11),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E5631')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F4F6F4')]),
-    ]))
-    elements.append(table)
-
-    # Documents section
-    docs = {}
-    if intern.documents:
-        try:
-            docs = json.loads(intern.documents)
-        except Exception:
-            docs = {}
-    elements.append(Spacer(1, 16))
-    elements.append(Paragraph(ar("المستندات"), base_style))
-    doc_lines = []
-    if docs:
-        for k, v in docs.items():
-            if k == 'others':
-                continue
-            if v:
-                doc_lines.append(f"- {k}: {v}")
-    others = docs.get('others', []) if isinstance(docs.get('others'), list) else []
-    for o in others:
-        if isinstance(o, dict) and o.get('file'):
-            doc_lines.append(f"- {o.get('name', 'مستند إضافي')}: {o.get('file')}")
-    if not doc_lines:
-        doc_lines.append("- لا توجد مستندات.")
-    for line in doc_lines:
-        elements.append(Paragraph(ar(line), base_style))
-
-    doc.build(elements)
-    buffer.seek(0)
+    try:
+        from pdf_report import build_intern_pdf
+        buffer = build_intern_pdf([intern])
+    except ImportError:
+        return jsonify({"msg": "PDF generation library not installed"}), 500
     return send_file(buffer, as_attachment=True, download_name=f"Profil_{intern.id}.pdf", mimetype='application/pdf')
 
 @app.route('/api/interns/export', methods=['GET'])
@@ -1478,83 +1376,12 @@ def export_interns():
         buffer.seek(0)
         return send_file(buffer, as_attachment=True, download_name="Interns_Export.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-    # Default: PDF (one profile per page)
+    # Default: PDF (one formal profile per page)
     try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.units import cm
-        from reportlab.lib import colors
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-        from reportlab.lib.enums import TA_RIGHT
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
-        import bidi.algorithm as bidi
-        import arabic_reshaper
+        from pdf_report import build_intern_pdf
+        buffer = build_intern_pdf(interns)
     except ImportError:
         return jsonify({"msg": "PDF generation library not installed"}), 500
-
-    font_name = "Helvetica"
-    for c in ["C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/tahoma.ttf"]:
-        if os.path.exists(c):
-            try:
-                pdfmetrics.registerFont(TTFont("Arabic", c))
-                font_name = "Arabic"
-                break
-            except Exception:
-                pass
-
-    def ar(text):
-        if not text:
-            return ""
-        if font_name == "Helvetica":
-            return text
-        try:
-            return bidi.get_display(arabic_reshaper.reshape(text))
-        except Exception:
-            return text
-
-    base_style = ParagraphStyle('Ar', fontName=font_name, fontSize=11, alignment=TA_RIGHT, leading=18)
-    title_style = ParagraphStyle('ArTitle', fontName=font_name, fontSize=18, alignment=TA_RIGHT, leading=24, spaceAfter=10)
-
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-    elements = []
-    for idx, i in enumerate(interns):
-        if idx > 0:
-            elements.append(PageBreak())
-        elements.append(Paragraph(ar(f"ملف المتدرب: {i.name}"), title_style))
-        if i.name_fr:
-            elements.append(Paragraph(ar(i.name_fr), base_style))
-        elements.append(Spacer(1, 12))
-        data = [
-            [ar("الحقل"), ar("القيمة")],
-            [ar("رقم التسجيل"), ar(f"INT-{i.id:04d}")],
-            [ar("رقم الهوية الوطنية"), ar(i.national_id or "—")],
-            [ar("البريد الإلكتروني"), ar(i.email or "—")],
-            [ar("رقم الهاتف"), ar(i.phone or "—")],
-            [ar("تاريخ الازدياد"), ar(i.date_of_birth or "—")],
-            [ar("تاريخ البدء"), ar(i.start_date or "—")],
-            [ar("تاريخ الانتهاء"), ar(i.end_date or "—")],
-            [ar("الجامعة أو المعهد"), ar(i.university or "—")],
-            [ar("القسم"), ar(i.department or "—")],
-            [ar("المؤطر"), ar(i.encadrant or "—")],
-            [ar("الحالة"), ar(i.status or "—")],
-            [ar("العنوان"), ar(i.address or "—")],
-        ]
-        table = Table(data, colWidths=[6*cm, 10*cm])
-        table.setStyle(TableStyle([
-            ('FONT', (0, 0), (-1, -1), font_name, 11),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E5631')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F4F6F4')]),
-        ]))
-        elements.append(table)
-
-    doc.build(elements)
-    buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name="Interns_Export.pdf", mimetype='application/pdf')
 
 
