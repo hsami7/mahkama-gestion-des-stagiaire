@@ -1,5 +1,5 @@
 import React from 'react';
-import { House, FileText, DownloadSimple, User, SignOut } from '@phosphor-icons/react';
+import { House, FileText, User, SignOut } from '@phosphor-icons/react';
 
 interface InternSidebarProps {
   activeTab: string;
@@ -15,8 +15,7 @@ interface InternSidebarProps {
 export function InternSidebar({ activeTab, setActiveTab, internData, user, missingCount, pendingCount = 0, reqDotColor = '#F4B400', onLogout }: InternSidebarProps) {
   const navItems = [
     { id: 'status', name: 'حالة الطلب', icon: <House size={24} /> },
-    { id: 'docs', name: 'مستنداتي', icon: <FileText size={24} />, badge: pendingCount > 0 },
-    { id: 'downloads', name: 'التنزيلات', icon: <DownloadSimple size={24} /> },
+    { id: 'documents', name: 'المستندات', icon: <FileText size={24} />, badge: pendingCount > 0 },
     { id: 'profile', name: 'ملفي الشخصي', icon: <User size={24} /> },
   ];
 

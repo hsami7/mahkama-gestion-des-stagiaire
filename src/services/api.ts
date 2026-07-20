@@ -75,10 +75,13 @@ export const api = {
     return resData;
   },
 
-  uploadFile: async (endpoint: string, file: File) => {
+  uploadFile: async (endpoint: string, file: File, extraFields?: Record<string, string>) => {
     const token = sessionStorage.getItem('token');
     const formData = new FormData();
     formData.append('file', file);
+    if (extraFields) {
+      Object.entries(extraFields).forEach(([k, v]) => formData.append(k, v));
+    }
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers: {
@@ -103,6 +106,27 @@ export const api = {
     }
     return response.json();
   },
+
+  // --- Document Lifecycle ---
+  getInternDocuments: (internId: number) =>
+    api.get(`/interns/${internId}/documents`),
+
+  uploadInternDocument: (internId: number, docType: string, file: File) =>
+    api.uploadFile(`/interns/${internId}/documents/upload`, file, { doc_type: docType }),
+
+  approveDocument: (internId: number, docId: number) =>
+    api.post(`/interns/${internId}/documents/${docId}/approve`, {}),
+
+  rejectDocument: (internId: number, docId: number, reason: string) =>
+    api.post(`/interns/${internId}/documents/${docId}/reject`, { rejection_reason: reason }),
+
+  uploadSignedDocument: (internId: number, docType: string, file: File) =>
+    api.uploadFile(`/interns/${internId}/documents/signed`, file, { doc_type: docType }),
+
+  getMyDocuments: () => api.get('/intern/documents'),
+
+  downloadDocument: (docId: number) =>
+    `${API_BASE}/intern-documents/${docId}/download?token=${sessionStorage.getItem('token')}`,
 
   exportInternPdf: (
     internId: number,

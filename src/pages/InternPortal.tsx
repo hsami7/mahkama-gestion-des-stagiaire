@@ -1,8 +1,20 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { api } from '../services/api';
+import { CheckCircle, DownloadSimple } from '@phosphor-icons/react';
+import { api, API_BASE } from '../services/api';
 import { InternSidebar } from '../components/InternSidebar';
 import { Header } from '../components/Header';
 import '../InternPortal.css';
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  CIN: 'بطاقة التعريف الوطنية (CIN)',
+  CV: 'السيرة الذاتية (CV)',
+  INSURANCE: 'التأمين (Assurance)',
+  DEMANDE: 'طلب التدريب (Demande)',
+  CONVENTION_SIGNED: 'اتفاقية التدريب الموقعة',
+  FINAL_REPORT: 'التقرير النهائي',
+  ATTESTATION_SIGNED: 'شهادة التدريب الموقعة',
+  OTHER: 'مستند إضافي',
+};
 
 export function InternPortal() {
   const [activeTab, setActiveTab] = useState('status');
@@ -12,35 +24,11 @@ export function InternPortal() {
   const [uploading, setUploading] = useState<number | null>(null);
   const [internData, setInternData] = useState<any>(null);
   const [toastMsg, setToastMsg] = useState<{msg: string, type: string} | null>(null);
+  const [lifecycleDocs, setLifecycleDocs] = useState<any[]>([]);
 
-  const uploadedDocs = useMemo(() => {
-    if (!internData?.documents) return [];
-    if (Array.isArray(internData.documents)) return internData.documents;
-    const docs: any[] = [];
-    Object.entries(internData.documents).forEach(([key, val]) => {
-      if (key === 'others' && Array.isArray(val)) {
-        val.forEach((o: any, idx) => {
-          if (o.file && typeof o.file === 'string' && o.file.trim() !== '') {
-            docs.push({ id: `other-${idx}`, document_type: o.name || 'مستند إضافي', file_path: o.file, status: 'مرفوعة' });
-          }
-        });
-      } else if (typeof val === 'string' && val.trim() !== '') {
-        let title = key;
-        if (key === 'cv') title = 'السيرة الذاتية (CV)';
-        if (key === 'cin' || key === 'id') title = 'البطاقة الوطنية (CIN)';
-        if (key === 'insurance') title = 'تأمين التدريب';
-        if (key === 'convention') title = 'اتفاقية التدريب';
-        if (key === 'demande') title = 'طلب التدريب';
-        docs.push({ id: key, document_type: title, file_path: val, status: 'مرفوعة' });
-      }
-    });
-    return docs;
-  }, [internData?.documents]);
-  
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
 
-  // Build a viewable URL for an uploaded file path (handles bare filenames, full paths, and missing extensions)
   const buildFileUrl = (path: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
@@ -81,15 +69,26 @@ export function InternPortal() {
     }
   };
 
+  const fetchLifecycleDocs = async () => {
+    try {
+      const data = await api.getMyDocuments();
+      setLifecycleDocs(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchRequests();
     fetchProfile();
+    fetchLifecycleDocs();
   }, []);
 
   // Poll for newly created document requests and notify the intern
   useEffect(() => {
     const interval = setInterval(() => {
       fetchRequests(true);
+      fetchLifecycleDocs();
     }, 10000);
     return () => clearInterval(interval);
   }, [internData?.id]);
@@ -144,13 +143,11 @@ export function InternPortal() {
     }
 
     setUploading(docType as any);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('document_type', docType);
 
     try {
-      await api.post(`/intern/upload_unrequested`, formData);
+      await api.uploadInternDocument(internData?.id, docType, file);
       showToast('تم رفع المستند بنجاح!', 'success');
+      fetchLifecycleDocs();
       fetchProfile();
       fetchRequests();
     } catch (err: any) {
@@ -164,19 +161,17 @@ export function InternPortal() {
 
   // Returns true if the document for a given request is already uploaded.
   const isRequestUploaded = (r: any): boolean => {
-    const docs = internData?.documents;
     if (r.document_type === 'other') {
-      const others = (docs && Array.isArray(docs.others)) ? docs.others : [];
-      return others.some((o: any) => o.name === r.custom_title && o.file && o.file.trim() !== '');
+      return lifecycleDocs.some(d => d.custom_title === r.custom_title && d.file_path && d.status !== 'MISSING');
     }
-    return !!(docs && typeof docs[r.document_type] === 'string' && docs[r.document_type].trim() !== '');
+    return lifecycleDocs.some(d => d.doc_type === r.document_type && d.file_path && d.status !== 'MISSING');
   };
 
   // A request is only "actionable" (still nagging) if its document is not yet uploaded.
-  const missingCount = useMemo(() => requests.filter((r: any) => !isRequestUploaded(r)).length, [requests, internData?.documents]);
+  const missingCount = useMemo(() => requests.filter((r: any) => !isRequestUploaded(r)).length, [requests, lifecycleDocs]);
 
   // Pending re-upload requests that are still truly missing a document (drives the banner + dot)
-  const pendingCount = useMemo(() => requests.filter((r: any) => !isRequestUploaded(r)).length, [requests, internData?.documents]);
+  const pendingCount = useMemo(() => requests.filter((r: any) => !isRequestUploaded(r)).length, [requests, lifecycleDocs]);
 
   // Orange/yellow palette for request notifications
   const REQ_BG = '#FFF6E5';
@@ -187,8 +182,7 @@ export function InternPortal() {
   const getPageTitle = (tab: string) => {
     switch (tab) {
       case 'status': return 'حالة الطلب';
-      case 'docs': return 'مستنداتي';
-      case 'downloads': return 'التنزيلات';
+      case 'documents': return 'المستندات';
       case 'profile': return 'ملفي الشخصي';
       default: return 'بوابة المتدرب';
     }
@@ -317,164 +311,128 @@ export function InternPortal() {
             )}
           </div>
 
-          {/* DOCUMENTS */}
-          <div className={`view ${activeTab === 'docs' ? 'on' : ''}`}>
-            <div className="section-title"><h2 style={{fontSize:19, margin:0}}>مستنداتي</h2></div>
-            <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>المستندات الخاصة بك وحالتها الحالية</p>
+          {/* DOCUMENTS — unified view */}
+          <div className={`view ${activeTab === 'documents' ? 'on' : ''}`}>
+            <div className="section-title"><h2 style={{fontSize:19, margin:0}}>المستندات</h2></div>
+            <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>المستندات المستلمة من الإدارة والملفات التي قمت برفعها</p>
 
-            <div className="card" style={{padding: 24}}>
-              <div className="section-title" style={{marginBottom: 20}}><h3>المستندات المرفقة</h3></div>
-              
-              {[
-                { key: 'id', label: 'بطاقة التعريف الوطنية (CIN)' },
-                { key: 'convention', label: 'اتفاقية التدريب (Convention de stage)' },
-                { key: 'demande', label: 'طلب التدريب (Demande de stage)' },
-                { key: 'insurance', label: 'تأمين التدريب (Insurance)' },
-                { key: 'resume', label: 'السيرة الذاتية (Resume)' }
-              ].map(docItem => {
-                const uploaded = uploadedDocs.find((d: any) => d.id === docItem.key);
-                const req = requests.find(r => r.document_type === docItem.key);
-
-                return (
-                  <div className={`doc-item ${uploaded ? 'ok' : req ? 'missing' : ''}`} key={docItem.key}>
-                    <div className="di">
-                      {uploaded ? (
-                        <svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
-                      ) : req ? (
-                        <svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-                      ) : (
-                        <svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
-                      )}
-                    </div>
-                    <div>
-                      <div className="dn">{docItem.label}</div>
-                      <div className="ds" style={{ color: req && !uploaded ? 'var(--danger)' : '' }}>
-                        {uploaded ? 'مرفق متوفر' : req ? 'مطلوبة — بانتظار الرفع' : 'غير متوفر'}
-                      </div>
-                      {req?.note && req.note.trim() !== '' && !uploaded && (
-                        <div className="req-note" style={{ fontSize: 12, color: 'var(--slate)', marginTop: 6, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', lineHeight: 1.6 }}>
-                          <b style={{ color: 'var(--ink)' }}>ملاحظة: </b>{req.note}
-                        </div>
-                      )}
-                    </div>
-                    <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
-                      {uploaded && uploaded.file_path ? (
-                        <a href={buildFileUrl(uploaded.file_path)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
-                          <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> عرض
-                        </a>
-                      ) : (
-                        <>
-                          <input 
-                            type="file" 
-                            id={req ? `f-${req.id}` : `f-proactive-${docItem.key}`} 
-                            onChange={e => {
-                              if (e.target.files && e.target.files[0]) {
-                                if (req) {
-                                  handleUpload(req.id, e.target.files[0]);
-                                } else {
-                                  handleProactiveUpload(docItem.key, e.target.files[0]);
-                                }
-                              }
-                            }}
-                          />
-                          <button className="btn btn-ink" style={{padding:'8px 14px', fontSize:12.5}} onClick={() => document.getElementById(req ? `f-${req.id}` : `f-proactive-${docItem.key}`)?.click()} disabled={uploading === (req ? req.id : docItem.key)}>
-                            {uploading === (req ? req.id : docItem.key) ? 'جاري...' : 'رفع الآن'}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Render Custom Requests */}
-              {requests.filter(r => !['cin', 'convention', 'demande', 'insurance', 'cv'].includes(r.document_type)).map(req => (
-                <div className="doc-item missing" key={req.id}>
-                  <div className="di"><svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></div>
-                  <div>
-                    <div className="dn">{req.custom_title || req.document_type}</div>
-                    {isRequestUploaded(req) ? (
-                      <div className="ds">مرفق متوفر</div>
-                    ) : (
-                      <div className="ds" style={{ color: 'var(--danger)' }}>مطلوبة — بانتظار الرفع</div>
-                    )}
-                    {req.note && req.note.trim() !== '' && (
-                      <div className="req-note" style={{ fontSize: 12, color: 'var(--slate)', marginTop: 6, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', lineHeight: 1.6 }}>
-                        <b style={{ color: 'var(--ink)' }}>ملاحظة: </b>{req.note}
-                      </div>
-                    )}
-                  </div>
-                  <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
-                    {req.template_path && (
-                      <a 
-                        href={`http://127.0.0.1:5055${req.template_path.startsWith('/') ? '' : '/'}${req.template_path}`} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="btn btn-ghost sm" 
-                        style={{color:'var(--gold-dark)', border: '1px solid var(--gold-border)'}}
-                      >
-                        <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M12 15V3M7 10l5 5 5-5"/><path d="M4 21h16"/></svg> تحميل النموذج
-                      </a>
-                    )}
-                    {(() => {
-                      const cur = (internData?.documents?.others || []).find((o: any) => o.name === req.custom_title && o.file && o.file.trim() !== '');
-                      return cur ? (
-                        <a href={buildFileUrl(cur.file)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
-                          <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> عرض الحالي
-                        </a>
-                      ) : null;
-                    })()}
-                    <input
-                      type="file" 
-                      id={`f-${req.id}`} 
-                      onChange={e => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleUpload(req.id, e.target.files[0]);
-                        }
-                      }}
-                    />
-                    <button className="btn btn-ink" style={{padding:'8px 14px', fontSize:12.5}} onClick={() => document.getElementById(`f-${req.id}`)?.click()} disabled={uploading === req.id}>
-                      {uploading === req.id ? 'جاري...' : 'رفع الآن'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {/* Render Custom Uploaded Docs */}
-              {uploadedDocs.filter((d: any) => d.id.startsWith('other-')).map((doc: any, i: number) => (
-                <div className="doc-item ok" key={doc.id || i}>
-                  <div className="di"><svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></div>
-                  <div>
-                    <div className="dn">{doc.document_type || 'مستند إضافي'}</div>
-                    <div className="ds">مرفق متوفر</div>
-                  </div>
-                  <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
-                    {doc.file_path && (
-                      <a href={buildFileUrl(doc.file_path)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
-                        <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> عرض
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-            </div>
-          </div>
-
-          {/* DOWNLOADS */}
-          <div className={`view ${activeTab === 'downloads' ? 'on' : ''}`}>
-            <div className="section-title"><h2 style={{fontSize:19, margin:0}}>التنزيلات</h2></div>
-            <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>وثائق جاهزة مشتركة من إدارة التدريب</p>
-            <div className="dl-grid">
-              <div className="card" style={{padding:18}}>
-                <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:14}}>
-                  <div style={{width:40, height:40, borderRadius:9, background:'var(--paper)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--gold-dark)'}}><svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M6 2h9l3 3v17H6z"/><path d="M15 2v4h4"/></svg></div>
-                  <div><b style={{fontSize:13}}>دليل المتدرب الداخلي</b><div style={{fontSize:11, color:'var(--slate-light)'}}>PDF · 1.1 ميجابايت</div></div>
-                </div>
-                <button className="btn btn-ghost" style={{width:'100%', justifyContent:'center'}} onClick={() => showToast('جاري التحميل...', 'info')}>
-                  <svg className="icon" viewBox="0 0 24 24" style={{width:15, height:15}}><path d="M12 15V3M7 10l5 5 5-5"/><path d="M4 21h16"/></svg> تحميل
-                </button>
+            {/* Card 1: Received from Admin */}
+            <div className="card" style={{padding:24, marginBottom: 18}}>
+              <div className="section-title" style={{marginBottom:16}}>
+                <h3 style={{fontSize:15, margin:0, color:'var(--success)'}}>المستندات المستلمة من الإدارة</h3>
               </div>
+              {lifecycleDocs.filter(d => d.uploaded_by === 'ADMIN' || d.status === 'APPROVED_AND_SIGNED').length === 0 && (
+                <div style={{textAlign:'center', padding:'20px', color:'var(--slate-light)', fontSize:13}}>لا توجد مستندات مستلمة بعد من الإدارة</div>
+              )}
+              {lifecycleDocs.filter(d => d.uploaded_by === 'ADMIN' || d.status === 'APPROVED_AND_SIGNED').map(d => (
+                <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)'}}>
+                  <div className="di"><CheckCircle weight="fill" style={{color:'var(--success)', width:18}} /></div>
+                  <div>
+                    <div className="dn">{d.label}</div>
+                    <div className="ds" style={{color:'var(--success)'}}>تم الاستلام — {d.updated_at ? new Date(d.updated_at).toLocaleDateString('fr-FR') : ''}</div>
+                  </div>
+                  <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
+                    {d.file_path && (
+                      <a href={api.downloadDocument(d.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
+                        <DownloadSimple size={14} /> تحميل
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Card 2: Upload Your Files */}
+            <div className="card" style={{padding:24}}>
+              <div className="section-title" style={{marginBottom:16}}>
+                <h3 style={{fontSize:15, margin:0, color:'var(--gold-dark)'}}>رفع ملفاتك</h3>
+              </div>
+              {requests.filter(r => !isRequestUploaded(r)).length > 0 && (
+                <div style={{background:'#FFF6E5', border:'1px solid #F2D49B', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:12.5, color:'#9A6B00'}}>
+                  لديك طلبات مستندات من الإدارة بانتظار الرفع
+                  {requests.filter(r => !isRequestUploaded(r)).map(r => (
+                    <div key={r.id} style={{marginTop:6, fontWeight:600}}>• {r.custom_title || r.document_type}{r.note ? `: ${r.note}` : ''}</div>
+                  ))}
+                </div>
+              )}
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
+                <thead>
+                  <tr style={{borderBottom:'1px solid var(--line)'}}>
+                    <th style={{textAlign:'right', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
+                    <th style={{textAlign:'center', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
+                    <th style={{textAlign:'left', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {['CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED'].map(docType => {
+                    const doc = lifecycleDocs.find(d => d.doc_type === docType);
+                    const req = requests.find(r => r.document_type === docType);
+                    const status = doc?.status === 'APPROVED_AND_SIGNED' ? 'approved' : doc?.status === 'REVISION_REQUESTED' ? 'rejected' : doc?.file_path ? 'uploaded' : 'missing';
+                    const statusLabel = status === 'approved' ? 'مقبول' : status === 'rejected' ? 'مطلوب إعادة الرفع' : status === 'uploaded' ? 'قيد المراجعة' : 'غير مرفوع';
+                    const statusColor = status === 'approved' ? 'var(--success)' : status === 'rejected' ? 'var(--danger)' : status === 'uploaded' ? 'var(--gold)' : 'var(--slate-light)';
+                    return (
+                      <tr key={docType} style={{borderBottom:'1px solid var(--line)'}}>
+                        <td style={{padding:'10px 4px', fontWeight:600}}>
+                          {DOC_TYPE_LABELS[docType]}
+                          {doc?.rejection_reason && status === 'rejected' && (
+                            <div style={{fontSize:11, color:'var(--danger)', marginTop:2}}>{doc.rejection_reason}</div>
+                          )}
+                        </td>
+                        <td style={{textAlign:'center', padding:'10px 4px', color: statusColor, fontWeight:600, fontSize:12}}>{statusLabel}</td>
+                        <td style={{textAlign:'left', padding:'10px 4px'}}>
+                          <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                            {doc?.file_path && (
+                              <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <DownloadSimple size={14} />
+                              </a>
+                            )}
+                            {(status === 'missing' || status === 'rejected') && (
+                              <>
+                                <input type="file" id={`doc-upload-${docType}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleProactiveUpload(docType, e.target.files[0]); }} />
+                                <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`doc-upload-${docType}`)?.click()} disabled={uploading === docType}>
+                                  {uploading === docType ? 'جاري...' : 'رفع'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Custom requests from admin */}
+                  {requests.filter(r => !['CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED', 'FINAL_REPORT', 'ATTESTATION_SIGNED'].includes(r.document_type)).map(req => {
+                    const uploaded = lifecycleDocs.find(d => d.custom_title === req.custom_title && d.file_path);
+                    return (
+                      <tr key={req.id} style={{borderBottom:'1px solid var(--line)'}}>
+                        <td style={{padding:'10px 4px', fontWeight:600}}>
+                          {req.custom_title || req.document_type}
+                          {req.note && <div style={{fontSize:11, color:'var(--slate)', marginTop:2}}>{req.note}</div>}
+                        </td>
+                        <td style={{textAlign:'center', padding:'10px 4px'}}>
+                          {uploaded ? <span style={{color:'var(--gold)', fontWeight:600, fontSize:12}}>قيد المراجعة</span> : <span style={{color:'var(--danger)', fontWeight:600, fontSize:12}}>مطلوب</span>}
+                        </td>
+                        <td style={{textAlign:'left', padding:'10px 4px'}}>
+                          <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                            {uploaded?.file_path && (
+                              <a href={api.downloadDocument(uploaded.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <DownloadSimple size={14} />
+                              </a>
+                            )}
+                            {!uploaded && (
+                              <>
+                                <input type="file" id={`req-upload-${req.id}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleUpload(req.id, e.target.files[0]); }} />
+                                <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`req-upload-${req.id}`)?.click()} disabled={uploading === req.id}>
+                                  {uploading === req.id ? 'جاري...' : 'رفع'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -507,12 +465,9 @@ export function InternPortal() {
           <div className={`bn-item ${activeTab === 'status' ? 'active' : ''}`} onClick={() => setActiveTab('status')}>
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>الحالة
           </div>
-          <div className={`bn-item ${activeTab === 'docs' ? 'active' : ''}`} onClick={() => setActiveTab('docs')}>
+          <div className={`bn-item ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => setActiveTab('documents')}>
             {pendingCount > 0 && <span className="bn-dot" style={{ background: REQ_DOT, borderColor: REQ_DOT }}></span>}
-            <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>مستنداتي
-          </div>
-          <div className={`bn-item ${activeTab === 'downloads' ? 'active' : ''}`} onClick={() => setActiveTab('downloads')}>
-            <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><path d="M12 15V3M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>تنزيلات
+            <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>المستندات
           </div>
           <div className={`bn-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>ملفي
