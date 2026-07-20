@@ -258,6 +258,28 @@ def _fallback_avatar(side):
     return frame
 
 
+def _thumbnail_square(data, px=400):
+    """Center-crop to a square and downscale to px, returning small JPEG bytes."""
+    try:
+        from PIL import Image as PILImage
+        img = PILImage.open(io.BytesIO(data))
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        w, h = img.size
+        s = min(w, h)
+        left = (w - s) // 2
+        top = (h - s) // 2
+        img = img.crop((left, top, left + s, top + s))
+        if s > px:
+            img = img.resize((px, px), PILImage.LANCZOS)
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=82, optimize=True)
+        out.seek(0)
+        return out.getvalue()
+    except Exception:
+        return None
+
+
 def _photo_flowable(intern, size_cm=2.6):
     """Return an Image/placeholder Table flowable for the intern's avatar."""
     from reportlab.lib.units import cm
@@ -267,6 +289,7 @@ def _photo_flowable(intern, size_cm=2.6):
     side = size_cm * cm
     data = _photo_bytes(intern)
     if data:
+        data = _thumbnail_square(data, 400) or data
         try:
             img = Image(io.BytesIO(data), width=side, height=side)
             frame = Table([[img]], colWidths=[side], rowHeights=[side])
