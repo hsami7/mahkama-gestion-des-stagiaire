@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, WarningCircle, DownloadSimple, Certificate, CalendarCheck, MicrosoftExcelLogo, FilePdf } from '@phosphor-icons/react';
+import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, WarningCircle, DownloadSimple, Certificate, CalendarCheck, MicrosoftExcelLogo, FilePdf, Eye } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -55,6 +55,25 @@ export function Profile() {
   const [approveStartDate, setApproveStartDate] = useState('');
   const [approveEndDate, setApproveEndDate] = useState('');
   const [durationStr, setDurationStr] = useState('');
+
+  // PDF Export Modal State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportMode, setExportMode] = useState<'summary' | 'full'>('summary');
+
+  const handleExportAction = (disposition: 'attachment' | 'inline') => {
+    const url = api.exportInternPdf(intern.id, exportMode, disposition);
+    if (disposition === 'inline') {
+      const win = window.open(url, '_blank');
+      if (win) {
+        const triggerPrint = () => { try { win.focus(); win.print(); } catch (e) {} };
+        win.addEventListener('load', triggerPrint);
+        setTimeout(triggerPrint, 1200);
+      }
+    } else {
+      window.open(url, '_blank');
+    }
+    setShowExportModal(false);
+  };
 
   // Evaluation Modal State
   const [showEvalModal, setShowEvalModal] = useState(false);
@@ -304,7 +323,7 @@ export function Profile() {
            <button title="تصدير الملف الشخصي Excel" onClick={() => window.open(api.exportInterns('excel', [intern.id]), '_blank')} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#E8F5E9', border: '1.5px solid #21A366', color: '#1a1a1a', transition: 'all 0.2s' }}>
              <MicrosoftExcelLogo weight="bold" size={18} color="#1a1a1a" />
            </button>
-           <button title="تصدير الملف الشخصي PDF" onClick={() => window.open(api.exportInternPdf(intern.id), '_blank')} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#1E5631', border: '1.5px solid #1E5631', color: '#fff', transition: 'all 0.2s' }}>
+           <button title="تصدير PDF" onClick={() => { setExportMode('summary'); setShowExportModal(true); }} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#1E5631', border: '1.5px solid #1E5631', color: '#fff', transition: 'all 0.2s' }}>
              <FilePdf weight="bold" size={18} color="#fff" />
            </button>
           <button title="تعديل" onClick={handleEdit} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fef3c7', border: '1.5px solid #f59e0b', color: '#1a1a1a', transition: 'all 0.2s' }}>
@@ -503,6 +522,51 @@ export function Profile() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {showExportModal && (
+        <div className="overlay on" style={{ display: 'flex' }}>
+          <div className="modal">
+            <div className="modal-head">
+              <h3>تصدير PDF</h3>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowExportModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', color: 'var(--slate)' }}>اختر نوع التصدير</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setExportMode('summary')}
+                  style={{ textAlign: 'right', padding: '14px 16px', borderRadius: '10px', cursor: 'pointer', background: exportMode === 'summary' ? 'var(--brand-tint, #EEF4EF)' : 'var(--paper)', border: `1.5px solid ${exportMode === 'summary' ? '#1E5631' : 'var(--line)'}`, transition: 'all 0.2s' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#1E5631' }}>
+                    <FilePdf weight="bold" size={18} color="#1E5631" /> الملف الأساسي فقط
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: 'var(--slate)', marginTop: '4px' }}>ملف من صفحة واحدة: المعلومات الشخصية والأكاديمية وقائمة بالمستندات المرفوعة.</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportMode('full')}
+                  style={{ textAlign: 'right', padding: '14px 16px', borderRadius: '10px', cursor: 'pointer', background: exportMode === 'full' ? 'var(--brand-tint, #EEF4EF)' : 'var(--paper)', border: `1.5px solid ${exportMode === 'full' ? '#1E5631' : 'var(--line)'}`, transition: 'all 0.2s' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#1E5631' }}>
+                    <FileText weight="bold" size={18} color="#1E5631" /> الملف الكامل مع جميع المستندات
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: 'var(--slate)', marginTop: '4px' }}>ملف متعدد الصفحات: بيانات المتدرب متبوعة بجميع المستندات المرفوعة (الاتفاقية، البطاقة الوطنية، التأمين، السيرة الذاتية...).</div>
+                </button>
+              </div>
+            </div>
+            <div className="modal-foot" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="btn btn-ghost" onClick={() => setShowExportModal(false)}>إلغاء</button>
+              <button className="btn btn-ghost" style={{ border: '1.5px solid #1E5631', color: '#1E5631' }} onClick={() => handleExportAction('inline')}>
+                <Eye weight="bold" className="icon" /> معاينة وطباعة
+              </button>
+              <button className="btn" style={{ background: '#1E5631', color: '#fff', border: 'none' }} onClick={() => handleExportAction('attachment')}>
+                <DownloadSimple weight="bold" className="icon" /> تحميل PDF
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
