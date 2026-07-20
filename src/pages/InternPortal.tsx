@@ -40,6 +40,14 @@ export function InternPortal() {
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
 
+  // Build a viewable URL for an uploaded file path (handles bare filenames, full paths, and missing extensions)
+  const buildFileUrl = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    const name = path.replace(/^\/api\/uploads\//, '').replace(/^\//, '');
+    return `http://127.0.0.1:5000/api/uploads/${name}`;
+  };
+
   const seenRequests = useRef<Set<number>>(new Set());
 
   const fetchRequests = async (notifyNew: boolean = false) => {
@@ -330,7 +338,7 @@ export function InternPortal() {
                     </div>
                     <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
                       {uploaded && uploaded.file_path ? (
-                        <a href={uploaded.file_path.startsWith('http') ? uploaded.file_path : `http://127.0.0.1:5000${uploaded.file_path.startsWith('/api/uploads/') ? uploaded.file_path : uploaded.file_path.startsWith('/') ? '/api/uploads' + uploaded.file_path : '/api/uploads/' + uploaded.file_path}`} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
+                        <a href={buildFileUrl(uploaded.file_path)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
                           <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> عرض
                         </a>
                       ) : (
@@ -412,7 +420,7 @@ export function InternPortal() {
                   </div>
                   <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
                     {doc.file_path && (
-                      <a href={doc.file_path.startsWith('http') ? doc.file_path : `http://127.0.0.1:5000${doc.file_path.startsWith('/api/uploads/') ? doc.file_path : doc.file_path.startsWith('/') ? '/api/uploads' + doc.file_path : '/api/uploads/' + doc.file_path}`} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
+                      <a href={buildFileUrl(doc.file_path)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
                         <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> عرض
                       </a>
                     )}

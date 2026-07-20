@@ -139,7 +139,9 @@ export function Profile() {
   };
 
   const handleDownload = (filename: string) => {
-    window.open(`${API_BASE}/documents/${filename}`, '_blank');
+    if (!filename) return;
+    const name = filename.replace(/^\/api\/uploads\//, '').replace(/^\//, '');
+    window.open(`${API_BASE}/documents/${name}`, '_blank');
   };
 
   const handlePrint = () => {
