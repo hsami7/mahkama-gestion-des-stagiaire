@@ -161,20 +161,22 @@ export function InternPortal() {
   };
 
   const totalRequests = requests.length;
-  // A request is only "missing" if the corresponding document is not yet uploaded.
-  const missingCount = useMemo(() => {
-    const docs = internData?.documents;
-    const others = (docs && Array.isArray(docs.others)) ? docs.others : [];
-    return requests.filter((r: any) => {
-      if (r.document_type === 'other') {
-        return !others.some((o: any) => o.name === r.custom_title && o.file && o.file.trim() !== '');
-      }
-      return !(docs && typeof docs[r.document_type] === 'string' && docs[r.document_type].trim() !== '');
-    }).length;
-  }, [requests, internData?.documents]);
 
-  // Pending re-upload requests from the admin (regardless of whether a file is already attached)
-  const pendingCount = requests.length;
+  // Returns true if the document for a given request is already uploaded.
+  const isRequestUploaded = (r: any): boolean => {
+    const docs = internData?.documents;
+    if (r.document_type === 'other') {
+      const others = (docs && Array.isArray(docs.others)) ? docs.others : [];
+      return others.some((o: any) => o.name === r.custom_title && o.file && o.file.trim() !== '');
+    }
+    return !!(docs && typeof docs[r.document_type] === 'string' && docs[r.document_type].trim() !== '');
+  };
+
+  // A request is only "actionable" (still nagging) if its document is not yet uploaded.
+  const missingCount = useMemo(() => requests.filter((r: any) => !isRequestUploaded(r)).length, [requests, internData?.documents]);
+
+  // Pending re-upload requests that are still truly missing a document (drives the banner + dot)
+  const pendingCount = useMemo(() => requests.filter((r: any) => !isRequestUploaded(r)).length, [requests, internData?.documents]);
 
   // Orange/yellow palette for request notifications
   const REQ_BG = '#FFF6E5';
@@ -226,7 +228,7 @@ export function InternPortal() {
                     <div>
                       لديك {pendingCount} طلب لإعادة رفع مستند من الإدارة — <span style={{textDecoration:'underline', cursor:'pointer'}} onClick={() => setActiveTab('docs')}>عرض الطلبات</span>
                       <ul style={{margin:'8px 0 0', paddingRight:18, fontWeight:500, fontSize:12.5, lineHeight:1.9}}>
-                        {requests.map((r: any) => (
+                        {requests.filter((r: any) => !isRequestUploaded(r)).map((r: any) => (
                           <li key={r.id}>{r.custom_title || r.document_type}{r.note ? ` — ${r.note}` : ''}</li>
                         ))}
                       </ul>
@@ -388,10 +390,14 @@ export function InternPortal() {
               {/* Render Custom Requests */}
               {requests.filter(r => !['cin', 'convention', 'demande', 'insurance', 'cv'].includes(r.document_type)).map(req => (
                 <div className="doc-item missing" key={req.id}>
-                  <div className="di"><svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></div>
+                  <div className="di"><svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></div>
                   <div>
                     <div className="dn">{req.custom_title || req.document_type}</div>
-                    <div className="ds" style={{ color: 'var(--danger)' }}>مطلوبة — بانتظار الرفع</div>
+                    {isRequestUploaded(req) ? (
+                      <div className="ds">مرفق متوفر</div>
+                    ) : (
+                      <div className="ds" style={{ color: 'var(--danger)' }}>مطلوبة — بانتظار الرفع</div>
+                    )}
                     {req.note && req.note.trim() !== '' && (
                       <div className="req-note" style={{ fontSize: 12, color: 'var(--slate)', marginTop: 6, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', lineHeight: 1.6 }}>
                         <b style={{ color: 'var(--ink)' }}>ملاحظة: </b>{req.note}
