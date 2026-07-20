@@ -210,21 +210,67 @@ def _status_color(status):
     return mapping.get(s, (_BRAND, _BRAND_LIGHT))
 
 
+def _photo_bytes(intern):
+    """Return raw image bytes for the intern photo from a remote URL or local upload."""
+    path = getattr(intern, "photo_path", None)
+    if not path:
+        return None
+    p = str(path).strip()
+    if p.lower().startswith(("http://", "https://")):
+        try:
+            import urllib.request
+            req = urllib.request.Request(p, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                return resp.read()
+        except Exception:
+            return None
+    local = _resolve_upload(p)
+    if local and not _is_pdf_file(local):
+        try:
+            with open(local, "rb") as f:
+                return f.read()
+        except Exception:
+            return None
+    return None
+
+
+def _fallback_avatar(side):
+    """A drawn person-silhouette placeholder so the cell never looks empty."""
+    from reportlab.lib import colors
+    from reportlab.graphics.shapes import Drawing, Circle, Rect, Wedge
+    from reportlab.platypus import Table, TableStyle
+
+    d = Drawing(side, side)
+    fg = colors.HexColor("#8AA692")
+    d.add(Circle(side / 2.0, side * 0.66, side * 0.16, fillColor=fg, strokeColor=None))
+    d.add(Wedge(side / 2.0, side * 0.12, side * 0.34, 0, 180, fillColor=fg, strokeColor=None))
+    frame = Table([[d]], colWidths=[side], rowHeights=[side])
+    frame.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(_BRAND_LIGHT)),
+        ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#CFDDD2")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    return frame
+
+
 def _photo_flowable(intern, size_cm=2.6):
     """Return an Image/placeholder Table flowable for the intern's avatar."""
     from reportlab.lib.units import cm
     from reportlab.lib import colors
     from reportlab.platypus import Image, Table, TableStyle
-    from reportlab.lib.styles import ParagraphStyle
-    from reportlab.platypus import Paragraph
-    from reportlab.lib.enums import TA_CENTER
 
     side = size_cm * cm
-    local = _resolve_upload(getattr(intern, "photo_path", None))
-    if local and not _is_pdf_file(local):
+    data = _photo_bytes(intern)
+    if data:
         try:
-            from PIL import Image as PILImage  # noqa: F401
-            img = Image(local, width=side, height=side)
+            from reportlab.lib.utils import ImageReader
+            reader = ImageReader(io.BytesIO(data))
+            img = Image(reader, width=side, height=side)
             frame = Table([[img]], colWidths=[side], rowHeights=[side])
             frame.setStyle(TableStyle([
                 ("BOX", (0, 0), (-1, -1), 1, colors.HexColor(_BRAND)),
@@ -238,24 +284,7 @@ def _photo_flowable(intern, size_cm=2.6):
             return frame
         except Exception:
             pass
-    # Fallback avatar placeholder
-    ph_style = ParagraphStyle(
-        "PhotoPlaceholder", fontName="Helvetica", fontSize=size_cm * 9,
-        alignment=TA_CENTER, leading=size_cm * 10,
-        textColor=colors.HexColor("#9AA79B"),
-    )
-    ph = Table([[Paragraph("\u25CB", ph_style)]], colWidths=[side], rowHeights=[side])
-    ph.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(_BRAND_LIGHT)),
-        ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#CFDDD2")),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    return ph
+    return _fallback_avatar(side)
 
 
 def build_intern_pdf(interns, mode="summary"):
@@ -566,13 +595,6 @@ def build_intern_pdf(interns, mode="summary"):
         return buffer
 
     for intern, title, local in attachments:
-        divider = _attachment_divider(intern, title)
-        if divider is not None:
-            try:
-                for page in PdfReader(divider).pages:
-                    writer.add_page(page)
-            except Exception:
-                pass
         pages_added = False
         if _is_pdf_file(local):
             try:
@@ -653,11 +675,6 @@ def _simple_page(title_text, subtitle_text=None):
         return None
     buf.seek(0)
     return buf
-
-
-def _attachment_divider(intern, title):
-    reg = "INT-%04d" % intern.id
-    return _simple_page(title, "%s · %s" % (reg, intern.name or ""))
 
 
 def _attachment_error(intern, title):
