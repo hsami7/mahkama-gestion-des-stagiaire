@@ -812,7 +812,12 @@ def create_document_request(intern_id):
                 filename = f"tpl_{uuid.uuid4().hex}.pdf"
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 template_path = f"/api/uploads/{filename}"
-        
+
+    # Prevent duplicate pending requests for the same document: supersede any existing one
+    DocumentRequest.query.filter_by(
+        intern_id=intern_id, document_type=doc_type, custom_title=custom_title, status='pending'
+    ).update({'status': 'superseded'})
+
     new_request = DocumentRequest(
         intern_id=intern_id,
         document_type=doc_type,
@@ -959,6 +964,13 @@ def upload_requested_document(request_id):
                 docs[doc_request.document_type] = file_url
 
             intern.documents = json.dumps(docs)
+            # Fulfill this request and any other pending request for the same document
+            DocumentRequest.query.filter_by(
+                intern_id=intern.id,
+                document_type=doc_request.document_type,
+                custom_title=doc_request.custom_title,
+                status='pending'
+            ).update({'status': 'fulfilled'})
             doc_request.status = 'fulfilled'
             db.session.commit()
             log_action(current_user.get('name'), f"قام برفع مستند ({doc_request.custom_title or doc_request.document_type}) استجابة لطلب")
@@ -1017,10 +1029,15 @@ def upload_unrequested_document():
         import json
         docs = json.loads(intern.documents or "{}")
         docs[doc_type] = file_url
-            
+
+        # Fulfill any pending request that matches this document (proactive upload counts as fulfilling)
+        DocumentRequest.query.filter_by(
+            intern_id=intern.id, document_type=doc_type, status='pending'
+        ).update({'status': 'fulfilled'})
+
         intern.documents = json.dumps(docs)
         db.session.commit()
-        
+
         log_action(current_user.get('name'), f"قام برفع مستند إضافي ({doc_type})")
         return jsonify({"msg": "تم رفع المستند بنجاح"}), 200
         
@@ -1028,4 +1045,4 @@ def upload_unrequested_document():
 
 if __name__ == '__main__':
     init_db()
-    app.run(port=5000, debug=True)
+    app.run(port=5055, debug=True)

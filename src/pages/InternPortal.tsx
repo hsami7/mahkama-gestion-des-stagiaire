@@ -45,7 +45,7 @@ export function InternPortal() {
     if (!path) return '';
     if (path.startsWith('http')) return path;
     const name = path.replace(/^\/api\/uploads\//, '').replace(/^\//, '');
-    return `http://127.0.0.1:5000/api/uploads/${name}`;
+    return `http://127.0.0.1:5055/api/uploads/${name}`;
   };
 
   const seenRequests = useRef<Set<number>>(new Set());
@@ -152,6 +152,7 @@ export function InternPortal() {
       await api.post(`/intern/upload_unrequested`, formData);
       showToast('تم رفع المستند بنجاح!', 'success');
       fetchProfile();
+      fetchRequests();
     } catch (err: any) {
       showToast(err?.message || 'حدث خطأ أثناء الرفع', 'error');
     } finally {
@@ -400,7 +401,7 @@ export function InternPortal() {
                   <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
                     {req.template_path && (
                       <a 
-                        href={`http://127.0.0.1:5000${req.template_path.startsWith('/') ? '' : '/'}${req.template_path}`} 
+                        href={`http://127.0.0.1:5055${req.template_path.startsWith('/') ? '' : '/'}${req.template_path}`} 
                         target="_blank" 
                         rel="noreferrer" 
                         className="btn btn-ghost sm" 
