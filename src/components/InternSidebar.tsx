@@ -7,13 +7,15 @@ interface InternSidebarProps {
   internData: any;
   user: any;
   missingCount: number;
+  pendingCount?: number;
+  reqDotColor?: string;
   onLogout: () => void;
 }
 
-export function InternSidebar({ activeTab, setActiveTab, internData, user, missingCount, onLogout }: InternSidebarProps) {
+export function InternSidebar({ activeTab, setActiveTab, internData, user, missingCount, pendingCount = 0, reqDotColor = '#F4B400', onLogout }: InternSidebarProps) {
   const navItems = [
     { id: 'status', name: 'حالة الطلب', icon: <House size={24} /> },
-    { id: 'docs', name: 'مستنداتي', icon: <FileText size={24} />, badge: missingCount > 0 },
+    { id: 'docs', name: 'مستنداتي', icon: <FileText size={24} />, badge: pendingCount > 0 },
     { id: 'downloads', name: 'التنزيلات', icon: <DownloadSimple size={24} /> },
     { id: 'profile', name: 'ملفي الشخصي', icon: <User size={24} /> },
   ];
@@ -44,7 +46,7 @@ export function InternSidebar({ activeTab, setActiveTab, internData, user, missi
                 {item.icon}
                 {item.name}
               </div>
-              {item.badge && <span className="badge-dot" style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', display: 'inline-block' }}></span>}
+              {item.badge && <span className="badge-dot" style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: reqDotColor, display: 'inline-block' }}></span>}
             </button>
           );
         })}

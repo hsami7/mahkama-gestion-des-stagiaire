@@ -172,6 +172,15 @@ export function InternPortal() {
     }).length;
   }, [requests, internData?.documents]);
 
+  // Pending re-upload requests from the admin (regardless of whether a file is already attached)
+  const pendingCount = requests.length;
+
+  // Orange/yellow palette for request notifications
+  const REQ_BG = '#FFF6E5';
+  const REQ_FG = '#9A6B00';
+  const REQ_BORDER = '#F2D49B';
+  const REQ_DOT = '#F4B400';
+
   const getPageTitle = (tab: string) => {
     switch (tab) {
       case 'status': return 'حالة الطلب';
@@ -190,6 +199,8 @@ export function InternPortal() {
         internData={internData} 
         user={user} 
         missingCount={missingCount} 
+        pendingCount={pendingCount} 
+        reqDotColor={REQ_DOT} 
         onLogout={handleLogout} 
       />
       <div className="main">
@@ -208,10 +219,17 @@ export function InternPortal() {
             {/* PENDING STATE */}
             {(!internData?.status || internData?.status === 'قيد المراجعة') && (
               <div className="state-block on">
-                {missingCount > 0 && (
-                  <div className="alert bad" style={{display:'flex', alignItems:'center', gap:10, padding:'16px 18px', borderRadius:'12px', marginBottom:18, fontSize:'13.5px', fontWeight:700, background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid #EBC9C4'}}>
-                    <svg className="icon" viewBox="0 0 24 24" style={{stroke:'var(--danger)', width:24, height:24}}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-                    لديك {missingCount} وثائق ناقصة تمنع استكمال المراجعة — <span style={{textDecoration:'underline', cursor:'pointer'}} onClick={() => setActiveTab('docs')}>إكمالها الآن</span>
+                {pendingCount > 0 && (
+                  <div className="alert req" style={{display:'flex', alignItems:'flex-start', gap:10, padding:'16px 18px', borderRadius:'12px', marginBottom:18, fontSize:'13.5px', fontWeight:700, background: REQ_BG, color: REQ_FG, border:`1px solid ${REQ_BORDER}`}}>
+                    <svg className="icon" viewBox="0 0 24 24" style={{stroke: REQ_FG, width:24, height:24, flexShrink:0, marginTop:2}}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                    <div>
+                      لديك {pendingCount} طلب لإعادة رفع مستند من الإدارة — <span style={{textDecoration:'underline', cursor:'pointer'}} onClick={() => setActiveTab('docs')}>عرض الطلبات</span>
+                      <ul style={{margin:'8px 0 0', paddingRight:18, fontWeight:500, fontSize:12.5, lineHeight:1.9}}>
+                        {requests.map((r: any) => (
+                          <li key={r.id}>{r.custom_title || r.document_type}{r.note ? ` — ${r.note}` : ''}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 )}
                 
@@ -367,10 +385,7 @@ export function InternPortal() {
               })}
 
               {/* Render Custom Requests */}
-              {requests.filter(r => !['cin', 'convention', 'demande', 'insurance', 'cv'].includes(r.document_type)).filter(req => {
-                const others = (internData?.documents && Array.isArray(internData.documents.others)) ? internData.documents.others : [];
-                return !(req.document_type === 'other' && others.some((o: any) => o.name === req.custom_title && o.file && o.file.trim() !== ''));
-              }).map(req => (
+              {requests.filter(r => !['cin', 'convention', 'demande', 'insurance', 'cv'].includes(r.document_type)).map(req => (
                 <div className="doc-item missing" key={req.id}>
                   <div className="di"><svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></div>
                   <div>
@@ -478,7 +493,7 @@ export function InternPortal() {
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>الحالة
           </div>
           <div className={`bn-item ${activeTab === 'docs' ? 'active' : ''}`} onClick={() => setActiveTab('docs')}>
-            {missingCount > 0 && <span className="bn-dot"></span>}
+            {pendingCount > 0 && <span className="bn-dot" style={{ background: REQ_DOT, borderColor: REQ_DOT }}></span>}
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>مستنداتي
           </div>
           <div className={`bn-item ${activeTab === 'downloads' ? 'active' : ''}`} onClick={() => setActiveTab('downloads')}>
