@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SignIn, LockKey, EnvelopeSimple } from '@phosphor-icons/react';
+import { api } from '../services/api';
 
 export function Login({ setAuthToken }: { setAuthToken: (token: string) => void }) {
   const [email, setEmail] = useState('');
@@ -11,87 +12,82 @@ export function Login({ setAuthToken }: { setAuthToken: (token: string) => void 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      const data = await api.post('/login', { email, password });
       
-      const data = await response.json();
-      
-      if (response.ok) {
-        localStorage.setItem('token', data.access_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setAuthToken(data.access_token);
-        navigate('/');
-      } else {
-        setError(data.msg || 'فشل تسجيل الدخول');
-      }
-    } catch (err) {
-      setError('خطأ في الاتصال بالخادم');
+      sessionStorage.setItem('token', data.access_token);
+      sessionStorage.setItem('user', JSON.stringify(data.user));
+      setAuthToken(data.access_token);
+      navigate('/');
+    } catch (err: any) {
+      setError(err.message || 'فشل تسجيل الدخول');
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="bg-blue-600 text-white w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <LockKey size={24} />
+    <div id="login">
+      <div className="login-card">
+        <div className="login-side">
+          <div>
+            <div className="brand-seal">س</div>
+            <h1>سِجِلّ</h1>
+            <p>نظام إدارة المتدربين<br/>وزارة العدل</p>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">تسجيل الدخول</h2>
-          <p className="text-sm text-gray-500">مرحباً بك في نظام إدارة المتدربين</p>
+          <div className="foot">
+            الإصدار 1.0.0 &copy; 2026
+          </div>
         </div>
+        
+        <div className="login-main">
+          <h2>تسجيل الدخول</h2>
+          <p className="sub">مرحباً بك في نظام إدارة المتدربين</p>
 
-        {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-4 text-sm text-center">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">البريد الإلكتروني</label>
-            <div className="relative">
-              <span className="absolute inset-y-0 right-3 flex items-center text-gray-400">
-                <EnvelopeSimple size={20} />
-              </span>
-              <input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-3 pr-10 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                placeholder="admin@mahkama.ma"
-              />
+          {error && (
+            <div style={{color: 'var(--danger)', backgroundColor: 'var(--danger-bg)', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '13.5px'}}>
+              {error}
             </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">كلمة المرور</label>
-            <div className="relative">
-              <span className="absolute inset-y-0 right-3 flex items-center text-gray-400">
-                <LockKey size={20} />
-              </span>
-              <input 
-                type="password" 
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-3 pr-10 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
+          )}
 
-          <button 
-            type="submit" 
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 mt-6"
-          >
-            <SignIn size={20} />
-            تسجيل الدخول
-          </button>
-        </form>
+          <form onSubmit={handleLogin}>
+            <div className="form-group">
+              <label>البريد الإلكتروني</label>
+              <div style={{ position: 'relative' }}>
+                <EnvelopeSimple size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-light)' }} />
+                <input 
+                  type="email" 
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@mahkama.ma"
+                  style={{ paddingRight: '38px' }}
+                />
+              </div>
+            </div>
+            
+            <div className="form-group">
+              <label>كلمة المرور</label>
+              <div style={{ position: 'relative' }}>
+                <LockKey size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-light)' }} />
+                <input 
+                  type="password" 
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={{ paddingRight: '38px' }}
+                />
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn btn-gold"
+              style={{ width: '100%', justifyContent: 'center', marginTop: '16px', padding: '12px' }}
+            >
+              <SignIn size={20} />
+              تسجيل الدخول
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

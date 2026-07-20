@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../services/api';
 import { InternSidebar } from '../components/InternSidebar';
 import { Header } from '../components/Header';
+import { Messaging } from '../components/Messaging';
 import '../InternPortal.css';
 
 export function InternPortal() {
@@ -12,6 +13,7 @@ export function InternPortal() {
   const [uploading, setUploading] = useState<number | null>(null);
   const [internData, setInternData] = useState<any>(null);
   const [toastMsg, setToastMsg] = useState<{msg: string, type: string} | null>(null);
+  const [messagesCount, setMessagesCount] = useState(0);
 
   const uploadedDocs = useMemo(() => {
     if (!internData?.documents) return [];
@@ -81,18 +83,34 @@ export function InternPortal() {
     }
   };
 
+  const fetchMessagesCount = async () => {
+    if (!internData?.id) return;
+    try {
+      const msgs = await api.getMessages(internData.id);
+      const count = (msgs || []).filter((m: any) => m.sender_role === 'admin' && !(m.waiting_for_reply && m.replied)).length;
+      setMessagesCount(count);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchRequests();
     fetchProfile();
   }, []);
 
+  useEffect(() => {
+    if (internData?.id) fetchMessagesCount();
+  }, [internData?.id]);
+
   // Poll for newly created document requests and notify the intern
   useEffect(() => {
     const interval = setInterval(() => {
       fetchRequests(true);
+      fetchMessagesCount();
     }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [internData?.id]);
 
   const handleLogout = () => {
     sessionStorage.removeItem('token');
@@ -189,6 +207,7 @@ export function InternPortal() {
       case 'status': return 'حالة الطلب';
       case 'docs': return 'مستنداتي';
       case 'downloads': return 'التنزيلات';
+      case 'messages': return 'المراسلات';
       case 'profile': return 'ملفي الشخصي';
       default: return 'بوابة المتدرب';
     }
@@ -203,6 +222,7 @@ export function InternPortal() {
         user={user} 
         missingCount={missingCount} 
         pendingCount={pendingCount} 
+        messagesCount={messagesCount}
         reqDotColor={REQ_DOT} 
         onLogout={handleLogout} 
       />
@@ -332,7 +352,7 @@ export function InternPortal() {
                 { key: 'insurance', label: 'تأمين التدريب (Insurance)' },
                 { key: 'resume', label: 'السيرة الذاتية (Resume)' }
               ].map(docItem => {
-                const uploaded = uploadedDocs.find(d => d.id === docItem.key);
+                const uploaded = uploadedDocs.find((d: any) => d.id === docItem.key);
                 const req = requests.find(r => r.document_type === docItem.key);
 
                 return (
@@ -441,7 +461,7 @@ export function InternPortal() {
               ))}
 
               {/* Render Custom Uploaded Docs */}
-              {uploadedDocs.filter(d => d.id.startsWith('other-')).map((doc: any, i: number) => (
+              {uploadedDocs.filter((d: any) => d.id.startsWith('other-')).map((doc: any, i: number) => (
                 <div className="doc-item ok" key={doc.id || i}>
                   <div className="di"><svg className="icon" viewBox="0 0 24 24" style={{width:18, height:18}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></div>
                   <div>
@@ -478,6 +498,19 @@ export function InternPortal() {
             </div>
           </div>
 
+          {/* MESSAGES */}
+          <div className={`view ${activeTab === 'messages' ? 'on' : ''}`}>
+            <div className="section-title"><h2 style={{fontSize:19, margin:0}}>المراسلات</h2></div>
+            <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>الرسائل والملفات بينك وبين الإدارة</p>
+            <div className="card" style={{padding: 24}}>
+              {internData?.id ? (
+                <Messaging internId={internData.id} mode="intern" />
+              ) : (
+                <div style={{color:'var(--slate)', fontSize:13}}>جاري التحميل...</div>
+              )}
+            </div>
+          </div>
+
           {/* PROFILE */}
           <div className={`view ${activeTab === 'profile' ? 'on' : ''}`}>
             <div className="profile-head">
@@ -486,7 +519,7 @@ export function InternPortal() {
               </div>
               <div><div className="profile-id">{internData?.name || user?.name}</div><div className="profile-sub">{internData?.email || user?.email}</div></div>
             </div>
-            <div className="card">
+            <div className="card" style={{ padding: '20px 24px' }}>
               <div className="section-title"><h3>المعلومات الشخصية</h3></div>
 
               <div className="info-row"><div className="k">رقم التسجيل</div><div className="v">{internData ? `INT-${internData.id.toString().padStart(4, '0')}` : 'غير محدد'}</div></div>
@@ -513,6 +546,10 @@ export function InternPortal() {
           </div>
           <div className={`bn-item ${activeTab === 'downloads' ? 'active' : ''}`} onClick={() => setActiveTab('downloads')}>
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><path d="M12 15V3M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>تنزيلات
+          </div>
+          <div className={`bn-item ${activeTab === 'messages' ? 'active' : ''}`} onClick={() => setActiveTab('messages')}>
+            {messagesCount > 0 && <span className="bn-dot" style={{ background: '#2F9E44', borderColor: '#2F9E44' }}></span>}
+            <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>مراسلات
           </div>
           <div className={`bn-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>ملفي

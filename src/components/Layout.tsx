@@ -12,6 +12,8 @@ export function Layout() {
       case '/interns': return 'إدارة المتدربين';
       case '/form-builder': return 'منشئ النماذج';
       case '/settings': return 'الإعدادات';
+      case '/attendance': return 'سجل الحضور اليومي';
+      case '/timeline': return 'مخطط تغطية المتدربين';
       default: return 'نظام إدارة المتدربين';
     }
   };
@@ -19,10 +21,12 @@ export function Layout() {
   return (
     <div className="app-container">
       <Sidebar />
-      <main className="main-content">
+      <div className="main">
         <Header title={getPageTitle(location.pathname)} />
-        <Outlet />
-      </main>
+        <div className="view on">
+          <Outlet />
+        </div>
+      </div>
     </div>
   );
 }

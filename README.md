@@ -1,5 +1,15 @@
 # React + TypeScript + Vite
 
+## Running the project
+
+To run the full app (Flask backend + Vite frontend + Electron):
+
+```
+npm run electron:full
+```
+
+The backend must be running on http://localhost:5055 for login to work, otherwise you'll get a "Bad Gateway" / ECONNREFUSED error.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

@@ -102,5 +102,24 @@ export const api = {
       throw new Error(`API Error: ${response.statusText}`);
     }
     return response.json();
-  }
+  },
+
+  getMessages: async (internId: number) => {
+    return api.get(`/interns/${internId}/messages`);
+  },
+
+  sendMessage: async (internId: number, data: FormData) => {
+    return api.post(`/interns/${internId}/messages`, data);
+  },
+
+  deleteMessage: async (internId: number, messageId: number) => {
+    return api.delete(`/interns/${internId}/messages/${messageId}`);
+  },
+
+  exportInternPdf: (internId: number) =>
+    `${API_BASE}/interns/${internId}/profile-pdf?token=${sessionStorage.getItem('token')}`,
+  exportInternMd: (internId: number) =>
+    `${API_BASE}/interns/${internId}/profile-md?token=${sessionStorage.getItem('token')}`,
+  exportInterns: (format: 'pdf' | 'excel', ids?: number[]) =>
+    `${API_BASE}/interns/export?format=${format}${ids && ids.length ? `&ids=${ids.join(',')}` : ''}&token=${sessionStorage.getItem('token')}`,
 };

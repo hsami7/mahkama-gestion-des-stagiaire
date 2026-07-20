@@ -12,7 +12,8 @@ export function UsersPermissions() {
     roles: { view: false, add: false, edit: false, delete: false },
     assign_encadrant: { view: true, add: true, edit: true, delete: false },
     attendance: { view: true, add: true, edit: true, delete: false },
-    approve_interns: { view: true, add: true, edit: true, delete: false }
+    approve_interns: { view: true, add: true, edit: true, delete: false },
+    evaluate_interns: { view: true, add: true, edit: true, delete: false }
   };
 
   const [users, setUsers] = useState<any[]>([]);
@@ -88,7 +89,8 @@ export function UsersPermissions() {
           roles: { view: true, add: true, edit: true, delete: true },
           assign_encadrant: { view: true, add: true, edit: true, delete: true },
           attendance: { view: true, add: true, edit: true, delete: true },
-          approve_interns: { view: true, add: true, edit: true, delete: true }
+          approve_interns: { view: true, add: true, edit: true, delete: true },
+          evaluate_interns: { view: true, add: true, edit: true, delete: true }
         }
       : JSON.parse(newUser.permissions || JSON.stringify(defaultPermissions));
   } catch (e) {}
@@ -108,7 +110,8 @@ export function UsersPermissions() {
     roles: 'الأدوار والصلاحيات',
     assign_encadrant: 'تعيين المؤطر (المشرف)',
     attendance: 'سجل الحضور اليومي',
-    approve_interns: 'قبول ورفض المتدربين'
+    approve_interns: 'قبول ورفض المتدربين',
+    evaluate_interns: 'تقييم المتدربين'
   };
 
   return (

@@ -1,8 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Printer, PencilSimple, Trash, FileText, CheckCircle, WarningCircle, DownloadSimple, Certificate, CalendarCheck } from '@phosphor-icons/react';
+import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, WarningCircle, DownloadSimple, Certificate, CalendarCheck, MicrosoftExcelLogo, FilePdf } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
+import { Messaging } from '../components/Messaging';
+
+const EVAL_CRITERIA = [
+  { key: 'discipline', label: 'الانضباط والالتزام بالمواعيد' },
+  { key: 'skills', label: 'المهارات والكفاءة المهنية' },
+  { key: 'teamwork', label: 'العمل الجماعي والتواصل' },
+  { key: 'initiative', label: 'المبادرة والاجتهاد' },
+  { key: 'quality', label: 'جودة العمل المنجز' },
+];
+const EVAL_MAX_PER = 4;
+const EVAL_TOTAL_MAX = EVAL_CRITERIA.length * EVAL_MAX_PER;
+
+function toDateInputValue(value?: string): string {
+  if (!value || value.trim() === '') return '';
+  const v = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) {
+    const [, d, mo, y] = m;
+    return `${y}-${mo}-${d}`;
+  }
+  return '';
+}
 
 export function Profile() {
   const navigate = useNavigate();
@@ -32,6 +55,12 @@ export function Profile() {
   const [approveStartDate, setApproveStartDate] = useState('');
   const [approveEndDate, setApproveEndDate] = useState('');
   const [durationStr, setDurationStr] = useState('');
+
+  // Evaluation Modal State
+  const [showEvalModal, setShowEvalModal] = useState(false);
+  const [evalScores, setEvalScores] = useState<Record<string, number>>({});
+  const [evalComments, setEvalComments] = useState('');
+  const [savingEval, setSavingEval] = useState(false);
 
   // Calculate duration whenever dates change
   useEffect(() => {
@@ -95,11 +124,13 @@ export function Profile() {
   const isAdmin = user?.role === 'Admin';
   let canAssignEncadrant = isAdmin;
   let canApproveInterns = isAdmin;
+  let canEvaluateInterns = isAdmin;
   if (!isAdmin && user?.permissions) {
     try {
       const perms = JSON.parse(user.permissions);
       if (perms?.assign_encadrant?.edit) canAssignEncadrant = true;
       if (perms?.approve_interns?.edit) canApproveInterns = true;
+      if (perms?.evaluate_interns?.edit) canEvaluateInterns = true;
     } catch (e) {}
   }
 
@@ -144,10 +175,6 @@ export function Profile() {
     window.open(`${API_BASE}/documents/${name}`, '_blank');
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const handleEdit = () => {
     navigate('/interns', { state: { editIntern: intern } });
   };
@@ -175,8 +202,8 @@ export function Profile() {
       return;
     }
 
-    setApproveStartDate(intern.start_date || new Date().toISOString().split('T')[0]);
-    setApproveEndDate(intern.end_date || '');
+    setApproveStartDate(toDateInputValue(intern.start_date) || new Date().toISOString().split('T')[0]);
+    setApproveEndDate(toDateInputValue(intern.end_date));
     setShowApproveModal(true);
   };
 
@@ -204,6 +231,36 @@ export function Profile() {
       toast.success('تم قبول المتدرب وتنشيط حسابه بنجاح!');
     } catch (err) {
       toast.error('فشل القبول');
+    }
+  };
+
+  const openEvalModal = () => {
+    const existing = intern?.evaluation?.criteria || {};
+    const scores: Record<string, number> = {};
+    EVAL_CRITERIA.forEach(c => { scores[c.key] = existing[c.key] ?? 0; });
+    setEvalScores(scores);
+    setEvalComments(intern?.evaluation?.comments || '');
+    setShowEvalModal(true);
+  };
+
+  const evalTotal = EVAL_CRITERIA.reduce((sum, c) => sum + (evalScores[c.key] || 0), 0);
+
+  const saveEvaluation = async () => {
+    setSavingEval(true);
+    try {
+      const res = await api.post(`/interns/${id}/evaluation`, {
+        criteria: evalScores,
+        comments: evalComments,
+        total: evalTotal,
+        max: EVAL_TOTAL_MAX,
+      });
+      setIntern({ ...intern, evaluation: res.evaluation });
+      setShowEvalModal(false);
+      toast.success('تم حفظ تقييم المتدرب بنجاح!');
+    } catch (err) {
+      toast.error('فشل حفظ التقييم');
+    } finally {
+      setSavingEval(false);
     }
   };
 
@@ -244,9 +301,12 @@ export function Profile() {
           <button title="تحميل شهادة التدريب" onClick={() => window.open(`${API_BASE}/interns/${intern.id}/attestation?token=${sessionStorage.getItem('token')}`, '_blank')} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#e0e7ff', border: '1.5px solid #6366f1', color: '#1a1a1a', transition: 'all 0.2s' }}>
             <Certificate weight="bold" size={18} color="#1a1a1a" />
           </button>
-          <button title="طباعة" onClick={handlePrint} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#f4f5f7', border: '1.5px solid #d1d5db', color: '#1a1a1a', transition: 'all 0.2s' }}>
-            <Printer weight="bold" size={18} color="#1a1a1a" />
-          </button>
+           <button title="تصدير الملف الشخصي Excel" onClick={() => window.open(api.exportInterns('excel', [intern.id]), '_blank')} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#E8F5E9', border: '1.5px solid #21A366', color: '#1a1a1a', transition: 'all 0.2s' }}>
+             <MicrosoftExcelLogo weight="bold" size={18} color="#1a1a1a" />
+           </button>
+           <button title="تصدير الملف الشخصي PDF" onClick={() => window.open(api.exportInternPdf(intern.id), '_blank')} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#1E5631', border: '1.5px solid #1E5631', color: '#fff', transition: 'all 0.2s' }}>
+             <FilePdf weight="bold" size={18} color="#fff" />
+           </button>
           <button title="تعديل" onClick={handleEdit} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fef3c7', border: '1.5px solid #f59e0b', color: '#1a1a1a', transition: 'all 0.2s' }}>
             <PencilSimple weight="bold" size={18} color="#1a1a1a" />
           </button>
@@ -382,6 +442,12 @@ export function Profile() {
         </div>
       </div>
 
+      {intern.status === 'نشط' && (
+        <div className="card" style={{ padding: '24px', marginTop: '24px' }}>
+          <Messaging internId={intern.id} mode="admin" />
+        </div>
+      )}
+
       {canApproveInterns && intern.status !== 'نشط' && intern.status !== 'مرفوض' && (
         <div className="card" style={{ padding: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '20px', borderTop: '4px solid var(--gold)', background: 'linear-gradient(to left, var(--paper), var(--bg))' }}>
           <div>
@@ -395,6 +461,100 @@ export function Profile() {
             <button className="btn btn-primary" onClick={handleApproveClick} style={{ padding: '12px 24px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
               ✓ قبول الطلب وتنشيط الحساب
             </button>
+          </div>
+        </div>
+      )}
+
+      {intern.status === 'نشط' && (canEvaluateInterns || intern.evaluation) && (
+        <div className="card" style={{ padding: '28px', marginTop: '24px', borderTop: '4px solid var(--success)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>تقييم المتدرب</h3>
+              <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>تقييم أداء المتدرب بناءً على معايير محددة.</p>
+            </div>
+            {canEvaluateInterns && (
+              <button className="btn btn-primary" onClick={openEvalModal} style={{ padding: '12px 24px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px' }}>
+                {intern.evaluation ? 'تعديل التقييم' : '★ تقييم المتدرب'}
+              </button>
+            )}
+          </div>
+
+          {intern.evaluation && (
+            <div style={{ marginTop: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <span style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--success)' }}>
+                  {intern.evaluation.total}/{intern.evaluation.max}
+                </span>
+                <span style={{ fontSize: '13px', color: 'var(--slate)' }}>
+                  بواسطة {intern.evaluation.evaluator} · {intern.evaluation.date}
+                </span>
+              </div>
+              {EVAL_CRITERIA.map(c => (
+                <div key={c.key} className="info-row">
+                  <span className="k">{c.label}</span>
+                  <span className="v">{intern.evaluation.criteria?.[c.key] ?? 0} / {EVAL_MAX_PER}</span>
+                </div>
+              ))}
+              {intern.evaluation.comments && (
+                <div style={{ marginTop: '12px', background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--slate)', display: 'block', marginBottom: '4px' }}>ملاحظات المقيّم:</span>
+                  {intern.evaluation.comments}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {showEvalModal && (
+        <div className="overlay on" style={{ display: 'flex' }}>
+          <div className="modal">
+            <div className="modal-head">
+              <h3>تقييم المتدرب</h3>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowEvalModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {EVAL_CRITERIA.map(c => (
+                <div key={c.key} className="form-group">
+                  <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{c.label}</span>
+                    <span style={{ color: 'var(--gold-dark)', fontWeight: 'bold' }}>{evalScores[c.key] ?? 0} / {EVAL_MAX_PER}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={EVAL_MAX_PER}
+                    step={1}
+                    value={evalScores[c.key] ?? 0}
+                    onChange={e => setEvalScores({ ...evalScores, [c.key]: Number(e.target.value) })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              ))}
+              <div style={{ background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', margin: '8px 0 16px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--slate)' }}>المجموع الكلي:</span>
+                <div style={{ fontWeight: 'bold', color: 'var(--gold-dark)', marginTop: '4px', fontSize: '1.2rem' }}>
+                  {evalTotal} / {EVAL_TOTAL_MAX}
+                </div>
+              </div>
+              <div className="form-group">
+                <label>ملاحظات (اختياري)</label>
+                <textarea
+                  className="input"
+                  rows={4}
+                  value={evalComments}
+                  onChange={e => setEvalComments(e.target.value)}
+                  placeholder="أضف ملاحظاتك حول أداء المتدرب..."
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-ghost" onClick={() => setShowEvalModal(false)}>إلغاء</button>
+              <button className="btn btn-success" style={{ background: 'var(--success)', color: '#fff', border: 'none' }} onClick={saveEvaluation} disabled={savingEval}>
+                {savingEval ? 'جاري الحفظ...' : 'حفظ التقييم'}
+              </button>
+            </div>
           </div>
         </div>
       )}

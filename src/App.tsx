@@ -8,6 +8,11 @@ import { DocumentVault } from './pages/DocumentVault';
 import { Login } from './pages/Login';
 import { UsersPermissions } from './pages/UsersPermissions';
 import { InternPortal } from './pages/InternPortal';
+import { Settings } from './pages/Settings';
+import { Profile } from './pages/Profile';
+import { Attendance } from './pages/Attendance';
+import { Timeline } from './pages/Timeline';
+import PublicForm from './pages/PublicForm';
 
 function ProtectedRoute({ children, token }: { children: React.ReactNode, token: string | null }) {
   if (!token) {
@@ -17,48 +22,52 @@ function ProtectedRoute({ children, token }: { children: React.ReactNode, token:
 }
 
 function App() {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(sessionStorage.getItem('token'));
   
-  const userStr = localStorage.getItem('user');
+  const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
   const isIntern = user?.role === 'Intern';
 
   // Update token state if changed in other tabs or logged out
   useEffect(() => {
     const checkToken = () => {
-      setToken(localStorage.getItem('token'));
+      setToken(sessionStorage.getItem('token'));
     };
     window.addEventListener('storage', checkToken);
     return () => window.removeEventListener('storage', checkToken);
   }, []);
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login setAuthToken={setToken} />} />
-        
+    <Routes>
+      <Route path="/login" element={<Login setAuthToken={setToken} />} />
+      <Route path="/apply" element={<PublicForm />} />
+      
+
+      {isIntern ? (
+        <Route path="/*" element={
+          <ProtectedRoute token={token}>
+            <InternPortal />
+          </ProtectedRoute>
+        } />
+      ) : (
         <Route path="/" element={
           <ProtectedRoute token={token}>
             <Layout />
           </ProtectedRoute>
         }>
-          {isIntern ? (
-            <>
-              <Route index element={<InternPortal />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </>
-          ) : (
-            <>
-              <Route index element={<Dashboard />} />
-              <Route path="interns" element={<Interns />} />
-              <Route path="form-builder" element={<FormBuilder />} />
-              <Route path="vault" element={<DocumentVault />} />
-              <Route path="users" element={<UsersPermissions />} />
-            </>
-          )}
+          <Route index element={<Dashboard />} />
+          <Route path="interns" element={<Interns />} />
+          <Route path="interns/:id" element={<Profile />} />
+          <Route path="form-builder" element={<FormBuilder />} />
+          <Route path="vault" element={<DocumentVault />} />
+          <Route path="attendance" element={<Attendance />} />
+          <Route path="timeline" element={<Timeline />} />
+          <Route path="users" element={<UsersPermissions />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
-      </Routes>
-    </BrowserRouter>
+      )}
+    </Routes>
   );
 }
 

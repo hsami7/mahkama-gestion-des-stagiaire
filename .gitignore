@@ -22,3 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python
+__pycache__/
+*.pyc
+
+# Databases (local data)
+*.sqlite
+database.sqlite
+instance/
+
+# Uploaded files / generated assets
+backend/uploads/
+backend/vault/
+interns_output.json
+
+# Local agent/skills dir
+.agents/

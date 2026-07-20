@@ -21,6 +21,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 jwt = JWTManager(app)
 db = SQLAlchemy(app)
 
+# Allow download endpoints (opened via window.open) to authenticate using ?token=...
+# in addition to the standard Authorization: Bearer header.
+app.config['JWT_TOKEN_LOCATION'] = ['headers', 'query_string']
+app.config['JWT_QUERY_STRING_NAME'] = 'token'
+
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -76,6 +81,7 @@ class Intern(db.Model):
     university = db.Column(db.String(150), nullable=True)
     address = db.Column(db.Text, nullable=True)
     documents = db.Column(db.Text, nullable=True)
+    evaluation = db.Column(db.Text, nullable=True)
 
 class Attendance(db.Model):
     __tablename__ = 'attendance'
@@ -100,6 +106,20 @@ class Form(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     form_data = db.Column(db.Text, nullable=False)
 
+class Message(db.Model):
+    __tablename__ = 'messages'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
+    sender_role = db.Column(db.String(20), nullable=False)  # 'admin' or 'intern'
+    sender_name = db.Column(db.String(150), nullable=True)
+    body = db.Column(db.Text, nullable=True)
+    attachment_path = db.Column(db.String(255), nullable=True)
+    attachment_name = db.Column(db.String(255), nullable=True)
+    waiting_for_reply = db.Column(db.Boolean, default=False)
+    expected_format = db.Column(db.String(20), nullable=True)  # 'text', 'pdf', 'word', 'any'
+    replied = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.String(50), nullable=False)
+
 class SystemLog(db.Model):
     __tablename__ = 'system_logs'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -120,6 +140,15 @@ def log_action(user, action):
 def init_db():
     with app.app_context():
         db.create_all()
+        # Auto-add newer columns to existing DBs
+        try:
+            cols = [c['name'] for c in db.inspect(db.engine).get_columns('interns')]
+            if 'evaluation' not in cols:
+                db.session.execute(db.text('ALTER TABLE interns ADD COLUMN evaluation TEXT'))
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Migration check failed: {e}")
         # Create default Admin user if none exists
         admin = User.query.filter_by(email='admin@mahkama.ma').first()
         if not admin:
@@ -279,7 +308,8 @@ def get_interns():
         "status": i.status,
         "photo_path": i.photo_path,
         "start_date": i.start_date,
-        "end_date": i.end_date
+        "end_date": i.end_date,
+        "department": i.department
     } for i in interns])
 
 @app.route('/api/interns/<int:intern_id>', methods=['GET'])
@@ -294,6 +324,13 @@ def get_intern(intern_id):
     if intern.documents:
         try:
             docs = json.loads(intern.documents)
+        except:
+            pass
+
+    evaluation = None
+    if intern.evaluation:
+        try:
+            evaluation = json.loads(intern.evaluation)
         except:
             pass
             
@@ -313,7 +350,8 @@ def get_intern(intern_id):
         "date_of_birth": intern.date_of_birth,
         "university": intern.university,
         "address": intern.address,
-        "documents": docs
+        "documents": docs,
+        "evaluation": evaluation
     })
 
 @app.route('/api/interns', methods=['POST'])
@@ -386,6 +424,8 @@ def update_intern(intern_id):
     intern.date_of_birth = data.get('date_of_birth', intern.date_of_birth)
     intern.university = data.get('university', intern.university)
     intern.address = data.get('address', intern.address)
+    if 'status' in data:
+        intern.status = data.get('status')
     
     if 'photo_path' in data:
         intern.photo_path = data.get('photo_path')
@@ -399,6 +439,32 @@ def update_intern(intern_id):
     log_action(user_name, f"قام بتعديل بيانات المتدرب: {intern.name}")
     
     return jsonify({"success": True})
+
+@app.route('/api/interns/<int:intern_id>/evaluation', methods=['POST'])
+@jwt_required()
+def save_evaluation(intern_id):
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+
+    import json
+    data = request.json or {}
+    current_user = get_jwt()
+    user_name = current_user.get('name') if current_user else 'Unknown'
+
+    evaluation = {
+        "criteria": data.get('criteria', {}),
+        "comments": data.get('comments', ''),
+        "total": data.get('total'),
+        "max": data.get('max'),
+        "evaluator": user_name,
+        "date": datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    intern.evaluation = json.dumps(evaluation, ensure_ascii=False)
+    db.session.commit()
+
+    log_action(user_name, f"قام بتقييم المتدرب: {intern.name}")
+    return jsonify({"success": True, "evaluation": evaluation})
 
 @app.route('/api/interns/<int:intern_id>/attendance', methods=['GET'])
 @jwt_required()
@@ -1042,6 +1108,455 @@ def upload_unrequested_document():
         return jsonify({"msg": "تم رفع المستند بنجاح"}), 200
         
     return jsonify({"msg": "Invalid file. Only PDF is allowed."}), 400
+
+# --- MESSAGING ROUTES (admin <-> intern) ---
+def build_file_url(path: str) -> str:
+    if not path:
+        return ''
+    if path.startswith('http'):
+        return path
+    name = path.replace('/api/uploads/', '').replace('/api/documents/', '').replace('/', '')
+    return f"http://127.0.0.1:5055/api/uploads/{name}"
+
+def allowed_message_attachment(filename: str) -> bool:
+    if not filename:
+        return False
+    ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+    return ext in ('pdf', 'doc', 'docx', 'txt', 'png', 'jpg', 'jpeg', 'webp')
+
+@app.route('/api/interns/<int:intern_id>/messages', methods=['GET'])
+@jwt_required()
+def get_messages(intern_id):
+    msgs = Message.query.filter_by(intern_id=intern_id).order_by(Message.created_at.asc()).all()
+    result = []
+    for m in msgs:
+        result.append({
+            "id": m.id,
+            "intern_id": m.intern_id,
+            "sender_role": m.sender_role,
+            "sender_name": m.sender_name,
+            "body": m.body,
+            "attachment_path": m.attachment_path,
+            "attachment_name": m.attachment_name,
+            "attachment_url": build_file_url(m.attachment_path) if m.attachment_path else None,
+            "waiting_for_reply": m.waiting_for_reply,
+            "expected_format": m.expected_format,
+            "replied": m.replied,
+            "created_at": m.created_at
+        })
+    return jsonify(result), 200
+
+@app.route('/api/interns/<int:intern_id>/messages', methods=['POST'])
+@jwt_required()
+def send_message(intern_id):
+    current_user = get_jwt()
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+
+    role = current_user.get('role')
+    if role == 'Intern':
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        if not user or (intern.email and user.email != intern.email):
+            return jsonify({"msg": "Unauthorized"}), 403
+
+    is_json = request.is_json
+    body = (request.form.get('body') if not is_json else request.json.get('body')) or ''
+    waiting_for_reply = False
+    expected_format = None
+
+    if role != 'Intern':
+        waiting_for_reply = str((request.form.get('waiting_for_reply') if not is_json else request.json.get('waiting_for_reply')) or '').lower() in ('1', 'true', 'on')
+        expected_format = (request.form.get('expected_format') if not is_json else request.json.get('expected_format')) or None
+
+    attachment_path = None
+    attachment_name = None
+    if 'file' in request.files:
+        file = request.files['file']
+        if file and file.filename != '':
+            if not allowed_message_attachment(file.filename):
+                return jsonify({"msg": "عذراً، صيغة الملف غير مدعومة"}), 400
+            file.seek(0, os.SEEK_END)
+            size = file.tell()
+            file.seek(0)
+            if size > 15 * 1024 * 1024:
+                return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 15 ميجابايت"}), 400
+            filename = safe_filename('msg', file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            attachment_path = f"/api/uploads/{filename}"
+            attachment_name = file.filename
+
+    # When an intern replies to a message, mark waiting messages as replied
+    if role == 'Intern' and (body.strip() != '' or attachment_path):
+        Message.query.filter_by(intern_id=intern_id, waiting_for_reply=True).update({'replied': True})
+
+    new_msg = Message(
+        intern_id=intern_id,
+        sender_role='intern' if role == 'Intern' else 'admin',
+        sender_name=current_user.get('name'),
+        body=body,
+        attachment_path=attachment_path,
+        attachment_name=attachment_name,
+        waiting_for_reply=waiting_for_reply and role != 'Intern',
+        expected_format=expected_format if role != 'Intern' else None,
+        replied=False,
+        created_at=datetime.utcnow().isoformat()
+    )
+    db.session.add(new_msg)
+    db.session.commit()
+
+    log_action(current_user.get('name'), f"أرسل رسالة للمتدرب {intern.name}")
+    return jsonify({
+        "id": new_msg.id,
+        "intern_id": new_msg.intern_id,
+        "sender_role": new_msg.sender_role,
+        "sender_name": new_msg.sender_name,
+        "body": new_msg.body,
+        "attachment_path": new_msg.attachment_path,
+        "attachment_name": new_msg.attachment_name,
+        "attachment_url": build_file_url(new_msg.attachment_path) if new_msg.attachment_path else None,
+        "waiting_for_reply": new_msg.waiting_for_reply,
+        "expected_format": new_msg.expected_format,
+        "replied": new_msg.replied,
+        "created_at": new_msg.created_at
+    }), 201
+
+@app.route('/api/interns/<int:intern_id>/messages/<int:message_id>', methods=['DELETE'])
+@jwt_required()
+def delete_message(intern_id, message_id):
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+    msg = Message.query.filter_by(id=message_id, intern_id=intern_id).first()
+    if not msg:
+        return jsonify({"msg": "Message not found"}), 404
+    if msg.attachment_path:
+        try:
+            name = msg.attachment_path.replace('/api/uploads/', '').replace('/', '')
+            fp = os.path.join(app.config['UPLOAD_FOLDER'], name)
+            if os.path.exists(fp):
+                os.remove(fp)
+        except Exception:
+            pass
+    db.session.delete(msg)
+    db.session.commit()
+    return jsonify({"success": True}), 200
+
+# --- PERSONAL PROFILE EXPORT (md / PDF / Excel) ---
+def render_intern_md(intern: Intern) -> str:
+    docs = {}
+    if intern.documents:
+        try:
+            docs = json.loads(intern.documents)
+        except Exception:
+            docs = {}
+    others = docs.get('others', []) if isinstance(docs.get('others'), list) else []
+
+    def row(label, val):
+        return f"| {label} | {val or '—'} |"
+
+    lines = []
+    lines.append(f"# ملف المتدرب: {intern.name}")
+    if intern.name_fr:
+        lines.append(f"**{intern.name_fr}**")
+    lines.append("")
+    lines.append("## المعلومات الشخصية")
+    lines.append("")
+    lines.append("| الحقل | القيمة |")
+    lines.append("| --- | --- |")
+    lines.append(row("رقم التسجيل", f"INT-{intern.id:04d}"))
+    lines.append(row("رقم الهوية الوطنية", intern.national_id))
+    lines.append(row("البريد الإلكتروني", intern.email))
+    lines.append(row("رقم الهاتف", intern.phone))
+    lines.append(row("تاريخ الازدياد", intern.date_of_birth))
+    lines.append(row("تاريخ البدء", intern.start_date))
+    lines.append(row("تاريخ الانتهاء", intern.end_date))
+    lines.append(row("الجامعة أو المعهد", intern.university))
+    lines.append(row("القسم", intern.department))
+    lines.append(row("المؤطر", intern.encadrant))
+    lines.append(row("الحالة", intern.status))
+    lines.append(row("العنوان", intern.address))
+    lines.append("")
+    lines.append("## المستندات")
+    lines.append("")
+    if docs:
+        for k, v in docs.items():
+            if k == 'others':
+                continue
+            if v:
+                lines.append(f"- {k}: {v}")
+    for o in others:
+        if isinstance(o, dict) and o.get('file'):
+            lines.append(f"- {o.get('name', 'مستند إضافي')}: {o.get('file')}")
+    if not docs and not others:
+        lines.append("- لا توجد مستندات.")
+    lines.append("")
+    return "\n".join(lines)
+
+@app.route('/api/interns/<int:intern_id>/profile-md', methods=['GET'])
+@jwt_required()
+def download_profile_md(intern_id):
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+    md = render_intern_md(intern)
+    buffer = io.BytesIO(md.encode('utf-8'))
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name=f"Profil_{intern.id}.md", mimetype='text/markdown')
+
+@app.route('/api/interns/<int:intern_id>/profile-pdf', methods=['GET'])
+@jwt_required()
+def download_profile_pdf(intern_id):
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.enums import TA_RIGHT
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import bidi.algorithm as bidi
+        import arabic_reshaper
+    except ImportError:
+        return jsonify({"msg": "PDF generation library not installed"}), 500
+
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+
+    # Load an Arabic-capable font if available, else fall back to default
+    font_name = "Helvetica"
+    candidates = [
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/tahoma.ttf",
+        os.path.join(os.path.dirname(__file__), "fonts", "arial.ttf"),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            try:
+                pdfmetrics.registerFont(TTFont("Arabic", c))
+                font_name = "Arabic"
+                break
+            except Exception:
+                pass
+
+    def ar(text: str) -> str:
+        if not text:
+            return ""
+        if font_name == "Helvetica":
+            return text
+        try:
+            return bidi.get_display(arabic_reshaper.reshape(text))
+        except Exception:
+            return text
+
+    styles = getSampleStyleSheet()
+    base_style = ParagraphStyle('Ar', fontName=font_name, fontSize=11, alignment=TA_RIGHT, leading=18)
+    title_style = ParagraphStyle('ArTitle', fontName=font_name, fontSize=18, alignment=TA_RIGHT, leading=24, spaceAfter=10)
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    elements: list = []
+    elements.append(Paragraph(ar(f"ملف المتدرب: {intern.name}"), title_style))
+    if intern.name_fr:
+        elements.append(Paragraph(ar(intern.name_fr), base_style))
+    elements.append(Spacer(1, 12))
+
+    data = [
+        [ar("الحقل"), ar("القيمة")],
+        [ar("رقم التسجيل"), ar(f"INT-{intern.id:04d}")],
+        [ar("رقم الهوية الوطنية"), ar(intern.national_id or "—")],
+        [ar("البريد الإلكتروني"), ar(intern.email or "—")],
+        [ar("رقم الهاتف"), ar(intern.phone or "—")],
+        [ar("تاريخ الازدياد"), ar(intern.date_of_birth or "—")],
+        [ar("تاريخ البدء"), ar(intern.start_date or "—")],
+        [ar("تاريخ الانتهاء"), ar(intern.end_date or "—")],
+        [ar("الجامعة أو المعهد"), ar(intern.university or "—")],
+        [ar("القسم"), ar(intern.department or "—")],
+        [ar("المؤطر"), ar(intern.encadrant or "—")],
+        [ar("الحالة"), ar(intern.status or "—")],
+        [ar("العنوان"), ar(intern.address or "—")],
+    ]
+    table = Table(data, colWidths=[6*cm, 10*cm])
+    table.setStyle(TableStyle([
+        ('FONT', (0, 0), (-1, -1), font_name, 11),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E5631')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F4F6F4')]),
+    ]))
+    elements.append(table)
+
+    # Documents section
+    docs = {}
+    if intern.documents:
+        try:
+            docs = json.loads(intern.documents)
+        except Exception:
+            docs = {}
+    elements.append(Spacer(1, 16))
+    elements.append(Paragraph(ar("المستندات"), base_style))
+    doc_lines = []
+    if docs:
+        for k, v in docs.items():
+            if k == 'others':
+                continue
+            if v:
+                doc_lines.append(f"- {k}: {v}")
+    others = docs.get('others', []) if isinstance(docs.get('others'), list) else []
+    for o in others:
+        if isinstance(o, dict) and o.get('file'):
+            doc_lines.append(f"- {o.get('name', 'مستند إضافي')}: {o.get('file')}")
+    if not doc_lines:
+        doc_lines.append("- لا توجد مستندات.")
+    for line in doc_lines:
+        elements.append(Paragraph(ar(line), base_style))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name=f"Profil_{intern.id}.pdf", mimetype='application/pdf')
+
+@app.route('/api/interns/export', methods=['GET'])
+@jwt_required()
+def export_interns():
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+
+    fmt = request.args.get('format', 'pdf').lower()
+    ids_param = request.args.get('ids')
+    if ids_param:
+        try:
+            ids = [int(x) for x in ids_param.split(',') if x.strip()]
+        except ValueError:
+            return jsonify({"msg": "Invalid ids"}), 400
+        interns = Intern.query.filter(Intern.id.in_(ids)).all()
+    else:
+        interns = Intern.query.all()
+
+    if not interns:
+        return jsonify({"msg": "No interns to export"}), 404
+
+    if fmt == 'excel':
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment
+            from openpyxl.utils import get_column_letter
+        except ImportError:
+            return jsonify({"msg": "Excel library not installed"}), 500
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Interns"
+        headers = ["ID", "الاسم", "الاسم (فرنسية)", "البريد", "الهاتف", "رقم الهوية",
+                   "القسم", "المؤطر", "الحالة", "تاريخ البدء", "تاريخ الانتهاء",
+                   "تاريخ الازدياد", "الجامعة", "العنوان"]
+        ws.append(headers)
+        header_fill = PatternFill(start_color="1E5631", end_color="1E5631", fill_type="solid")
+        for col, _ in enumerate(headers, start=1):
+            c = ws.cell(row=1, column=col)
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = header_fill
+            c.alignment = Alignment(horizontal="right", vertical="center")
+        for i in interns:
+            ws.append([
+                i.id, i.name, i.name_fr, i.email, i.phone, i.national_id,
+                i.department, i.encadrant, i.status, i.start_date, i.end_date,
+                i.date_of_birth, i.university, i.address
+            ])
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[get_column_letter(col)].width = 18
+        ws.column_dimensions['B'].width = 24
+        ws.column_dimensions['N'].width = 30
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name="Interns_Export.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    # Default: PDF (one profile per page)
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+        from reportlab.lib.enums import TA_RIGHT
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import bidi.algorithm as bidi
+        import arabic_reshaper
+    except ImportError:
+        return jsonify({"msg": "PDF generation library not installed"}), 500
+
+    font_name = "Helvetica"
+    for c in ["C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/tahoma.ttf"]:
+        if os.path.exists(c):
+            try:
+                pdfmetrics.registerFont(TTFont("Arabic", c))
+                font_name = "Arabic"
+                break
+            except Exception:
+                pass
+
+    def ar(text):
+        if not text:
+            return ""
+        if font_name == "Helvetica":
+            return text
+        try:
+            return bidi.get_display(arabic_reshaper.reshape(text))
+        except Exception:
+            return text
+
+    base_style = ParagraphStyle('Ar', fontName=font_name, fontSize=11, alignment=TA_RIGHT, leading=18)
+    title_style = ParagraphStyle('ArTitle', fontName=font_name, fontSize=18, alignment=TA_RIGHT, leading=24, spaceAfter=10)
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    elements = []
+    for idx, i in enumerate(interns):
+        if idx > 0:
+            elements.append(PageBreak())
+        elements.append(Paragraph(ar(f"ملف المتدرب: {i.name}"), title_style))
+        if i.name_fr:
+            elements.append(Paragraph(ar(i.name_fr), base_style))
+        elements.append(Spacer(1, 12))
+        data = [
+            [ar("الحقل"), ar("القيمة")],
+            [ar("رقم التسجيل"), ar(f"INT-{i.id:04d}")],
+            [ar("رقم الهوية الوطنية"), ar(i.national_id or "—")],
+            [ar("البريد الإلكتروني"), ar(i.email or "—")],
+            [ar("رقم الهاتف"), ar(i.phone or "—")],
+            [ar("تاريخ الازدياد"), ar(i.date_of_birth or "—")],
+            [ar("تاريخ البدء"), ar(i.start_date or "—")],
+            [ar("تاريخ الانتهاء"), ar(i.end_date or "—")],
+            [ar("الجامعة أو المعهد"), ar(i.university or "—")],
+            [ar("القسم"), ar(i.department or "—")],
+            [ar("المؤطر"), ar(i.encadrant or "—")],
+            [ar("الحالة"), ar(i.status or "—")],
+            [ar("العنوان"), ar(i.address or "—")],
+        ]
+        table = Table(data, colWidths=[6*cm, 10*cm])
+        table.setStyle(TableStyle([
+            ('FONT', (0, 0), (-1, -1), font_name, 11),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E5631')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F4F6F4')]),
+        ]))
+        elements.append(table)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name="Interns_Export.pdf", mimetype='application/pdf')
+
 
 if __name__ == '__main__':
     init_db()
