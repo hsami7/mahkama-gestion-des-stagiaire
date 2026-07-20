@@ -409,7 +409,15 @@ export function InternPortal() {
                         <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M12 15V3M7 10l5 5 5-5"/><path d="M4 21h16"/></svg> تحميل النموذج
                       </a>
                     )}
-                    <input 
+                    {(() => {
+                      const cur = (internData?.documents?.others || []).find((o: any) => o.name === req.custom_title && o.file && o.file.trim() !== '');
+                      return cur ? (
+                        <a href={buildFileUrl(cur.file)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{color:'var(--slate)'}}>
+                          <svg className="icon" viewBox="0 0 24 24" style={{width:14, height:14}}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> عرض الحالي
+                        </a>
+                      ) : null;
+                    })()}
+                    <input
                       type="file" 
                       id={`f-${req.id}`} 
                       onChange={e => {

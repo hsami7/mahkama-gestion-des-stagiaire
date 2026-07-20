@@ -1,6 +1,17 @@
 export const API_BASE = '/api';
 import { notify } from '../components/Toast';
 
+// Parse JSON safely; return a plain object (with optional msg) when the body isn't JSON
+// (e.g. an HTML error page from the server) instead of throwing a parse error.
+async function safeJson(response: Response): Promise<any> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { msg: text || response.statusText };
+  }
+}
+
 function getAuthHeaders(isFormData: boolean = false) {
   const token = sessionStorage.getItem('token');
   const headers: any = {};
@@ -43,9 +54,9 @@ export const api = {
       headers: getAuthHeaders(isFormData),
       body: isFormData ? data : JSON.stringify(data)
     });
-    const resData = await response.json();
+    const resData = await safeJson(response);
     if (!response.ok) {
-      throw new Error(resData.msg || 'Something went wrong');
+      throw new Error(typeof resData === 'object' && resData?.msg ? resData.msg : 'حدث خطأ أثناء العملية');
     }
     return resData;
   },
@@ -57,9 +68,9 @@ export const api = {
       headers: getAuthHeaders(isFormData),
       body: isFormData ? data : JSON.stringify(data)
     });
-    const resData = await response.json();
+    const resData = await safeJson(response);
     if (!response.ok) {
-      throw new Error(resData.msg || 'Something went wrong');
+      throw new Error(typeof resData === 'object' && resData?.msg ? resData.msg : 'حدث خطأ أثناء العملية');
     }
     return resData;
   },

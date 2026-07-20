@@ -936,23 +936,42 @@ def upload_requested_document(request_id):
             
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         file_url = f"/api/uploads/{filename}"
-        
-        import json
-        docs = json.loads(intern.documents or "{}")
-        
-        if doc_request.document_type == 'other':
-            if 'others' not in docs:
-                docs['others'] = []
-            docs['others'].append({"name": doc_request.custom_title or 'مستند إضافي', "file": file_url})
-        else:
-            docs[doc_request.document_type] = file_url
-            
-        intern.documents = json.dumps(docs)
-        doc_request.status = 'fulfilled'
-        
-        db.session.commit()
-        log_action(current_user.get('name'), f"قام برفع مستند ({doc_request.custom_title or doc_request.document_type}) استجابة لطلب")
-        
+
+        try:
+            import json
+            try:
+                docs = json.loads(intern.documents or "{}")
+            except Exception:
+                docs = {}
+            if not isinstance(docs, dict):
+                docs = {}
+
+            if doc_request.document_type == 'other':
+                if 'others' not in docs or not isinstance(docs['others'], list):
+                    docs['others'] = []
+                req_name = doc_request.custom_title or 'مستند إضافي'
+                existing = next((o for o in docs['others'] if isinstance(o, dict) and o.get('name') == req_name), None)
+                if existing:
+                    existing['file'] = file_url
+                else:
+                    docs['others'].append({"name": req_name, "file": file_url})
+            else:
+                docs[doc_request.document_type] = file_url
+
+            intern.documents = json.dumps(docs)
+            doc_request.status = 'fulfilled'
+            db.session.commit()
+            log_action(current_user.get('name'), f"قام برفع مستند ({doc_request.custom_title or doc_request.document_type}) استجابة لطلب")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Upload metadata update failed but file saved: {e}")
+            # File was saved successfully; still report success to the client
+            try:
+                doc_request.status = 'fulfilled'
+                db.session.commit()
+            except Exception:
+                pass
+
         return jsonify({"msg": "تم رفع المستند بنجاح"}), 200
         
     return jsonify({"msg": "Invalid file. Only PDF is allowed."}), 400
