@@ -116,8 +116,12 @@ export const api = {
     return api.delete(`/interns/${internId}/messages/${messageId}`);
   },
 
-  exportInternPdf: (internId: number) =>
-    `${API_BASE}/interns/${internId}/profile-pdf?token=${sessionStorage.getItem('token')}`,
+  exportInternPdf: (
+    internId: number,
+    mode: 'summary' | 'full' = 'summary',
+    disposition: 'attachment' | 'inline' = 'attachment',
+  ) =>
+    `${API_BASE}/interns/${internId}/profile-pdf?mode=${mode}&disposition=${disposition}&token=${sessionStorage.getItem('token')}`,
   exportInternMd: (internId: number) =>
     `${API_BASE}/interns/${internId}/profile-md?token=${sessionStorage.getItem('token')}`,
   exportInterns: (format: 'pdf' | 'excel', ids?: number[]) =>
