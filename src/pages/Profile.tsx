@@ -60,19 +60,55 @@ export function Profile() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMode, setExportMode] = useState<'summary' | 'full'>('summary');
 
-  const handleExportAction = (disposition: 'attachment' | 'inline') => {
+  const handleExportAction = async (disposition: 'attachment' | 'inline') => {
     const url = api.exportInternPdf(intern.id, exportMode, disposition);
-    if (disposition === 'inline') {
-      const win = window.open(url, '_blank');
-      if (win) {
-        const triggerPrint = () => { try { win.focus(); win.print(); } catch (e) {} };
-        win.addEventListener('load', triggerPrint);
-        setTimeout(triggerPrint, 1200);
-      }
-    } else {
+    setShowExportModal(false);
+
+    if (disposition !== 'inline') {
+      window.open(url, '_blank');
+      return;
+    }
+
+    // Preview & Print: fetch the PDF, load it in a hidden iframe, then print it.
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('fetch failed');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+
+      let done = false;
+      const cleanup = () => {
+        setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch (e) {}
+          try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+        }, 60000);
+      };
+      iframe.onload = () => {
+        if (done) return;
+        done = true;
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch (e) {
+            window.open(blobUrl, '_blank');
+          }
+          cleanup();
+        }, 400);
+      };
+    } catch (e) {
       window.open(url, '_blank');
     }
-    setShowExportModal(false);
   };
 
   // Evaluation Modal State
