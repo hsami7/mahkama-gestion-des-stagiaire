@@ -24,6 +24,30 @@ db = SQLAlchemy(app)
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+def safe_filename(prefix: str, original: str) -> str:
+    """Generate a safe, unique upload filename while preserving the original extension."""
+    import uuid
+    base = secure_filename(original)
+    # secure_filename may strip the extension for unusual names; recover it from the original
+    ext = ''
+    if '.' in original:
+        ext = '.' + original.rsplit('.', 1)[1].lower()
+        if len(ext) > 10 or not ext[1:].isalnum():
+            ext = ''
+    if not ext and base and '.' in base:
+        ext = '.' + base.rsplit('.', 1)[1].lower()
+    if not base:
+        base = f"{prefix}_{uuid.uuid4().hex}"
+    else:
+        base = base.rsplit('.', 1)[0]  # drop any extension from the base; we re-add it below
+    name = f"{base}{ext}" if ext else base
+    # guarantee uniqueness
+    full = os.path.join(app.config['UPLOAD_FOLDER'], name)
+    if os.path.exists(full):
+        name = f"{base}_{uuid.uuid4().hex[:6]}{ext}"
+    return name
+
+
 # --- MODELS ---
 class User(db.Model):
     __tablename__ = 'users'
@@ -697,10 +721,9 @@ def upload_document():
         if size > 5 * 1024 * 1024:
             return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 5 ميجابايت"}), 400
             
-        filename = secure_filename(file.filename)
-        if not filename or not filename.lower().endswith('.pdf'):
-            import uuid
-            filename = f"doc_{uuid.uuid4().hex[:8]}.pdf"
+        filename = safe_filename('doc', file.filename)
+        if not filename.lower().endswith('.pdf'):
+            filename = f"{filename}.pdf"
             
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         return jsonify({"msg": "تم رفع الملف بنجاح", "filename": filename}), 201
@@ -738,6 +761,10 @@ def download_document(filename):
 
 @app.route('/api/uploads/<filename>', methods=['GET'])
 def serve_upload(filename):
+    import mimetypes
+    path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.isfile(path) and open(path, 'rb').read(5) == b'%PDF-':
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, mimetype='application/pdf')
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # --- SYSTEM LOGS ROUTE ---
@@ -903,10 +930,9 @@ def upload_requested_document(request_id):
         if size > 15 * 1024 * 1024:
             return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 15 ميجابايت"}), 400
             
-        filename = secure_filename(file.filename)
-        if not filename:
-            import uuid
-            filename = f"req_{uuid.uuid4().hex}.pdf"
+        filename = safe_filename('req', file.filename)
+        if not filename.lower().endswith('.pdf'):
+            filename = f"{filename}.pdf"
             
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         file_url = f"/api/uploads/{filename}"
@@ -962,10 +988,9 @@ def upload_unrequested_document():
         if size > 15 * 1024 * 1024:
             return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 15 ميجابايت"}), 400
             
-        filename = secure_filename(file.filename)
-        if not filename:
-            import uuid
-            filename = f"doc_{uuid.uuid4().hex}.pdf"
+        filename = safe_filename('doc', file.filename)
+        if not filename.lower().endswith('.pdf'):
+            filename = f"{filename}.pdf"
             
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         file_url = f"/api/uploads/{filename}"
