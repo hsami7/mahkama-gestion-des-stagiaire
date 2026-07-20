@@ -14,10 +14,12 @@ function createWindow() {
     title: "نظام إدارة المتدربين"
   });
 
+  win.maximize();
+
   if (isDev) {
     // In dev mode, load the Vite local server
-    win.loadURL('http://localhost:5173');
-    win.webContents.openDevTools();
+    win.loadURL('http://localhost:5174');
+    // win.webContents.openDevTools();
   } else {
     // In production, load the built React app
     win.loadFile(path.join(__dirname, 'dist', 'index.html'));
