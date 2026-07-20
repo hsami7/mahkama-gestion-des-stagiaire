@@ -127,6 +127,28 @@ class SystemLog(db.Model):
     user = db.Column(db.String(150), nullable=True)
     action = db.Column(db.Text, nullable=False)
 
+DOC_TYPES = [
+    'CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED',
+    'FINAL_REPORT', 'ATTESTATION_SIGNED', 'OTHER'
+]
+DOC_STATUSES = ['MISSING', 'PENDING_REVIEW', 'REVISION_REQUESTED', 'APPROVED_AND_SIGNED']
+
+class DocumentLifecycle(db.Model):
+    __tablename__ = 'document_lifecycle'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
+    doc_type = db.Column(db.String(50), nullable=False)
+    file_path = db.Column(db.String(255), nullable=True)
+    uploaded_by = db.Column(db.String(20), nullable=True)   # 'INTERN' or 'ADMIN'
+    status = db.Column(db.String(30), default='MISSING')
+    rejection_reason = db.Column(db.Text, nullable=True)
+    is_visible_to_intern = db.Column(db.Boolean, default=False)
+    custom_title = db.Column(db.String(150), nullable=True)
+    created_at = db.Column(db.String(50), nullable=True)
+    updated_at = db.Column(db.String(50), nullable=True)
+
+    intern = db.relationship('Intern', backref='documents_lifecycle')
+
 def log_action(user, action):
     try:
         new_log = SystemLog(user=user, action=action)
@@ -149,6 +171,11 @@ def init_db():
         except Exception as e:
             db.session.rollback()
             print(f"Migration check failed: {e}")
+        # Migrate legacy doc JSON to DocumentLifecycle
+        try:
+            _migrate_legacy_documents()
+        except Exception as e:
+            print(f"Document migration skipped: {e}")
         # Create default Admin user if none exists
         admin = User.query.filter_by(email='admin@mahkama.ma').first()
         if not admin:
@@ -156,6 +183,68 @@ def init_db():
             admin = User(name='مدير النظام', email='admin@mahkama.ma', password=hashed_pw, role='Admin')
             db.session.add(admin)
             db.session.commit()
+
+
+def _migrate_legacy_documents():
+    """Migrate `interns.documents` JSON blob into DocumentLifecycle records."""
+    import json
+    TYPE_MAP = {
+        'cin': 'CIN', 'id': 'CIN', 'identite': 'CIN',
+        'cv': 'CV', 'resume': 'CV',
+        'insurance': 'INSURANCE', 'assurance': 'INSURANCE',
+        'demande': 'DEMANDE',
+        'convention': 'CONVENTION_SIGNED',
+        'photo': 'CIN',
+    }
+    interns = Intern.query.all()
+    now = datetime.utcnow().isoformat()
+    for intern in interns:
+        if not intern.documents:
+            continue
+        try:
+            docs = json.loads(intern.documents)
+        except Exception:
+            continue
+        if not isinstance(docs, dict):
+            continue
+        for k, v in docs.items():
+            if k == 'others':
+                if isinstance(v, list):
+                    for o in v:
+                        if isinstance(o, dict) and o.get('file'):
+                            title = o.get('name', 'مستند إضافي')
+                            existing = DocumentLifecycle.query.filter_by(
+                                intern_id=intern.id, custom_title=title
+                            ).first()
+                            if existing:
+                                continue
+                            dl = DocumentLifecycle(
+                                intern_id=intern.id, doc_type='OTHER',
+                                file_path=o['file'], uploaded_by='INTERN',
+                                status='PENDING_REVIEW', is_visible_to_intern=False,
+                                custom_title=title, created_at=now, updated_at=now
+                            )
+                            db.session.add(dl)
+                continue
+            if not v:
+                continue
+            doc_type = TYPE_MAP.get(k.strip().lower(), 'OTHER')
+            existing = DocumentLifecycle.query.filter_by(
+                intern_id=intern.id, doc_type=doc_type
+            ).filter(
+                DocumentLifecycle.custom_title.is_(None)
+            ).first()
+            if existing:
+                continue
+            dl = DocumentLifecycle(
+                intern_id=intern.id, doc_type=doc_type,
+                file_path=str(v) if isinstance(v, str) else None,
+                uploaded_by='INTERN',
+                status='PENDING_REVIEW', is_visible_to_intern=False,
+                created_at=now, updated_at=now
+            )
+            db.session.add(dl)
+        db.session.commit()
 
 # --- AUTHENTICATION ROUTES ---
 @app.route('/api/login', methods=['POST'])
@@ -1058,6 +1147,7 @@ def upload_requested_document(request_id):
 @jwt_required()
 def upload_unrequested_document():
     user_id = get_jwt_identity()
+    current_user = get_jwt()
     user = User.query.get(user_id)
     if not user:
         return jsonify({"msg": "User not found"}), 404
@@ -1392,6 +1482,307 @@ def export_interns():
     return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
 
 
-if __name__ == '__main__':
+# --- DOCUMENT LIFECYCLE ENDPOINTS ---
+
+DOC_TYPE_LABELS = {
+    'CIN': 'بطاقة التعريف الوطنية (CIN)',
+    'CV': 'السيرة الذاتية (CV)',
+    'INSURANCE': 'التأمين (Assurance)',
+    'DEMANDE': 'طلب التدريب (Demande)',
+    'CONVENTION_SIGNED': 'اتفاقية التدريب الموقعة',
+    'FINAL_REPORT': 'التقرير النهائي',
+    'ATTESTATION_SIGNED': 'شهادة التدريب الموقعة',
+    'OTHER': 'مستند إضافي',
+}
+
+def _seed_doc_records(intern_id):
+    """Ensure one DocumentLifecycle row exists per standard doc_type for this intern."""
+    now = datetime.utcnow().isoformat()
+    for dt in ['CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED', 'FINAL_REPORT', 'ATTESTATION_SIGNED']:
+        existing = DocumentLifecycle.query.filter_by(intern_id=intern_id, doc_type=dt).filter(
+            DocumentLifecycle.custom_title.is_(None)
+        ).first()
+        if not existing:
+            dl = DocumentLifecycle(intern_id=intern_id, doc_type=dt, status='MISSING',
+                                   created_at=now, updated_at=now)
+            db.session.add(dl)
+    db.session.commit()
+
+
+def _get_doc_type_intern():
+    """For intern-portal endpoints: return (intern, user_claims) from JWT matching Intern.email."""
+    claims = get_jwt()
+    role = claims.get('role')
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return None, None, None
+    if role == 'Intern':
+        intern = Intern.query.filter_by(email=user.email).first()
+        return intern, claims, user
+    return None, claims, user
+
+
+@app.route('/api/interns/<int:intern_id>/documents', methods=['GET'])
+@jwt_required()
+def list_intern_documents(intern_id):
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+    _seed_doc_records(intern_id)
+    docs = DocumentLifecycle.query.filter_by(intern_id=intern_id).order_by(DocumentLifecycle.doc_type).all()
+    result = []
+    for d in docs:
+        result.append({
+            "id": d.id,
+            "doc_type": d.doc_type,
+            "label": DOC_TYPE_LABELS.get(d.doc_type, d.custom_title or d.doc_type),
+            "file_path": d.file_path,
+            "uploaded_by": d.uploaded_by,
+            "status": d.status,
+            "rejection_reason": d.rejection_reason,
+            "is_visible_to_intern": d.is_visible_to_intern,
+            "custom_title": d.custom_title,
+            "created_at": d.created_at,
+            "updated_at": d.updated_at,
+        })
+    return jsonify(result), 200
+
+
+@app.route('/api/interns/<int:intern_id>/documents/upload', methods=['POST'])
+@jwt_required()
+def upload_intern_document(intern_id):
+    """Intern uploads a file for a given doc_type (creates or updates lifecycle record)."""
+    intern, claims, user = _get_doc_type_intern()
+    if not intern or intern.id != intern_id:
+        current_user = get_jwt()
+        if current_user.get('role') not in ('Admin',):
+            return jsonify({"msg": "Unauthorized"}), 403
+        intern = Intern.query.get(intern_id)
+        if not intern:
+            return jsonify({"msg": "Intern not found"}), 404
+
+    doc_type = request.form.get('doc_type')
+    if not doc_type or doc_type not in DOC_TYPES:
+        return jsonify({"msg": "Invalid doc_type"}), 400
+
+    if 'file' not in request.files:
+        return jsonify({"msg": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "No selected file"}), 400
+
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"msg": "PDF files only"}), 400
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    if size > 15 * 1024 * 1024:
+        return jsonify({"msg": "File too large (max 15MB)"}), 400
+
+    filename = safe_filename('doc', file.filename)
+    if not filename.lower().endswith('.pdf'):
+        filename += '.pdf'
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    file_url = f"/api/uploads/{filename}"
+
+    custom_title = request.form.get('custom_title')
+    now = datetime.utcnow().isoformat()
+
+    record = DocumentLifecycle.query.filter_by(
+        intern_id=intern.id, doc_type=doc_type
+    ).filter(
+        DocumentLifecycle.custom_title.is_(None) if not custom_title else DocumentLifecycle.custom_title == custom_title
+    ).first()
+
+    if not record:
+        record = DocumentLifecycle(
+            intern_id=intern.id, doc_type=doc_type,
+            status='PENDING_REVIEW', file_path=file_url,
+            uploaded_by='INTERN', is_visible_to_intern=False,
+            custom_title=custom_title, created_at=now, updated_at=now
+        )
+        db.session.add(record)
+    else:
+        record.file_path = file_url
+        record.status = 'PENDING_REVIEW'
+        record.uploaded_by = 'INTERN'
+        record.is_visible_to_intern = False
+        record.rejection_reason = None
+        record.updated_at = now
+
+    db.session.commit()
+
+    # Auto-fulfill any pending DocumentRequest for this doc_type
+    if not custom_title:
+        DocumentRequest.query.filter_by(
+            intern_id=intern.id, document_type=doc_type, status='pending'
+        ).update({'status': 'fulfilled'})
+
+    return jsonify({"msg": "Uploaded successfully", "doc": {
+        "id": record.id, "doc_type": record.doc_type, "status": record.status,
+        "file_path": record.file_path
+    }}), 200
+
+
+@app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/approve', methods=['POST'])
+@jwt_required()
+def approve_document(intern_id, doc_id):
+    current_user = get_jwt()
+    if current_user.get('role') not in ('Admin', 'Manager'):
+        return jsonify({"msg": "Unauthorized"}), 403
+    doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
+    if not doc:
+        return jsonify({"msg": "Document not found"}), 404
+    doc.status = 'APPROVED_AND_SIGNED'
+    doc.is_visible_to_intern = True
+    doc.updated_at = datetime.utcnow().isoformat()
+    db.session.commit()
+    intern = Intern.query.get(intern_id)
+    log_action(current_user.get('name'), f"قبول مستند ({doc.doc_type}) للمتدرب {intern.name if intern else ''}")
+    return jsonify({"success": True, "status": doc.status}), 200
+
+
+@app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/reject', methods=['POST'])
+@jwt_required()
+def reject_document(intern_id, doc_id):
+    current_user = get_jwt()
+    if current_user.get('role') not in ('Admin', 'Manager'):
+        return jsonify({"msg": "Unauthorized"}), 403
+    doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
+    if not doc:
+        return jsonify({"msg": "Document not found"}), 404
+    data = request.json or {}
+    reason = data.get('rejection_reason', '')
+    doc.status = 'REVISION_REQUESTED'
+    doc.rejection_reason = reason
+    doc.is_visible_to_intern = False
+    doc.updated_at = datetime.utcnow().isoformat()
+    db.session.commit()
+    intern = Intern.query.get(intern_id)
+    log_action(current_user.get('name'), f"إعادة مستند ({doc.doc_type}) للمتدرب {intern.name if intern else ''}: {reason}")
+    return jsonify({"success": True, "status": doc.status}), 200
+
+
+@app.route('/api/interns/<int:intern_id>/documents/signed', methods=['POST'])
+@jwt_required()
+def upload_signed_document(intern_id):
+    """Admin uploads a signed/approved version of a document (outgoing to intern)."""
+    current_user = get_jwt()
+    if current_user.get('role') not in ('Admin', 'Manager'):
+        return jsonify({"msg": "Unauthorized"}), 403
+    intern = Intern.query.get(intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+
+    doc_type = request.form.get('doc_type')
+    if not doc_type or doc_type not in DOC_TYPES:
+        return jsonify({"msg": "Invalid doc_type"}), 400
+
+    if 'file' not in request.files:
+        return jsonify({"msg": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "No selected file"}), 400
+
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"msg": "PDF files only"}), 400
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    if size > 15 * 1024 * 1024:
+        return jsonify({"msg": "File too large (max 15MB)"}), 400
+
+    filename = safe_filename('signed', file.filename)
+    if not filename.lower().endswith('.pdf'):
+        filename += '.pdf'
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    file_url = f"/api/uploads/{filename}"
+
+    now = datetime.utcnow().isoformat()
+    existing = DocumentLifecycle.query.filter_by(intern_id=intern.id, doc_type=doc_type).filter(
+        DocumentLifecycle.custom_title.is_(None)
+    ).first()
+    if existing:
+        existing.file_path = file_url
+        existing.status = 'APPROVED_AND_SIGNED'
+        existing.uploaded_by = 'ADMIN'
+        existing.is_visible_to_intern = True
+        existing.updated_at = now
+        db.session.commit()
+        log_action(current_user.get('name'), f"رفع نسخة موقعة من {doc_type} للمتدرب {intern.name}")
+        return jsonify({"msg": "Signed document uploaded", "doc_id": existing.id}), 200
+
+    record = DocumentLifecycle(
+        intern_id=intern.id, doc_type=doc_type, file_path=file_url,
+        uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
+        is_visible_to_intern=True, created_at=now, updated_at=now
+    )
+    db.session.add(record)
+    db.session.commit()
+    log_action(current_user.get('name'), f"رفع نسخة موقعة من {doc_type} للمتدرب {intern.name}")
+    return jsonify({"msg": "Signed document uploaded", "doc_id": record.id}), 201
+
+
+@app.route('/api/intern-documents/<int:doc_id>/download', methods=['GET'])
+def download_intern_document(doc_id):
+    """Secure download: intern can only download if is_visible_to_intern or they uploaded it."""
+    doc = DocumentLifecycle.query.get(doc_id)
+    if not doc or not doc.file_path:
+        return jsonify({"msg": "Document not found"}), 404
+
+    # Determine requester role
+    token = request.args.get('token')
+    intern_identity = None
+    is_admin = False
+    if token:
+        try:
+            from flask_jwt_extended import decode_token
+            decoded = decode_token(token)
+            claims = decoded.get('additional_claims', {})
+            is_admin = claims.get('role') in ('Admin', 'Manager')
+            if claims.get('role') == 'Intern':
+                user = User.query.get(int(decoded.get('sub', 0)))
+                if user:
+                    intern_identity = Intern.query.filter_by(email=user.email).first()
+        except Exception:
+            pass
+
+    if not is_admin:
+        if not intern_identity or intern_identity.id != doc.intern_id:
+            return jsonify({"msg": "Unauthorized"}), 403
+        if not doc.is_visible_to_intern and doc.uploaded_by == 'ADMIN':
+            return jsonify({"msg": "Unauthorized"}), 403
+
+    name = doc.file_path.replace('/api/uploads/', '').replace('/', '')
+    return send_from_directory(app.config['UPLOAD_FOLDER'], name)
+
+
+@app.route('/api/intern/documents', methods=['GET'])
+@jwt_required()
+def list_my_documents():
+    """Intern portal: list all documents visible to the intern."""
+    intern, claims, user = _get_doc_type_intern()
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+    _seed_doc_records(intern.id)
+    docs = DocumentLifecycle.query.filter_by(intern_id=intern.id).order_by(DocumentLifecycle.doc_type).all()
+    result = []
+    for d in docs:
+        entry = {
+            "id": d.id,
+            "doc_type": d.doc_type,
+            "label": DOC_TYPE_LABELS.get(d.doc_type, d.custom_title or d.doc_type),
+            "file_path": d.file_path,
+            "uploaded_by": d.uploaded_by,
+            "status": d.status,
+            "rejection_reason": d.rejection_reason,
+            "is_visible_to_intern": d.is_visible_to_intern,
+            "custom_title": d.custom_title,
+            "created_at": d.created_at,
+            "updated_at": d.updated_at,
+        }
+        result.append(entry)
+    return jsonify(result), 200
     init_db()
     app.run(port=5055, debug=True)
