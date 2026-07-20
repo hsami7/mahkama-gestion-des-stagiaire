@@ -268,9 +268,7 @@ def _photo_flowable(intern, size_cm=2.6):
     data = _photo_bytes(intern)
     if data:
         try:
-            from reportlab.lib.utils import ImageReader
-            reader = ImageReader(io.BytesIO(data))
-            img = Image(reader, width=side, height=side)
+            img = Image(io.BytesIO(data), width=side, height=side)
             frame = Table([[img]], colWidths=[side], rowHeights=[side])
             frame.setStyle(TableStyle([
                 ("BOX", (0, 0), (-1, -1), 1, colors.HexColor(_BRAND)),
