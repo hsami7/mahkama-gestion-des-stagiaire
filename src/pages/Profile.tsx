@@ -3,7 +3,6 @@ import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, WarningCircle, 
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
-import { Messaging } from '../components/Messaging';
 
 const EVAL_CRITERIA = [
   { key: 'discipline', label: 'الانضباط والالتزام بالمواعيد' },
@@ -496,12 +495,6 @@ export function Profile() {
           
         </div>
       </div>
-
-      {intern.status === 'نشط' && (
-        <div className="card" style={{ padding: '24px', marginTop: '24px' }}>
-          <Messaging internId={intern.id} mode="admin" />
-        </div>
-      )}
 
       {canApproveInterns && intern.status !== 'نشط' && intern.status !== 'مرفوض' && (
         <div className="card" style={{ padding: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '20px', borderTop: '4px solid var(--gold)', background: 'linear-gradient(to left, var(--paper), var(--bg))' }}>

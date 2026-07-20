@@ -1,9 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { MagnifyingGlass, Funnel, Hash, CaretDown, Plus, X, CalendarCheck } from '@phosphor-icons/react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { MagnifyingGlass, Funnel, Hash, CaretDown, Plus, X, CalendarCheck, ClipboardText, Certificate, FilePlus } from '@phosphor-icons/react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { api } from '../services/api';
+import { api, API_BASE } from '../services/api';
 import { TestModeAutofill } from '../components/TestModeAutofill';
 import { useToast } from '../components/Toast';
+
+function parseDate(v?: string): Date | null {
+  if (!v) return null;
+  const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
+  return null;
+}
+
+function remainingDays(endDate?: string): number | null {
+  const end = parseDate(endDate);
+  if (!end) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = end.getTime() - today.getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
 
 const defaultIntern = { 
   name: '', name_fr: '', encadrant: '', email: '', national_id: '', department: '',
@@ -25,15 +43,31 @@ export function Interns() {
   const [filterStatus, setFilterStatus] = useState('');
   const [appliedFilters, setAppliedFilters] = useState({ query: '', status: '' });
 
-  const filteredInterns = interns.filter(intern => {
-    const matchQuery = !appliedFilters.query || 
-      (intern.name && intern.name.toLowerCase().includes(appliedFilters.query.toLowerCase())) || 
-      (intern.national_id && intern.national_id.toLowerCase().includes(appliedFilters.query.toLowerCase()));
-    
-    const matchStatus = !appliedFilters.status || intern.status === appliedFilters.status;
+const filteredInterns = useMemo(() => {
+    const arr = interns.filter(intern => {
+      const matchQuery = !appliedFilters.query ||
+        (intern.name && intern.name.toLowerCase().includes(appliedFilters.query.toLowerCase())) ||
+        (intern.national_id && intern.national_id.toLowerCase().includes(appliedFilters.query.toLowerCase()));
 
-    return matchQuery && matchStatus;
-  });
+      const matchStatus = !appliedFilters.status || intern.status === appliedFilters.status;
+
+      return matchQuery && matchStatus;
+    });
+
+    // Sort: active interns by remaining days ascending (closest to end first), then others by status
+    return arr.sort((a, b) => {
+      const aActive = a.status === 'نشط';
+      const bActive = b.status === 'نشط';
+      if (aActive && bActive) {
+        const aRem = remainingDays(a.end_date) ?? 9999;
+        const bRem = remainingDays(b.end_date) ?? 9999;
+        return aRem - bRem;
+      }
+      if (aActive) return -1;
+      if (bActive) return 1;
+      return 0;
+    });
+  }, [interns, appliedFilters]);
 
   const fetchInterns = async () => {
     try {
@@ -561,6 +595,7 @@ export function Interns() {
                 <option value="مستندات ناقصة">مستندات ناقصة</option>
                 <option value="قيد المراجعة">قيد المراجعة</option>
                 <option value="منتهي">منتهي</option>
+                <option value="مرفوض">مرفوض</option>
               </select>
               <CaretDown weight="bold" className="icon" style={{ marginLeft: '-5px' }} />
             </div>
@@ -583,31 +618,70 @@ export function Interns() {
             </button>
           </div>
 
-          {filteredInterns.length > 0 ? (
+{filteredInterns.length > 0 ? (
             <div className="dossier-grid">
-              {filteredInterns.map(intern => (
-                <div key={intern.id} className="dossier" onClick={() => navigate(`/interns/${intern.id}`)}>
-                  <div className="stamp">
-                    {intern.status === 'نشط' && <span className="badge ok"><div className="dot"></div>نشط</span>}
-                    {intern.status === 'مستندات ناقصة' && <span className="badge bad"><div className="dot"></div>مستندات ناقصة</span>}
-                    {intern.status === 'قيد المراجعة' && <span className="badge warn"><div className="dot"></div>قيد المراجعة</span>}
-                    {intern.status === 'منتهي' && <span className="badge" style={{background: 'var(--paper)', color: 'var(--slate)'}}><div className="dot"></div>منتهي</span>}
-                    {intern.status === 'مرفوض' && <span className="badge" style={{background: '#FCE8E6', color: '#B3261E', border: '1px solid #F5C6C3'}}><div className="dot" style={{background: '#B3261E'}}></div>مرفوض</span>}
-                  </div>
-                  
-                  <div className="dossier-top">
-                    <img src={intern.photo_path || `https://i.pravatar.cc/150?u=${intern.id}`} alt={intern.name} className="dossier-photo" />
-                    <div>
-                      <div className="dossier-name">{intern.name}</div>
-                      <div className="dossier-role">متدرب</div>
+              {filteredInterns.map(intern => {
+                const rem = remainingDays(intern.end_date);
+                const isActive = intern.status === 'نشط';
+                const endingSoon = isActive && rem !== null && rem <= 30;
+                return (
+                  <div key={intern.id} className="dossier" onClick={() => navigate(`/interns/${intern.id}`)}>
+                    <div className="stamp">
+                      {intern.status === 'نشط' && <span className="badge ok"><div className="dot"></div>نشط</span>}
+                      {intern.status === 'مستندات ناقصة' && <span className="badge bad"><div className="dot"></div>مستندات ناقصة</span>}
+                      {intern.status === 'قيد المراجعة' && <span className="badge warn"><div className="dot"></div>قيد المراجعة</span>}
+                      {intern.status === 'منتهي' && <span className="badge" style={{background: 'var(--paper)', color: 'var(--slate)'}}><div className="dot"></div>منتهي</span>}
+                      {intern.status === 'مرفوض' && <span className="badge" style={{background: '#FCE8E6', color: '#B3261E', border: '1px solid #F5C6C3'}}><div className="dot" style={{background: '#B3261E'}}></div>مرفوض</span>}
                     </div>
+
+                    <div className="dossier-top">
+                      <img src={intern.photo_path || `https://i.pravatar.cc/150?u=${intern.id}`} alt={intern.name} className="dossier-photo" />
+                      <div>
+                        <div className="dossier-name">{intern.name}</div>
+                        <div className="dossier-role">متدرب</div>
+                      </div>
+                    </div>
+
+                    <div className="dossier-meta">
+                      <span>ID: {2026000 + intern.id}</span>
+                      {isActive && rem !== null && (
+                        <span className={endingSoon ? 'ending-soon' : ''}>
+                          {rem > 0 ? `باقي ${rem} يوم` : rem === 0 ? 'ينتهي اليوم' : 'منتهي'}
+                        </span>
+                      )}
+                    </div>
+
+                    {isActive && endingSoon && (
+                      <div className="dossier-actions" style={{ display: 'flex', gap: '6px', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--line)' }}>
+                        <button
+                          className="btn btn-ghost sm"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/interns/${intern.id}?tab=evaluation`); }}
+                          title="تقييم المتدرب"
+                        >
+                          <ClipboardText size={14} weight="bold" /> تقييم
+                        </button>
+                        <button
+                          className="btn btn-ghost sm"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                          onClick={(e) => { e.stopPropagation(); window.open(`${API_BASE}/interns/${intern.id}/attestation?token=${sessionStorage.getItem('token')}`, '_blank'); }}
+                          title="شهادة التدريب"
+                        >
+                          <Certificate size={14} weight="bold" /> شهادة
+                        </button>
+                        <button
+                          className="btn btn-ghost sm"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/interns/${intern.id}?tab=documents`); }}
+                          title="مستندات نهاية التدريب"
+                        >
+                          <FilePlus size={14} weight="bold" /> ملفات
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  
-                  <div className="dossier-meta">
-                    <span>ID: {2026000 + intern.id}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--slate)', background: 'var(--paper)', borderRadius: '16px', marginTop: '20px' }}>

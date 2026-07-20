@@ -104,18 +104,6 @@ export const api = {
     return response.json();
   },
 
-  getMessages: async (internId: number) => {
-    return api.get(`/interns/${internId}/messages`);
-  },
-
-  sendMessage: async (internId: number, data: FormData) => {
-    return api.post(`/interns/${internId}/messages`, data);
-  },
-
-  deleteMessage: async (internId: number, messageId: number) => {
-    return api.delete(`/interns/${internId}/messages/${messageId}`);
-  },
-
   exportInternPdf: (
     internId: number,
     mode: 'summary' | 'full' = 'summary',
