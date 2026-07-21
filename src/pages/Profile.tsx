@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, Star } from '@phosphor-icons/react';
+import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, ClipboardText } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
 
 const EVAL_CRITERIA = [
-  { key: 'discipline', label: 'الانضباط والالتزام بالمواعيد' },
-  { key: 'skills', label: 'المهارات والكفاءة المهنية' },
-  { key: 'teamwork', label: 'العمل الجماعي والتواصل' },
-  { key: 'initiative', label: 'المبادرة والاجتهاد' },
-  { key: 'quality', label: 'جودة العمل المنجز' },
+  { key: 'punctuality', label: 'المواظبة واحترام الوقت' },
+  { key: 'skills', label: 'المهارات السلوكية والعملية' },
+  { key: 'conduct', label: 'حسن التعامل' },
+  { key: 'seriousness', label: 'الجدية في العمل' },
 ];
-const EVAL_MAX_PER = 4;
-const EVAL_TOTAL_MAX = EVAL_CRITERIA.length * EVAL_MAX_PER;
 
 function toDateInputValue(value?: string): string {
   if (!value || value.trim() === '') return '';
@@ -134,11 +131,16 @@ export function Profile() {
     }
   };
 
-  // Evaluation Modal State
-  const [showEvalModal, setShowEvalModal] = useState(false);
-  const [evalScores, setEvalScores] = useState<Record<string, number>>({});
+  // Evaluation State
+  const [showEvalForm, setShowEvalForm] = useState(false);
+  const [evalTrainingLocation, setEvalTrainingLocation] = useState('');
+  const [evalPeriodFrom, setEvalPeriodFrom] = useState('');
+  const [evalPeriodTo, setEvalPeriodTo] = useState('');
+  const [evalRotations, setEvalRotations] = useState<{supervisor:string;department:string;from:string;to:string}[]>([]);
+  const [evalCriteria, setEvalCriteria] = useState<Record<string,{yes:boolean;no:boolean}>>({});
   const [evalComments, setEvalComments] = useState('');
   const [savingEval, setSavingEval] = useState(false);
+  const [uploadingSigned, setUploadingSigned] = useState(false);
 
   // Calculate duration whenever dates change
   useEffect(() => {
@@ -310,34 +312,111 @@ export function Profile() {
     }
   };
 
-  const openEvalModal = () => {
-    const existing = intern?.evaluation?.criteria || {};
-    const scores: Record<string, number> = {};
-    EVAL_CRITERIA.forEach(c => { scores[c.key] = existing[c.key] ?? 0; });
-    setEvalScores(scores);
-    setEvalComments(intern?.evaluation?.comments || '');
-    setShowEvalModal(true);
+  const openEvalForm = () => {
+    const ev = intern?.evaluation || {};
+    setEvalTrainingLocation(ev.training_location || '');
+    setEvalPeriodFrom(ev.period_from || '');
+    setEvalPeriodTo(ev.period_to || '');
+    setEvalRotations(ev.rotations || []);
+    setEvalCriteria(ev.criteria || {});
+    setEvalComments(ev.comments || '');
+    setShowEvalForm(true);
   };
-
-  const evalTotal = EVAL_CRITERIA.reduce((sum, c) => sum + (evalScores[c.key] || 0), 0);
 
   const saveEvaluation = async () => {
     setSavingEval(true);
     try {
       const res = await api.post(`/interns/${id}/evaluation`, {
-        criteria: evalScores,
+        training_location: evalTrainingLocation,
+        period_from: evalPeriodFrom,
+        period_to: evalPeriodTo,
+        rotations: evalRotations,
+        criteria: evalCriteria,
         comments: evalComments,
-        total: evalTotal,
-        max: EVAL_TOTAL_MAX,
       });
       setIntern({ ...intern, evaluation: res.evaluation });
-      setShowEvalModal(false);
       toast.success('تم حفظ تقييم المتدرب بنجاح!');
     } catch (err) {
       toast.error('فشل حفظ التقييم');
     } finally {
       setSavingEval(false);
     }
+  };
+
+  const addRotation = () => {
+    setEvalRotations([...evalRotations, { supervisor: '', department: '', from: '', to: '' }]);
+  };
+
+  const updateRotation = (idx: number, field: string, value: string) => {
+    const next = [...evalRotations];
+    (next[idx] as any)[field] = value;
+    setEvalRotations(next);
+  };
+
+  const removeRotation = (idx: number) => {
+    setEvalRotations(evalRotations.filter((_, i) => i !== idx));
+  };
+
+  const handleUploadSigned = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pdf')) { toast.error('يجب أن يكون الملف بصيغة PDF'); return; }
+    setUploadingSigned(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await api.post(`/interns/${id}/evaluation/signed-upload`, fd);
+      const ev = { ...(intern?.evaluation || {}), signed_file_path: res.signed_file_path };
+      setIntern({ ...intern, evaluation: ev });
+      toast.success('تم رفع النسخة الموقعة');
+    } catch { toast.error('فشل رفع النسخة الموقعة'); }
+    finally { setUploadingSigned(false); }
+  };
+
+  const handlePrintEval = () => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const ev = intern?.evaluation || {};
+    const crit = evalCriteria || ev.criteria || {};
+    const rots = evalRotations.length > 0 ? evalRotations : (ev.rotations || []);
+    const location = evalTrainingLocation || ev.training_location || '';
+    const pFrom = evalPeriodFrom || ev.period_from || '';
+    const pTo = evalPeriodTo || ev.period_to || '';
+    const comments = evalComments || ev.comments || '';
+    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>بطاقة تقييم التدريب</title><style>
+      body{font-family:'Traditional Arabic','Arial',sans-serif;padding:40px;font-size:14px;line-height:1.8}
+      h1{text-align:center;font-size:22px;margin-bottom:30px}
+      table{width:100%;border-collapse:collapse;margin-bottom:20px}
+      td,th{border:1px solid #333;padding:8px 12px;text-align:right}
+      th{background:#f0f0f0;font-weight:700}
+      .header-table td{width:25%}
+      .section{font-weight:700;background:#e8e8e8;text-align:center}
+      .signature{margin-top:60px;text-align:left;font-weight:700}
+      .notes{margin-top:20px;min-height:100px;border:1px dashed #999;padding:12px;white-space:pre-wrap}
+      .check{font-family:'Arial';font-size:16px}
+      @media print{body{padding:20px}}
+    </style></head><body>`);
+    w.document.write(`<h1>بطاقة تقييم التدريب</h1>`);
+    w.document.write(`<table class="header-table"><tr><td><b>الاسم الكامل:</b> ${intern?.name || ''}</td><td><b>مقر التدريب:</b> ${location}</td><td><b>فترة التدريب المطلوبة:</b></td><td>من: ${pFrom}<br>إلى: ${pTo}</td></tr></table>`);
+    w.document.write(`<table><tr><th colspan="4">معلومات عن التدريب</th></tr>`);
+    w.document.write(`<tr><th>المشرف على التكوين</th><th>الشعبة</th><th>الفترة</th></tr>`);
+    (rots.length > 0 ? rots : [{ supervisor: '', department: '', from: '', to: '' }]).forEach((r: any, i: number) => {
+      w.document.write(`<tr><td>${r.supervisor || ''}</td><td>${r.department || ''}</td><td>${r.label || ('الفترة ' + (i+1))}<br>من: ${r.from || ''} إلى: ${r.to || ''}</td></tr>`);
+    });
+    w.document.write(`</table>`);
+    w.document.write(`<table><tr><th>لا</th><th>نعم</th><th>تقييم المتدرب</th></tr>`);
+    EVAL_CRITERIA.forEach(c => {
+      const val = crit[c.key] || { yes: false, no: false };
+      w.document.write(`<tr><td style="text-align:center;font-size:18px">${val.no ? '☑' : '☐'}</td><td style="text-align:center;font-size:18px">${val.yes ? '☑' : '☐'}</td><td>${c.label}</td></tr>`);
+    });
+    w.document.write(`</table>`);
+    w.document.write(`<div class="section" style="padding:8px;margin-bottom:8px;text-align:center;background:#e8e8e8;font-weight:700">ملاحظات</div>`);
+    w.document.write(`<div class="notes">${comments || ''}</div>`);
+    w.document.write(`<div class="signature">توقيع المسؤول الإداري: ........................................</div>`);
+    w.document.write(`</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 500);
   };
 
   const handleReject = async () => {
@@ -666,40 +745,79 @@ export function Profile() {
         </div>
       )}
 
-      {intern.status === 'نشط' && (canEvaluateInterns || intern.evaluation) && (
+      {intern.status === 'نشط' && (canEvaluateInterns || intern.evaluation?.criteria) && (
         <div className="card" style={{ padding: '28px', marginTop: '24px', borderTop: '4px solid var(--success)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>تقييم المتدرب</h3>
-              <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>تقييم أداء المتدرب بناءً على معايير محددة.</p>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>بطاقة تقييم التدريب</h3>
+              <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>تقييم أداء المتدرب وطباعة البطاقة للتوقيع.</p>
             </div>
             {canEvaluateInterns && (
-              <button className="btn btn-primary" onClick={openEvalModal} style={{ padding: '12px 24px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px' }}>
-                {intern.evaluation ? 'تعديل التقييم' : <><Star size={18} weight="fill" /> تقييم المتدرب</>}
-              </button>
+              <div style={{display:'flex', gap:8}}>
+                {intern.evaluation?.signed_file_path && (
+                  <a href={intern.evaluation.signed_file_path} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'8px 14px', fontSize:12}}>
+                    <Eye size={14} /> معاينة الموقع
+                  </a>
+                )}
+                <button className="btn btn-primary" onClick={openEvalForm} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px' }}>
+                  <ClipboardText size={18} weight="fill" /> {intern.evaluation?.criteria ? 'تعديل التقييم' : 'تقييم المتدرب'}
+                </button>
+              </div>
             )}
           </div>
 
-          {intern.evaluation && (
+          {intern.evaluation?.criteria && (
             <div style={{ marginTop: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <span style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--success)' }}>
-                  {intern.evaluation.total}/{intern.evaluation.max}
-                </span>
-                <span style={{ fontSize: '13px', color: 'var(--slate)' }}>
-                  بواسطة {intern.evaluation.evaluator} · {intern.evaluation.date}
-                </span>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14, fontSize:13}}>
+                <div><b>مقر التدريب:</b> {intern.evaluation.training_location || '—'}</div>
+                <div><b>الفترة:</b> من {intern.evaluation.period_from || '—'} إلى {intern.evaluation.period_to || '—'}</div>
               </div>
-              {EVAL_CRITERIA.map(c => (
-                <div key={c.key} className="info-row">
-                  <span className="k">{c.label}</span>
-                  <span className="v">{intern.evaluation.criteria?.[c.key] ?? 0} / {EVAL_MAX_PER}</span>
+              {intern.evaluation.rotations?.length > 0 && (
+                <div style={{marginBottom:14, fontSize:12.5}}>
+                  <div style={{fontWeight:700, marginBottom:6}}>فترات التدريب:</div>
+                  {intern.evaluation.rotations.map((r: any, i: number) => (
+                    <div key={i} style={{background:'var(--paper)', padding:'6px 10px', borderRadius:6, marginBottom:4, border:'1px solid var(--line)'}}>
+                      <b>{r.label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {r.from} إلى {r.to}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5, marginBottom:12}}>
+                <thead><tr style={{borderBottom:'1px solid var(--line)'}}>
+                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
+                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>نعم</th>
+                  <th style={{textAlign:'right', padding:'6px 4px'}}>المعيار</th>
+                </tr></thead>
+                <tbody>
+                  {EVAL_CRITERIA.map(c => {
+                    const val = intern.evaluation.criteria?.[c.key] || {yes:false, no:false};
+                    return (
+                      <tr key={c.key} style={{borderBottom:'1px solid var(--line)'}}>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
+                        <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
               {intern.evaluation.comments && (
-                <div style={{ marginTop: '12px', background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--slate)', display: 'block', marginBottom: '4px' }}>ملاحظات المقيّم:</span>
+                <div style={{ background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', marginBottom:12, fontSize:13 }}>
+                  <span style={{ fontWeight:700, display:'block', marginBottom:4 }}>ملاحظات:</span>
                   {intern.evaluation.comments}
+                </div>
+              )}
+              <div style={{fontSize:11.5, color:'var(--slate)'}}>بواسطة: {intern.evaluation.evaluator} · {intern.evaluation.date}</div>
+              {canEvaluateInterns && (
+                <div style={{marginTop:12}}>
+                  <label className="btn btn-ghost sm" style={{cursor:'pointer', fontSize:12, display:'inline-flex', alignItems:'center', gap:6}}>
+                    <UploadSimple size={14} />
+                    {uploadingSigned ? 'جاري الرفع...' : 'رفع النسخة الموقعة (PDF)'}
+                    <input type="file" accept=".pdf" style={{display:'none'}} onChange={handleUploadSigned} disabled={uploadingSigned} />
+                  </label>
+                  <button className="btn btn-ghost sm" onClick={handlePrintEval} style={{marginRight:8, fontSize:12}}>
+                    <DownloadSimple size={14} /> طباعة البطاقة
+                  </button>
                 </div>
               )}
             </div>
@@ -752,52 +870,99 @@ export function Profile() {
         </div>
       )}
 
-      {showEvalModal && (
+      {showEvalForm && (
         <div className="overlay on" style={{ display: 'flex' }}>
-          <div className="modal">
+          <div className="modal" style={{maxWidth:700}}>
             <div className="modal-head">
-              <h3>تقييم المتدرب</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowEvalModal(false)}><X size={14} /></button>
+              <h3>بطاقة تقييم التدريب</h3>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowEvalForm(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
-              {EVAL_CRITERIA.map(c => (
-                <div key={c.key} className="form-group">
-                  <label style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{c.label}</span>
-                    <span style={{ color: 'var(--gold-dark)', fontWeight: 'bold' }}>{evalScores[c.key] ?? 0} / {EVAL_MAX_PER}</span>
-                  </label>
-                  <input
-                    type="range"
-                    min={0}
-                    max={EVAL_MAX_PER}
-                    step={1}
-                    value={evalScores[c.key] ?? 0}
-                    onChange={e => setEvalScores({ ...evalScores, [c.key]: Number(e.target.value) })}
-                    style={{ width: '100%' }}
-                  />
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16}}>
+                <div className="form-group" style={{margin:0}}>
+                  <label>مقر التدريب</label>
+                  <input className="input" value={evalTrainingLocation} onChange={e => setEvalTrainingLocation(e.target.value)} placeholder="مقر التدريب" />
                 </div>
-              ))}
-              <div style={{ background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', margin: '8px 0 16px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--slate)' }}>المجموع الكلي:</span>
-                <div style={{ fontWeight: 'bold', color: 'var(--gold-dark)', marginTop: '4px', fontSize: '1.2rem' }}>
-                  {evalTotal} / {EVAL_TOTAL_MAX}
+                <div className="form-group" style={{margin:0}}>
+                  <label>فترة التدريب المطلوبة</label>
+                  <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                    <span>من</span>
+                    <input className="input" type="date" value={evalPeriodFrom} onChange={e => setEvalPeriodFrom(e.target.value)} style={{flex:1}} />
+                    <span>إلى</span>
+                    <input className="input" type="date" value={evalPeriodTo} onChange={e => setEvalPeriodTo(e.target.value)} style={{flex:1}} />
+                  </div>
                 </div>
               </div>
+
+              <div style={{marginBottom:16}}>
+                <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8}}>
+                  <label style={{fontWeight:700, fontSize:13}}>معلومات عن التدريب (فترات)</label>
+                  <button className="btn btn-ghost sm" onClick={addRotation} style={{fontSize:11}}>+ إضافة فترة</button>
+                </div>
+                {evalRotations.length === 0 && <div style={{textAlign:'center', padding:12, color:'var(--slate-light)', fontSize:12}}>لم يتم إضافة أي فترات بعد</div>}
+                {evalRotations.map((r, i) => (
+                  <div key={i} style={{background:'var(--paper)', padding:12, borderRadius:8, border:'1px solid var(--line)', marginBottom:8}}>
+                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
+                      <b style={{fontSize:12}}>{r.label || ('الفترة '+(i+1))}</b>
+                      <button className="btn btn-ghost sm" onClick={() => removeRotation(i)} style={{fontSize:10, color:'var(--danger)', padding:'2px 6px'}}><X size={12} /> حذف</button>
+                    </div>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+                      <div className="form-group" style={{margin:0}}>
+                        <label style={{fontSize:11}}>المشرف على التكوين</label>
+                        <input className="input" style={{fontSize:12}} value={r.supervisor} onChange={e => updateRotation(i, 'supervisor', e.target.value)} placeholder="المشرف" />
+                      </div>
+                      <div className="form-group" style={{margin:0}}>
+                        <label style={{fontSize:11}}>الشعبة</label>
+                        <input className="input" style={{fontSize:12}} value={r.department} onChange={e => updateRotation(i, 'department', e.target.value)} placeholder="الشعبة" />
+                      </div>
+                      <div className="form-group" style={{margin:0}}>
+                        <label style={{fontSize:11}}>من</label>
+                        <input className="input" style={{fontSize:12}} type="date" value={r.from} onChange={e => updateRotation(i, 'from', e.target.value)} />
+                      </div>
+                      <div className="form-group" style={{margin:0}}>
+                        <label style={{fontSize:11}}>إلى</label>
+                        <input className="input" style={{fontSize:12}} type="date" value={r.to} onChange={e => updateRotation(i, 'to', e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{marginBottom:16}}>
+                <label style={{fontWeight:700, fontSize:13, display:'block', marginBottom:8}}>تقييم المتدرب</label>
+                <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
+                  <thead><tr style={{borderBottom:'1px solid var(--line)'}}>
+                    <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
+                    <th style={{textAlign:'center', padding:'6px 4px', width:60}}>نعم</th>
+                    <th style={{textAlign:'right', padding:'6px 4px'}}>المعيار</th>
+                  </tr></thead>
+                  <tbody>
+                    {EVAL_CRITERIA.map(c => {
+                      const val = evalCriteria[c.key] || {yes:false, no:false};
+                      return (
+                        <tr key={c.key} style={{borderBottom:'1px solid var(--line)'}}>
+                          <td style={{textAlign:'center', padding:'8px 4px'}}>
+                            <input type="checkbox" checked={val.no} onChange={e => setEvalCriteria({...evalCriteria, [c.key]:{...val, no: e.target.checked}})} style={{width:18,height:18,cursor:'pointer'}} />
+                          </td>
+                          <td style={{textAlign:'center', padding:'8px 4px'}}>
+                            <input type="checkbox" checked={val.yes} onChange={e => setEvalCriteria({...evalCriteria, [c.key]:{...val, yes: e.target.checked}})} style={{width:18,height:18,cursor:'pointer'}} />
+                          </td>
+                          <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
               <div className="form-group">
-                <label>ملاحظات (اختياري)</label>
-                <textarea
-                  className="input"
-                  rows={4}
-                  value={evalComments}
-                  onChange={e => setEvalComments(e.target.value)}
-                  placeholder="أضف ملاحظاتك حول أداء المتدرب..."
-                  style={{ resize: 'vertical' }}
-                />
+                <label>ملاحظات</label>
+                <textarea className="input" rows={4} value={evalComments} onChange={e => setEvalComments(e.target.value)} placeholder="ملاحظات..." style={{resize:'vertical'}} />
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={() => setShowEvalModal(false)}>إلغاء</button>
-              <button className="btn btn-success" style={{ background: 'var(--success)', color: '#fff', border: 'none' }} onClick={saveEvaluation} disabled={savingEval}>
+              <button className="btn btn-ghost" onClick={() => setShowEvalForm(false)}>إلغاء</button>
+              <button className="btn btn-ink" onClick={saveEvaluation} disabled={savingEval}>
                 {savingEval ? 'جاري الحفظ...' : 'حفظ التقييم'}
               </button>
             </div>

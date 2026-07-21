@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise } from '@phosphor-icons/react';
+import { CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise, ClipboardText } from '@phosphor-icons/react';
 import { api, API_BASE } from '../services/api';
 import { InternSidebar } from '../components/InternSidebar';
 import { Header } from '../components/Header';
@@ -493,6 +493,65 @@ export function InternPortal() {
               <div className="info-row"><div className="k">الجامعة أو المعهد</div><div className="v">{internData?.university || 'غير محدد'}</div></div>
               <div className="info-row" style={{ borderBottom: 'none', paddingBottom: 0 }}><div className="k">تغيير كلمة المرور</div><div className="v" style={{ paddingLeft: '8px' }}>يرجى الذهاب إلى الإعدادات لتغيير كلمة المرور</div></div>
             </div>
+
+            {internData?.evaluation?.criteria && (
+            <div className="card" style={{ padding: '20px 24px', marginTop: 16, borderTop: '3px solid var(--success)' }}>
+              <div className="section-title"><h3>بطاقة تقييم التدريب</h3></div>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14, fontSize:13}}>
+                <div><b>مقر التدريب:</b> {internData.evaluation.training_location || '—'}</div>
+                <div><b>الفترة:</b> من {internData.evaluation.period_from || '—'} إلى {internData.evaluation.period_to || '—'}</div>
+              </div>
+              {internData.evaluation.rotations?.length > 0 && (
+                <div style={{marginBottom:14, fontSize:12.5}}>
+                  <div style={{fontWeight:700, marginBottom:6}}>فترات التدريب:</div>
+                  {internData.evaluation.rotations.map((r: any, i: number) => (
+                    <div key={i} style={{background:'var(--paper)', padding:'6px 10px', borderRadius:6, marginBottom:4, border:'1px solid var(--line)'}}>
+                      <b>{r.label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {r.from} إلى {r.to}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5, marginBottom:12}}>
+                <thead><tr style={{borderBottom:'1px solid var(--line)'}}>
+                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
+                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>نعم</th>
+                  <th style={{textAlign:'right', padding:'6px 4px'}}>المعيار</th>
+                </tr></thead>
+                <tbody>
+                  {(window as any).EVAL_CRITERIA ? (window as any).EVAL_CRITERIA.map((c: any) => {
+                    const val = internData.evaluation.criteria?.[c.key] || {yes:false, no:false};
+                    return (
+                      <tr key={c.key} style={{borderBottom:'1px solid var(--line)'}}>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
+                        <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
+                      </tr>
+                    );
+                  }) : Object.keys(internData.evaluation.criteria || {}).length > 0 && (
+                    Object.entries(internData.evaluation.criteria).map(([key, val]: [string, any]) => (
+                      <tr key={key} style={{borderBottom:'1px solid var(--line)'}}>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
+                        <td style={{padding:'8px 4px', fontWeight:600}}>{key}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+              {internData.evaluation.comments && (
+                <div style={{ background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', marginBottom:12, fontSize:13 }}>
+                  <span style={{ fontWeight:700, display:'block', marginBottom:4 }}>ملاحظات:</span>
+                  {internData.evaluation.comments}
+                </div>
+              )}
+              {internData.evaluation.signed_file_path && (
+                <a href={internData.evaluation.signed_file_path} target="_blank" rel="noreferrer" className="btn btn-ink sm" style={{padding:'6px 14px', fontSize:12, display:'inline-flex', alignItems:'center', gap:6}}>
+                  <Eye size={14} /> معاينة البطاقة الموقعة
+                </a>
+              )}
+              <div style={{fontSize:11.5, color:'var(--slate)', marginTop:8}}>بتقييم من: {internData.evaluation.evaluator} · {internData.evaluation.date}</div>
+            </div>
+            )}
           </div>
 
         </div>

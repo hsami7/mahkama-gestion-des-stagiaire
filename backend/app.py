@@ -593,11 +593,19 @@ def save_evaluation(intern_id):
     current_user = get_jwt()
     user_name = current_user.get('name') if current_user else 'Unknown'
 
+    existing = {}
+    if intern.evaluation:
+        try: existing = json.loads(intern.evaluation)
+        except: pass
+
     evaluation = {
-        "criteria": data.get('criteria', {}),
-        "comments": data.get('comments', ''),
-        "total": data.get('total'),
-        "max": data.get('max'),
+        "training_location": data.get('training_location', existing.get('training_location', '')),
+        "period_from": data.get('period_from', existing.get('period_from', '')),
+        "period_to": data.get('period_to', existing.get('period_to', '')),
+        "rotations": data.get('rotations', existing.get('rotations', [])),
+        "criteria": data.get('criteria', existing.get('criteria', {})),
+        "comments": data.get('comments', existing.get('comments', '')),
+        "signed_file_path": existing.get('signed_file_path'),
         "evaluator": user_name,
         "date": datetime.now().strftime('%Y-%m-%d %H:%M')
     }
@@ -606,6 +614,47 @@ def save_evaluation(intern_id):
 
     log_action(user_name, f"قام بتقييم المتدرب: {intern.name}")
     return jsonify({"success": True, "evaluation": evaluation})
+
+@app.route('/api/interns/<int:intern_id>/evaluation/signed-upload', methods=['POST'])
+@jwt_required()
+def upload_signed_evaluation(intern_id):
+    intern = db.session.get(Intern, intern_id)
+    if not intern:
+        return jsonify({"msg": "Intern not found"}), 404
+    current_user = get_jwt()
+    if current_user.get('role') not in ('Admin', 'Manager'):
+        return jsonify({"msg": "Unauthorized"}), 403
+
+    if 'file' not in request.files:
+        return jsonify({"msg": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "No selected file"}), 400
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"msg": "PDF files only"}), 400
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    if size > 15 * 1024 * 1024:
+        return jsonify({"msg": "File too large (max 15MB)"}), 400
+
+    filename = safe_filename('eval_signed', file.filename)
+    if not filename.lower().endswith('.pdf'):
+        filename += '.pdf'
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    file_url = f"/api/uploads/{filename}"
+
+    import json
+    existing = {}
+    if intern.evaluation:
+        try: existing = json.loads(intern.evaluation)
+        except: pass
+    existing['signed_file_path'] = file_url
+    intern.evaluation = json.dumps(existing, ensure_ascii=False)
+    db.session.commit()
+
+    log_action(current_user.get('name'), f"رفع نسخة موقعة من تقييم المتدرب {intern.name}")
+    return jsonify({"success": True, "signed_file_path": file_url}), 200
 
 @app.route('/api/interns/<int:intern_id>/attendance', methods=['GET'])
 @jwt_required()
