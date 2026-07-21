@@ -373,9 +373,11 @@ export function Profile() {
           </div>
         </div>
         <div className="profile-actions" style={{ display: 'flex', gap: '8px' }}>
+          {intern.status !== 'مرفوض' && (
           <button title="تحميل شهادة التدريب" onClick={() => window.open(`${API_BASE}/interns/${intern.id}/attestation?token=${sessionStorage.getItem('token')}`, '_blank')} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#e0e7ff', border: '1.5px solid #6366f1', color: '#1a1a1a', transition: 'all 0.2s' }}>
             <Certificate weight="bold" size={18} color="#1a1a1a" />
           </button>
+          )}
            <button title="تصدير الملف الشخصي Excel" onClick={() => window.open(api.exportInterns('excel', [intern.id]), '_blank')} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#E8F5E9', border: '1.5px solid #21A366', color: '#1a1a1a', transition: 'all 0.2s' }}>
              <MicrosoftExcelLogo weight="bold" size={18} color="#1a1a1a" />
            </button>
