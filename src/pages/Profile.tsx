@@ -388,6 +388,10 @@ export function Profile() {
   };
 
   const saveEvaluation = async () => {
+    if (evalRotations.length === 0 || evalRotations.some(r => !r.supervisor || !r.department || !r.from || !r.to)) {
+      toast.error('يرجى إكمال معلومات فترات التدريب (المشرف، الشعبة، والتواريخ)');
+      return;
+    }
     setSavingEval(true);
     try {
       const res = await api.post(`/interns/${id}/evaluation`, {
@@ -399,6 +403,7 @@ export function Profile() {
       });
       setIntern({ ...intern, evaluation: res.evaluation });
       toast.success('تم حفظ تقييم المتدرب بنجاح!');
+      setShowEvalForm(false);
     } catch (err) {
       toast.error('فشل حفظ التقييم');
     } finally {
