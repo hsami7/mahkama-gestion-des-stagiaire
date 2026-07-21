@@ -780,6 +780,7 @@ export function Profile() {
 
       {canApproveInterns && intern.status !== 'نشط' && intern.status !== 'مرفوض' && (
         <>
+        <CoverageChart internId={Number(id)} />
         <div className="card" style={{ padding: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '20px', borderTop: '4px solid var(--gold)', background: 'linear-gradient(to left, var(--paper), var(--bg))' }}>
           <div>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>القرار النهائي للملف</h3>
@@ -794,7 +795,6 @@ export function Profile() {
             </button>
           </div>
         </div>
-        <CoverageChart internId={Number(id)} />
         </>
       )}
 
