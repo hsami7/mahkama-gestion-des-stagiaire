@@ -19,7 +19,7 @@ export function UsersPermissions() {
   const [users, setUsers] = useState<any[]>([]);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [newUser, setNewUser] = useState({ 
-    name: '', email: '', role: 'Manager', password: 'password123',
+    name: '', email: '', role: '', password: 'password123',
     permissions: JSON.stringify(defaultPermissions) 
   });
 
@@ -45,7 +45,7 @@ export function UsersPermissions() {
         await api.post('/users', newUser);
       }
       setEditingUserId(null);
-      setNewUser({ name: '', email: '', role: 'Manager', password: 'password123', permissions: JSON.stringify(defaultPermissions) });
+      setNewUser({ name: '', email: '', role: '', password: 'password123', permissions: JSON.stringify(defaultPermissions) });
       fetchUsers();
     } catch (err: any) {
       toast.error(err.message || 'فشل حفظ المستخدم');
@@ -152,8 +152,9 @@ export function UsersPermissions() {
               <label>الدور</label>
               <select 
                 value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}
-                className="input"
+                className="input" required
               >
+                <option value="" disabled>اختر الدور</option>
                 <option value="Admin">مدير نظام (Admin)</option>
                 <option value="Manager">مشرف (Manager)</option>
                 <option value="Intern">متدرب (Intern)</option>
@@ -161,9 +162,10 @@ export function UsersPermissions() {
             </div>
           </div>
 
+          {newUser.role && newUser.role !== 'Intern' && (
           <div style={{ marginTop: '32px', marginBottom: '24px' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '8px' }}>
-              مصفوفة الصلاحيات التفصيلية — {newUser.role === 'Admin' ? 'مدير نظام' : newUser.role === 'Manager' ? 'مشرف' : 'متدرب'}
+              مصفوفة الصلاحيات التفصيلية — {newUser.role === 'Admin' ? 'مدير نظام' : 'مشرف'}
             </h3>
             <p style={{ color: 'var(--slate)', fontSize: '0.9rem', marginBottom: '16px' }}>
               {newUser.role === 'Admin' ? 'المدير يملك كل الصلاحيات بشكل افتراضي.' : 'يمكنك تعديل الصلاحيات الخاصة بهذا المستخدم بشكل فردي.'}
@@ -181,7 +183,7 @@ export function UsersPermissions() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.keys(defaultPermissions).map((mod) => (
+                  {Object.keys(defaultPermissions).filter(mod => newUser.role === 'Manager' || mod !== 'evaluate_interns').map((mod) => (
                     <tr key={mod}>
                       <td style={{ fontWeight: 600 }}>{moduleNames[mod]}</td>
                       <td>
