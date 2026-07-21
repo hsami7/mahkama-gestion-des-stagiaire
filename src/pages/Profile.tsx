@@ -481,11 +481,41 @@ export function Profile() {
     <div class="notes">${comments || ''}</div>
     <div class="signature">توقيع المسؤول الإداري: ........................................</div>
     </body></html>`;
+    printHTML(html);
+  };
+
+  const printHTML = (html: string) => {
     const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const w = window.open(url, '_blank');
-    if (!w) { URL.revokeObjectURL(url); return; }
-    w.onload = () => { w.focus(); setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 500); };
+    const blobUrl = URL.createObjectURL(blob);
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = blobUrl;
+    document.body.appendChild(iframe);
+    let done = false;
+    const cleanup = () => {
+      setTimeout(() => {
+        try { document.body.removeChild(iframe); } catch (e) {}
+        try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+      }, 60000);
+    };
+    iframe.onload = () => {
+      if (done) return;
+      done = true;
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (e) {
+          window.open(blobUrl, '_blank');
+        }
+        cleanup();
+      }, 400);
+    };
   };
 
   const handleReject = async () => {
