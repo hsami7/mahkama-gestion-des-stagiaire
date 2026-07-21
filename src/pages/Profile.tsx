@@ -44,6 +44,26 @@ function formatDate(d: string | undefined | null): string {
   } catch { return d || '—'; }
 }
 
+const RotDateInput = React.memo(({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) => {
+  const [text, setText] = useState(value ? formatDate(value) : '');
+  useEffect(() => { setText(value ? formatDate(value) : ''); }, [value]);
+  const commit = (raw: string) => {
+    let clean = raw.replace(/[^\d]/g, '').slice(0, 8);
+    if (clean.length > 2) clean = clean.slice(0, 2) + '/' + clean.slice(2);
+    if (clean.length > 5) clean = clean.slice(0, 5) + '/' + clean.slice(5);
+    setText(clean);
+    const parts = clean.split('/');
+    if (parts.length === 3 && parts[2].length === 4) {
+      const iso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      if (!isNaN(new Date(iso).getTime())) onChange(iso);
+      else onChange('');
+    } else onChange('');
+  };
+  return (
+    <input type="text" inputMode="numeric" className="input" style={{fontSize:12}} value={text} onChange={e => commit(e.target.value)} onBlur={e => commit(e.target.value)} placeholder={placeholder} />
+  );
+});
+
 function sanitizeTitle(t: string): string {
   return t.replace(/\.pdf\.?$/i, '').trim();
 }
@@ -964,11 +984,11 @@ export function Profile() {
                       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
                         <div className="form-group" style={{margin:0}}>
                           <label style={{fontSize:11}}>من</label>
-                          <input className="input" style={{fontSize:12}} type="date" value={r.from} onChange={e => updateRotation(i, 'from', e.target.value)} />
+                          <RotDateInput value={r.from} onChange={v => updateRotation(i, 'from', v)} placeholder="dd/mm/yyyy" />
                         </div>
                         <div className="form-group" style={{margin:0}}>
                           <label style={{fontSize:11}}>إلى</label>
-                          <input className="input" style={{fontSize:12}} type="date" value={r.to} onChange={e => updateRotation(i, 'to', e.target.value)} />
+                          <RotDateInput value={r.to} onChange={v => updateRotation(i, 'to', v)} placeholder="dd/mm/yyyy" />
                         </div>
                       </div>
                       <div className="form-group" style={{margin:0}}>
