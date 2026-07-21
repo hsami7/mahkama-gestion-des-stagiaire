@@ -400,15 +400,15 @@ export function InternPortal() {
                         <td style={{textAlign:'left', padding:'10px 4px'}}>
                           <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
                             {doc?.file_path && (
-                              <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                <DownloadSimple size={14} />
+                              <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                <DownloadSimple size={14} /> معاينة
                               </a>
                             )}
                             {(status === 'missing' || status === 'rejected') && (
                               <>
                                 <input type="file" id={`doc-upload-${docType}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleProactiveUpload(docType, e.target.files[0]); }} />
                                 <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`doc-upload-${docType}`)?.click()} disabled={uploading === docType}>
-                                  📤 {uploading === docType ? 'جاري...' : 'رفع نسخة معدلة'}
+                                  📤 {uploading === docType ? 'جاري...' : 'رفع'}
                                 </button>
                               </>
                             )}
