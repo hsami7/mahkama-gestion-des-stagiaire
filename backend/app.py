@@ -1821,7 +1821,13 @@ def download_intern_document(doc_id):
                 if user:
                     intern_identity = Intern.query.filter_by(email=user.email).first()
         except Exception:
-            pass
+            import jwt
+            try:
+                decoded = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'], options={"verify_exp": False})
+                claims = decoded.get('additional_claims', {})
+                is_admin = claims.get('role') in ('Admin', 'Manager')
+            except Exception:
+                pass
 
     if not is_admin:
         if not intern_identity or intern_identity.id != doc.intern_id:
