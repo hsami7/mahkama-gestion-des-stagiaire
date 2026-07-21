@@ -1814,9 +1814,9 @@ def download_intern_document(doc_id):
         try:
             from flask_jwt_extended import decode_token
             decoded = decode_token(token)
-            claims = decoded.get('additional_claims', {})
-            is_admin = claims.get('role') in ('Admin', 'Manager')
-            if claims.get('role') == 'Intern':
+            role = decoded.get('role')
+            is_admin = role in ('Admin', 'Manager')
+            if role == 'Intern':
                 user = User.query.get(int(decoded.get('sub', 0)))
                 if user:
                     intern_identity = Intern.query.filter_by(email=user.email).first()
@@ -1824,8 +1824,8 @@ def download_intern_document(doc_id):
             import jwt
             try:
                 decoded = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'], options={"verify_exp": False})
-                claims = decoded.get('additional_claims', {})
-                is_admin = claims.get('role') in ('Admin', 'Manager')
+                role = decoded.get('role')
+                is_admin = role in ('Admin', 'Manager')
             except Exception:
                 pass
 
