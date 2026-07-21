@@ -46,8 +46,8 @@ export function Sidebar() {
   const baseNavItems = [
     { name: 'لوحة القيادة', path: '/', icon: <SquaresFour size={24} />, show: !isIntern },
     { name: 'المتدربين', path: '/interns', icon: <Users size={24} />, show: !isIntern && canViewInterns },
-    { name: '≡ منشئ النماذج', path: '/form-builder', icon: <FileText size={24} />, show: !isIntern && canViewForms },
-    { name: '📁 خزنة المستندات', path: '/vault', icon: <Archive size={24} />, show: !isIntern && canViewVault },
+    { name: 'منشئ النماذج', path: '/form-builder', icon: <FileText size={24} />, show: !isIntern && canViewForms },
+    { name: 'خزنة المستندات', path: '/vault', icon: <Archive size={24} />, show: !isIntern && canViewVault },
     { name: 'سجل الحضور اليومي', path: '/attendance', icon: <CalendarCheck size={24} />, show: !isIntern && canViewAttendance },
     { name: 'مخطط التغطية', path: '/timeline', icon: <ChartLine size={24} />, show: !isIntern },
     { name: 'المستخدمين والصلاحيات', path: '/users', icon: <ShieldCheck size={24} />, show: isAdmin },
