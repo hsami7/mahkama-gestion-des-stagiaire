@@ -962,10 +962,13 @@ export function Profile() {
               {vaultDocs.length === 0 && <div style={{textAlign:'center',padding:20,color:'var(--slate-light)'}}>الخزنة فارغة</div>}
               {vaultDocs.length > 0 && (
                 <>
-                  <label style={{display:'flex', alignItems:'center', gap:8, marginBottom:8, padding:'6px 4px', fontSize:12.5, cursor:'pointer', fontWeight:600}}>
-                    <input type="checkbox" checked={selectedVaultDocs.size === vaultDocs.length} onChange={e => setSelectedVaultDocs(e.target.checked ? new Set(vaultDocs.map(v => v.name)) : new Set())} />
-                    تحديد الكل
-                  </label>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,padding:'6px 10px',background:'var(--paper)',borderRadius:8,border:'1px solid var(--line)'}}>
+                    <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5,cursor:'pointer',fontWeight:700,color:'var(--brand)'}}>
+                      <input type="checkbox" checked={selectedVaultDocs.size === vaultDocs.length} onChange={e => setSelectedVaultDocs(e.target.checked ? new Set(vaultDocs.map(v => v.name)) : new Set())} />
+                      تحديد الكل
+                    </label>
+                    <span style={{fontSize:11.5,color:'var(--slate-light)'}}>{selectedVaultDocs.size}/{vaultDocs.length} مُختار</span>
+                  </div>
                   {vaultDocs.map((vd: any) => (
                     <label key={vd.name} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 4px',borderBottom:'1px solid var(--line)',cursor:'pointer',fontSize:13}}>
                       <input type="checkbox" checked={selectedVaultDocs.has(vd.name)} onChange={e => {
@@ -973,6 +976,7 @@ export function Profile() {
                         e.target.checked ? next.add(vd.name) : next.delete(vd.name);
                         setSelectedVaultDocs(next);
                       }} />
+                      <FileText size={14} style={{flexShrink:0,color:'var(--slate-light)'}} />
                       <span style={{fontWeight:600}}>{vd.name}</span>
                     </label>
                   ))}
