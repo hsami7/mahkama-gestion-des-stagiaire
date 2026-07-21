@@ -224,6 +224,7 @@ export function UsersPermissions() {
               </table>
             </div>
           </div>
+          )}
           
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--line)', paddingTop: '24px' }}>
             {editingUserId && (
@@ -253,6 +254,7 @@ export function UsersPermissions() {
             <thead style={{ backgroundColor: 'var(--paper)' }}>
               <tr>
                 <th>الاسم</th>
+                <th>اسم المستخدم</th>
                 <th>البريد الإلكتروني</th>
                 <th>الدور</th>
                 <th>إجراءات</th>
@@ -262,6 +264,7 @@ export function UsersPermissions() {
               {users.map(u => (
                 <tr key={u.id}>
                   <td style={{ fontWeight: 'bold' }}>{u.name}</td>
+                  <td style={{ color: 'var(--slate)' }}>{u.username}</td>
                   <td style={{ color: 'var(--slate)' }}>{u.email}</td>
                   <td>
                     <span className={`badge ${
@@ -287,7 +290,7 @@ export function UsersPermissions() {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--slate)', padding: '32px' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--slate)', padding: '32px' }}>
                     لا يوجد مستخدمين
                   </td>
                 </tr>
