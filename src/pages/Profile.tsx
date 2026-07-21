@@ -51,6 +51,7 @@ export function Profile() {
   // Document Lifecycle Center
   const [docsLifecycle, setDocsLifecycle] = useState<any[]>([]);
   const [assignDocType, setAssignDocType] = useState('CONVENTION_SIGNED');
+  const [assignCustomTitle, setAssignCustomTitle] = useState('');
   const [assignFile, setAssignFile] = useState<File | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [revisionDocId, setRevisionDocId] = useState<number | null>(null);
@@ -214,6 +215,12 @@ export function Profile() {
       fetchDocsLifecycle();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (showAssignModal && assignDocType && !assignCustomTitle) {
+      setAssignCustomTitle(DOC_TYPE_LABELS[assignDocType] || '');
+    }
+  }, [showAssignModal, assignDocType]);
 
   const markAttendance = async (status: string) => {
     const today = new Date().toISOString().split('T')[0];
@@ -453,7 +460,7 @@ export function Profile() {
           <h3><FileText weight="bold" className="icon" /> مركز المستندات</h3>
 
           <div style={{marginBottom: 12, display:'flex', gap: 8}}>
-            <button className="btn btn-ghost sm" onClick={() => { setAssignDocType('CONVENTION_SIGNED'); setAssignFile(null); setShowAssignModal(true); }} style={{fontSize:12, padding:'6px 12px'}}>
+            <button className="btn btn-ghost sm" onClick={() => { setAssignDocType('CONVENTION_SIGNED'); setAssignCustomTitle(''); setAssignFile(null); setShowAssignModal(true); }} style={{fontSize:12, padding:'6px 12px'}}>
               + رفع وثيقة موقعة
             </button>
             <button className="btn btn-ghost sm" onClick={async () => { try { const d = await api.get('/vault'); setVaultDocs(d); setShowVaultModal(true); } catch {} }} style={{fontSize:12, padding:'6px 12px'}}>
@@ -464,7 +471,7 @@ export function Profile() {
           {/* Section 1: المستندات المطلوبة من المتدرب (Incoming) */}
           <div style={{marginBottom:16}}>
             <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--gold-dark)'}}>المستندات المطلوبة من المتدرب</h4></div>
-            {['CIN','CV','INSURANCE','DEMANDE','FINAL_REPORT'].filter(t => !['CONVENTION_SIGNED','ATTESTATION_SIGNED'].includes(t)).length === 0 && <div/>}
+            {['CIN','CV','INSURANCE','DEMANDE'].filter(t => !['CONVENTION_SIGNED','ATTESTATION_SIGNED'].includes(t)).length === 0 && <div/>}
             <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
               <thead>
                 <tr style={{borderBottom:'1px solid var(--line)'}}>
@@ -475,9 +482,9 @@ export function Profile() {
                 </tr>
               </thead>
               <tbody>
-                {['CIN','CV','INSURANCE','DEMANDE','FINAL_REPORT'].map(dt => {
+                {['CIN','CV','INSURANCE','DEMANDE'].map(dt => {
                   const d = docsLifecycle.find(x => x.doc_type === dt);
-                  if (!d && dt !== 'FINAL_REPORT') return null;
+                  if (!d) return null;
                   return (
                     <tr key={dt} style={{borderBottom:'1px solid var(--line)'}}>
                       <td style={{padding:'8px 4px'}}>
@@ -500,9 +507,14 @@ export function Profile() {
                       <td style={{textAlign:'left', padding:'8px 4px'}}>
                         <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
                           {d?.file_path && (
-                            <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                              <DownloadSimple size={14} />
-                            </button>
+                            <>
+                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                👁️
+                              </button>
+                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                📥
+                              </button>
+                            </>
                           )}
                           {d && d.status !== 'MISSING' && (
                             <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
@@ -511,7 +523,7 @@ export function Profile() {
                           )}
                           {d?.status === 'PENDING_REVIEW' && (
                             <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                              <CheckCircle size={14} />
+                              ✓
                             </button>
                           )}
                         </div>
@@ -535,70 +547,71 @@ export function Profile() {
                 </tr>
               </thead>
               <tbody>
-                {docsLifecycle.filter(d => (d.uploaded_by === 'ADMIN' || d.doc_type === 'CONVENTION_SIGNED') && d.status === 'APPROVED_AND_SIGNED').length === 0 && (
-                  <tr><td colSpan={3} style={{textAlign:'center', padding:'16px 4px', color:'var(--slate-light)'}}>لم يتم إصدار أي وثائق موقعة بعد</td></tr>
-                )}
-                {docsLifecycle.filter(d => (d.uploaded_by === 'ADMIN' || d.doc_type === 'CONVENTION_SIGNED') && d.status === 'APPROVED_AND_SIGNED').map(d => (
-                  <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
-                    <td style={{padding:'8px 4px', fontWeight:600}}>{d.label}</td>
-                    <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
-                      {formatDate(d.updated_at)}
-                    </td>
-                    <td style={{textAlign:'left', padding:'8px 4px'}}>
-                      <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        <DownloadSimple size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {(() => {
+                  const signedDocs = docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED' && (d.uploaded_by === 'ADMIN' || d.doc_type === 'CONVENTION_SIGNED'));
+                  return signedDocs.length === 0 ? (
+                    <tr><td colSpan={3} style={{textAlign:'center', padding:'16px 4px', color:'var(--slate-light)'}}>لم يتم إصدار أي وثائق موقعة بعد</td></tr>
+                  ) : signedDocs.map(d => (
+                    <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
+                      <td style={{padding:'8px 4px', fontWeight:600}}>{d.label}</td>
+                      <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
+                        {formatDate(d.updated_at)}
+                      </td>
+                      <td style={{textAlign:'left', padding:'8px 4px'}}>
+                        <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <DownloadSimple size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
 
-          {/* Section 3: ختام التدريب والأرشيف (Exit Docs) */}
-          <div style={{marginBottom:8}}>
-            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--brand)'}}>ختام التدريب والأرشيف</h4></div>
-            <div style={{display:'flex', flexDirection:'column', gap:8}}>
-              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 6px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
-                <div style={{display:'flex', alignItems:'center', gap:8}}>
-                  <Certificate weight="fill" style={{color:'var(--gold-dark)', width:16}} />
-                  <span style={{fontWeight:600, fontSize:12.5}}>شهادة التدريب</span>
+          {/* Section 3: ختام التدريب والأرشيف (Exit Docs) — visible only after documents are uploaded */}
+          {(() => {
+            const att = docsLifecycle.find(d => d.doc_type === 'ATTESTATION_SIGNED');
+            const final = docsLifecycle.find(d => d.doc_type === 'FINAL_REPORT');
+            const hasExitDocs = att?.file_path || final?.file_path;
+            if (!hasExitDocs) return null;
+            return (
+            <div style={{marginBottom:8}}>
+              <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--brand)'}}>ختام التدريب والأرشيف</h4></div>
+              <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                {att?.file_path && (
+                <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 6px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
+                  <div style={{display:'flex', alignItems:'center', gap:8}}>
+                    <Certificate weight="fill" style={{color:'var(--gold-dark)', width:16}} />
+                    <span style={{fontWeight:600, fontSize:12.5}}>شهادة التدريب</span>
+                  </div>
+                  <div style={{display:'flex', gap:4}}>
+                    <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(att.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0}}>
+                      <DownloadSimple size={14} />
+                    </button>
+                  </div>
                 </div>
-                <div style={{display:'flex', gap:4}}>
-                  {(() => {
-                    const att = docsLifecycle.find(d => d.doc_type === 'ATTESTATION_SIGNED');
-                    const final = docsLifecycle.find(d => d.doc_type === 'FINAL_REPORT');
-                    return <>
-                      {att?.file_path && (
-                        <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(att.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0}}>
-                          <DownloadSimple size={14} />
-                        </button>
-                      )}
-                      <button className="btn btn-ghost sm" onClick={() => { setAssignDocType('ATTESTATION_SIGNED'); setAssignFile(null); setShowAssignModal(true); }} title="رفع نسخة موقعة" style={{width:28,height:28,padding:0,color:'var(--gold-dark)'}}>
-                        <UploadSimple size={14} />
-                      </button>
-                    </>;
-                  })()}
-                </div>
+                )}
+                <button className="btn btn-ghost" style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:12.5, border:'1.5px dashed var(--line)', borderRadius:8, color:'var(--slate)'}} onClick={async () => {
+                  if (!id) return;
+                  try {
+                    const res = await fetch(`${API_BASE}/interns/${id}/export-zip?token=${sessionStorage.getItem('token')}`);
+                    if (!res.ok) throw new Error('Export failed');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `Intern_${id}_Archive.zip`; a.click();
+                    URL.revokeObjectURL(url);
+                  } catch (e) {
+                    toast.error('فشل إنشاء الأرشيف');
+                  }
+                }}>
+                  <DownloadSimple weight="bold" size={16} style={{marginLeft:6}} />
+                  📦 تحميل أرشيف الملفات ZIP
+                </button>
               </div>
-              <button className="btn btn-ghost" style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:12.5, border:'1.5px dashed var(--line)', borderRadius:8, color:'var(--slate)'}} onClick={async () => {
-                if (!id) return;
-                try {
-                  const res = await fetch(`${API_BASE}/interns/${id}/export-zip?token=${sessionStorage.getItem('token')}`);
-                  if (!res.ok) throw new Error('Export failed');
-                  const blob = await res.blob();
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a'); a.href = url; a.download = `Intern_${id}_Archive.zip`; a.click();
-                  URL.revokeObjectURL(url);
-                } catch (e) {
-                  toast.error('فشل إنشاء الأرشيف');
-                }
-              }}>
-                <DownloadSimple weight="bold" size={16} style={{marginLeft:6}} />
-                📦 تحميل أرشيف الملفات ZIP
-              </button>
             </div>
-          </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -825,7 +838,7 @@ export function Profile() {
             <div className="modal-body">
               <div className="form-group">
                 <label>نوع الوثيقة</label>
-                <select className="input" value={assignDocType} onChange={e => setAssignDocType(e.target.value)}>
+                <select className="input" value={assignDocType} onChange={e => { setAssignDocType(e.target.value); setAssignCustomTitle(''); }} style={{marginBottom: 8}}>
                   <option value="CONVENTION_SIGNED">اتفاقية التدريب الموقعة</option>
                   <option value="CIN">بطاقة التعريف الوطنية (CIN)</option>
                   <option value="CV">السيرة الذاتية (CV)</option>
@@ -836,6 +849,13 @@ export function Profile() {
                   <option value="OTHER">مستند إضافي</option>
                 </select>
               </div>
+              {assignDocType === 'OTHER' && (
+              <div className="form-group">
+                <label>اسم المستند / العنوان</label>
+                <input type="text" className="input" value={assignCustomTitle} onChange={e => setAssignCustomTitle(e.target.value)} placeholder="اتفاقية التدريب المعدلة 2026" />
+                <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>سيظهر هذا العنوان للمتدرب. إذا ترك فارغًا، سيتم استخدام اسم نوع الوثيقة تلقائيًا.</small>
+              </div>
+              )}
               <div className="form-group">
                 <label>الملف الموقع (PDF)</label>
                 <input type="file" className="input" accept=".pdf" onChange={e => setAssignFile(e.target.files?.[0] || null)} />
@@ -847,7 +867,7 @@ export function Profile() {
               <button className="btn btn-success" style={{background:'var(--success)',color:'#fff',border:'none'}} disabled={!assignFile} onClick={async () => {
                 if (!assignFile) return;
                 try {
-                  await api.uploadSignedDocument(Number(id), assignDocType, assignFile);
+                  await api.uploadSignedDocument(Number(id), assignDocType, assignFile, assignCustomTitle);
                   toast.success('تم رفع الوثيقة الموقعة بنجاح');
                   setShowAssignModal(false);
                   setAssignFile(null);
@@ -903,7 +923,7 @@ export function Profile() {
         <div className="overlay on" style={{ display: 'flex' }}>
           <div className="modal" style={{maxWidth:500}}>
             <div className="modal-head">
-              <h3>📁 إضافة من خزنة المستندات</h3>
+              <h3>إضافة من خزنة المستندات</h3>
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowVaultModal(false)}>✕</button>
             </div>
             <div className="modal-body">
