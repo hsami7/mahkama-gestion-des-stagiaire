@@ -58,6 +58,7 @@ export function Profile() {
   const [revisionReason, setRevisionReason] = useState('');
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [vaultDocs, setVaultDocs] = useState<any[]>([]);
+  const [selectedVaultDocs, setSelectedVaultDocs] = useState<Set<string>>(new Set());
   const [vaultRequiresReturn, setVaultRequiresReturn] = useState(false);
   const [showVaultModal, setShowVaultModal] = useState(false);
 
@@ -955,36 +956,53 @@ export function Profile() {
           <div className="modal" style={{maxWidth:500}}>
             <div className="modal-head">
               <h3>إضافة من خزنة المستندات</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => { setShowVaultModal(false); setVaultRequiresReturn(false); }}><X size={14} /></button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => { setShowVaultModal(false); setSelectedVaultDocs(new Set()); setVaultRequiresReturn(false); }}><X size={14} /></button>
             </div>
             <div className="modal-body">
-              <label style={{display:'flex', alignItems:'center', gap:8, marginBottom:12, padding:'8px 12px', background:'#FFF6E5', borderRadius:8, border:'1px solid #F2D49B', fontSize:12.5, cursor:'pointer'}}>
-                <input type="checkbox" checked={vaultRequiresReturn} onChange={e => setVaultRequiresReturn(e.target.checked)} />
-                <ArrowsClockwise size={16} weight="bold" style={{color:'var(--gold-dark)'}} />
-                طلب تعبئة الوثيقة وإعادة رفعها من المتدرب
-              </label>
               {vaultDocs.length === 0 && <div style={{textAlign:'center',padding:20,color:'var(--slate-light)'}}>الخزنة فارغة</div>}
-              {vaultDocs.map((vd: any) => (
-                <div key={vd.name} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 4px',borderBottom:'1px solid var(--line)'}}>
-                  <div style={{fontWeight:600,fontSize:13,flex:1}}>{vd.name}</div>
-                  <button className="btn btn-ghost sm" style={{padding:'4px 10px',fontSize:11}} onClick={async () => {
-                    try {
-                      await api.post(`/interns/${id}/vault-attach`, { vault_name: vd.name, doc_type: 'OTHER', requires_return: vaultRequiresReturn });
-                      toast.success('تمت إضافة المستند من الخزنة');
-                      setShowVaultModal(false);
-                      setVaultRequiresReturn(false);
-                      fetchDocsLifecycle();
-                    } catch (err) {
-                      toast.error('فشلت الإضافة من الخزنة');
-                    }
-                  }}>
-                    إضافة للمتدرب
-                  </button>
-                </div>
-              ))}
+              {vaultDocs.length > 0 && (
+                <>
+                  <label style={{display:'flex', alignItems:'center', gap:8, marginBottom:8, padding:'6px 4px', fontSize:12.5, cursor:'pointer', fontWeight:600}}>
+                    <input type="checkbox" checked={selectedVaultDocs.size === vaultDocs.length} onChange={e => setSelectedVaultDocs(e.target.checked ? new Set(vaultDocs.map(v => v.name)) : new Set())} />
+                    تحديد الكل
+                  </label>
+                  {vaultDocs.map((vd: any) => (
+                    <label key={vd.name} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 4px',borderBottom:'1px solid var(--line)',cursor:'pointer',fontSize:13}}>
+                      <input type="checkbox" checked={selectedVaultDocs.has(vd.name)} onChange={e => {
+                        const next = new Set(selectedVaultDocs);
+                        e.target.checked ? next.add(vd.name) : next.delete(vd.name);
+                        setSelectedVaultDocs(next);
+                      }} />
+                      <span style={{fontWeight:600}}>{vd.name}</span>
+                    </label>
+                  ))}
+                  <label style={{display:'flex', alignItems:'center', gap:8, marginTop:12, padding:'8px 12px', background:'#FFF6E5', borderRadius:8, border:'1px solid #F2D49B', fontSize:12.5, cursor:'pointer'}}>
+                    <input type="checkbox" checked={vaultRequiresReturn} onChange={e => setVaultRequiresReturn(e.target.checked)} disabled={selectedVaultDocs.size === 0} />
+                    <ArrowsClockwise size={16} weight="bold" style={{color:'var(--gold-dark)'}} />
+                    طلب تعبئة الوثيقة وإعادة رفعها من المتدرب
+                  </label>
+                </>
+              )}
             </div>
-            <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={() => { setShowVaultModal(false); setVaultRequiresReturn(false); }}>إغلاق</button>
+            <div className="modal-foot" style={{display:'flex', gap:8, justifyContent:'space-between'}}>
+              <button className="btn btn-ghost" onClick={() => { setShowVaultModal(false); setSelectedVaultDocs(new Set()); setVaultRequiresReturn(false); }}>إلغاء</button>
+              <button className="btn btn-ink" disabled={selectedVaultDocs.size === 0} onClick={async () => {
+                try {
+                  const names = Array.from(selectedVaultDocs);
+                  await Promise.all(names.map(name =>
+                    api.post(`/interns/${id}/vault-attach`, { vault_name: name, doc_type: 'OTHER', requires_return: vaultRequiresReturn })
+                  ));
+                  toast.success(`تمت إضافة ${names.length} مستند${names.length > 1 ? 'ات' : ''} من الخزنة`);
+                  setShowVaultModal(false);
+                  setSelectedVaultDocs(new Set());
+                  setVaultRequiresReturn(false);
+                  fetchDocsLifecycle();
+                } catch (err) {
+                  toast.error('فشلت الإضافة من الخزنة');
+                }
+              }}>
+                إضافة للمتدرب ({selectedVaultDocs.size})
+              </button>
             </div>
           </div>
         </div>
