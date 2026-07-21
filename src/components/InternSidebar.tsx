@@ -13,12 +13,12 @@ interface InternSidebarProps {
 }
 
 export function InternSidebar({ activeTab, setActiveTab, internData, user, missingCount, pendingCount = 0, reqDotColor = '#F4B400', onLogout }: InternSidebarProps) {
-  const isAccepted = internData?.status === 'نشط';
+  const isRejected = internData?.status === 'مرفوض';
   const navItems = [
     { id: 'status', name: 'حالة الطلب', icon: <House size={24} /> },
     { id: 'profile', name: 'ملفي الشخصي', icon: <User size={24} /> },
   ];
-  if (isAccepted) {
+  if (!isRejected) {
     navItems.splice(1, 0, { id: 'documents', name: 'المستندات', icon: <FileText size={24} />, badge: pendingCount > 0 });
   }
 
