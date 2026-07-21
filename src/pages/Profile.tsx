@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, ClipboardText } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
@@ -87,6 +87,10 @@ export function Profile() {
   const [approveStartDate, setApproveStartDate] = useState('');
   const [approveEndDate, setApproveEndDate] = useState('');
   const [durationStr, setDurationStr] = useState('');
+  const [approveStartDisplay, setApproveStartDisplay] = useState('');
+  const [approveEndDisplay, setApproveEndDisplay] = useState('');
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const endDateRef = useRef<HTMLInputElement>(null);
 
   // PDF Export Modal State
   const [showExportModal, setShowExportModal] = useState(false);
@@ -281,6 +285,22 @@ export function Profile() {
     }
   };
 
+  const commitDate = (raw: string, setDisplay: (v: string) => void, setIso: (v: string) => void, hiddenRef: React.RefObject<HTMLInputElement | null>) => {
+    let clean = raw.replace(/[^\d]/g, '').slice(0, 8);
+    if (clean.length > 2) clean = clean.slice(0, 2) + '/' + clean.slice(2);
+    if (clean.length > 5) clean = clean.slice(0, 5) + '/' + clean.slice(5);
+    setDisplay(clean);
+    const parts = clean.split('/');
+    if (parts.length === 3 && parts[2].length === 4) {
+      const iso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      if (!isNaN(new Date(iso).getTime())) {
+        setIso(iso);
+        return;
+      }
+    }
+    setIso('');
+  };
+
   const handleApproveClick = () => {
     const requiredTypes = ['CIN', 'CV', 'INSURANCE', 'DEMANDE'];
     const missingDocs = requiredTypes.filter(dt => {
@@ -298,6 +318,8 @@ export function Profile() {
 
     setApproveStartDate(toDateInputValue(intern.start_date) || new Date().toISOString().split('T')[0]);
     setApproveEndDate(toDateInputValue(intern.end_date));
+    setApproveStartDisplay(formatDate(intern.start_date) || new Date().toLocaleDateString('en-GB'));
+    setApproveEndDisplay(formatDate(intern.end_date) || '');
     setShowApproveModal(true);
   };
 
@@ -1011,11 +1033,13 @@ export function Profile() {
               <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12}}>
                 <div className="form-group" style={{margin:0}}>
                   <label style={{fontSize:12}}>تاريخ البدء</label>
-                  <input type="date" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveStartDate} onChange={e => setApproveStartDate(e.target.value)} />
+                  <input type="text" inputMode="numeric" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveStartDisplay} onChange={e => handleStartDateChange(e.target.value)} placeholder="dd/mm/yyyy" />
+                  <input type="date" ref={startDateRef} style={{display:'none'}} onChange={e => { setApproveStartDate(e.target.value); setApproveStartDisplay(formatDate(e.target.value)); }} />
                 </div>
                 <div className="form-group" style={{margin:0}}>
                   <label style={{fontSize:12}}>تاريخ الانتهاء</label>
-                  <input type="date" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveEndDate} onChange={e => setApproveEndDate(e.target.value)} />
+                  <input type="text" inputMode="numeric" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveEndDisplay} onChange={e => handleEndDateChange(e.target.value)} placeholder="dd/mm/yyyy" />
+                  <input type="date" ref={endDateRef} style={{display:'none'}} onChange={e => { setApproveEndDate(e.target.value); setApproveEndDisplay(formatDate(e.target.value)); }} />
                 </div>
               </div>
 
