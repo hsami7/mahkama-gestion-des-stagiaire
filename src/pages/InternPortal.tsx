@@ -284,7 +284,7 @@ export function InternPortal() {
                 <div className="grid-2" style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16}}>
                   <div className="card mini-card" style={{padding:'18px 20px'}}>
                     <div className="mc-top" style={{marginBottom:10, display:'flex'}}><div className="mi" style={{width:36,height:36,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--success-bg)',color:'var(--success)'}}><svg className="icon" viewBox="0 0 24 24" style={{width:18,height:18}}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div></div>
-                    <b style={{fontSize:13.5, display:'block'}}>تاريخ الانطلاق</b><span style={{fontSize:12, color:'var(--slate)'}}>{internData?.start_date || 'غير محدد'}</span>
+                    <b style={{fontSize:13.5, display:'block'}}>تاريخ الانطلاق</b><span style={{fontSize:12, color:'var(--slate)'}}>{formatDate(internData?.start_date)}</span>
                   </div>
                   <div className="card mini-card" style={{padding:'18px 20px'}}>
                     <div className="mc-top" style={{marginBottom:10, display:'flex'}}><div className="mi" style={{width:36,height:36,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',background:'#EAF0FF',color:'#2A4FCB'}}><svg className="icon" viewBox="0 0 24 24" style={{width:18,height:18}}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></div></div>
@@ -498,14 +498,14 @@ export function InternPortal() {
             <div className="card" style={{ padding: '20px 24px', marginTop: 16, borderTop: '3px solid var(--success)' }}>
               <div className="section-title"><h3>بطاقة تقييم التدريب</h3></div>
               <div style={{marginBottom:14, fontSize:13}}>
-                <b>الفترة:</b> من {internData.evaluation.period_from || '—'} إلى {internData.evaluation.period_to || '—'}
+                <b>الفترة:</b> من {formatDate(internData.evaluation.period_from)} إلى {formatDate(internData.evaluation.period_to)}
               </div>
               {internData.evaluation.rotations?.length > 0 && (
                 <div style={{marginBottom:14, fontSize:12.5}}>
                   <div style={{fontWeight:700, marginBottom:6}}>فترات التدريب:</div>
                   {internData.evaluation.rotations.map((r: any, i: number) => (
                     <div key={i} style={{background:'var(--paper)', padding:'6px 10px', borderRadius:6, marginBottom:4, border:'1px solid var(--line)'}}>
-                      <b>{r.label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {r.from} إلى {r.to}
+                      <b>{r.label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {formatDate(r.from)} إلى {formatDate(r.to)}
                     </div>
                   ))}
                 </div>
@@ -548,7 +548,7 @@ export function InternPortal() {
                   <Eye size={14} /> معاينة البطاقة الموقعة
                 </a>
               )}
-              <div style={{fontSize:11.5, color:'var(--slate)', marginTop:8}}>بتقييم من: {internData.evaluation.evaluator} · {internData.evaluation.date}</div>
+              <div style={{fontSize:11.5, color:'var(--slate)', marginTop:8}}>بتقييم من: {internData.evaluation.evaluator} · {formatDate(internData.evaluation.date)}</div>
             </div>
             )}
           </div>

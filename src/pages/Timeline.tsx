@@ -31,8 +31,8 @@ function fmtRange(d?: Date | null): string {
 }
 
 function monthLabel(y: number, m: number): string {
-  const name = new Date(y, m, 1).toLocaleDateString('ar-EG', { month: 'long', ...LATN });
-  return `${name} ${y}`;
+  const mm = String(m + 1).padStart(2, '0');
+  return `${mm}/${y}`;
 }
 
 function dayKey(d: Date): string {
@@ -471,7 +471,7 @@ export function Timeline() {
           zIndex: 300, pointerEvents: 'none', maxWidth: 210, boxShadow: '0 16px 40px -12px rgba(0,0,0,.45)'
         }}>
           <div style={{ fontFamily: "'Cairo', sans-serif", fontWeight: 700, marginBottom: 7 }}>
-            {new Date(hover.key).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', ...LATN })} {new Date(hover.key).getFullYear()}
+            {(() => { const d = new Date(hover.key); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })()}
           </div>
           {hover.list.map(c => (
             <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>

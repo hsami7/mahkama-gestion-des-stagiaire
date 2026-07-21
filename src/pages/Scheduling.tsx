@@ -38,7 +38,10 @@ function parseDate(value?: string | null): Date | null {
 }
 
 function fmt(d: Date): string {
-  return d.toLocaleDateString('ar-EG', { day: '2-digit', month: 'short', year: 'numeric' });
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 function overlaps(aS: Date, aE: Date, bS: Date, bE: Date): boolean {

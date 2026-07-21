@@ -324,7 +324,7 @@ export function Profile() {
     const ev = intern?.evaluation || {};
     setEvalPeriodFrom(ev.period_from || '');
     setEvalPeriodTo(ev.period_to || '');
-    setEvalRotations(ev.rotations || []);
+    setEvalRotations(ev.rotations?.length > 0 ? ev.rotations : [{ supervisor: '', department: '', from: '', to: '' }]);
     setEvalCriteria(ev.criteria || {});
     setEvalComments(ev.comments || '');
     setShowEvalForm(true);
@@ -390,23 +390,25 @@ export function Profile() {
     const comments = evalComments || ev.comments || '';
     w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>بطاقة تقييم التدريب</title><style>
       body{font-family:'Traditional Arabic','Arial',sans-serif;padding:40px;font-size:14px;line-height:1.8}
-      h1{text-align:center;font-size:22px;margin-bottom:30px}
+      .header{text-align:center;font-size:13px;margin-bottom:4px}
+      h1{text-align:center;font-size:22px;margin:8px 0 24px}
       table{width:100%;border-collapse:collapse;margin-bottom:20px}
       td,th{border:1px solid #333;padding:8px 12px;text-align:right}
       th{background:#f0f0f0;font-weight:700}
-      .header-table td{width:25%}
       .section{font-weight:700;background:#e8e8e8;text-align:center}
       .signature{margin-top:60px;text-align:left;font-weight:700}
       .notes{margin-top:20px;min-height:100px;border:1px dashed #999;padding:12px;white-space:pre-wrap}
       .check{font-family:'Arial';font-size:16px}
       @media print{body{padding:20px}}
     </style></head><body>`);
+    w.document.write(`<div class="header">المملكة المغربية &mdash; وزارة العدل &mdash; محكمة الإستئناف الإدارية بفاس</div>`);
+    w.document.write(`<div class="header" style="margin-bottom:20px">كتابة الضبط بمحكمة الاستئناف الإدارية بفاس</div>`);
     w.document.write(`<h1>بطاقة تقييم التدريب</h1>`);
-    w.document.write(`<table class="header-table"><tr><td><b>الاسم الكامل:</b> ${intern?.name || ''}</td><td><b>فترة التدريب المطلوبة:</b></td><td>من: ${pFrom}<br>إلى: ${pTo}</td></tr></table>`);
-    w.document.write(`<table><tr><th colspan="4">معلومات عن التدريب</th></tr>`);
-    w.document.write(`<tr><th>الشعبة</th><th>المشرف على التكوين</th><th>الفترة</th></tr>`);
+    w.document.write(`<table><tr><td style="border:none;padding:4px 0"><b>الاسم الكامل:</b> ${intern?.name || ''}</td><td style="border:none;padding:4px 0"><b>فترة التدريب المطلوبة:</b> من: ${pFrom} إلى: ${pTo}</td></tr></table>`);
+    w.document.write(`<table><tr><th colspan="3">معلومات عن التدريب</th></tr>`);
+    w.document.write(`<tr><th>المشرف على التكوين</th><th>الشعبة</th><th>الفترة</th></tr>`);
     (rots.length > 0 ? rots : [{ supervisor: '', department: '', from: '', to: '' }]).forEach((r: any, i: number) => {
-      w.document.write(`<tr><td>${r.department || ''}</td><td>${r.supervisor || ''}</td><td>${r.label || ('الفترة ' + (i+1))}<br>من: ${r.from || ''} إلى: ${r.to || ''}</td></tr>`);
+      w.document.write(`<tr><td>${r.supervisor || ''}</td><td>${r.department || ''}</td><td>${r.label || ('الفترة ' + (i+1))}<br>من: ${r.from || ''} إلى: ${r.to || ''}</td></tr>`);
     });
     w.document.write(`</table>`);
     w.document.write(`<table><tr><th>لا</th><th>نعم</th><th>تقييم المتدرب</th></tr>`);
@@ -524,15 +526,15 @@ export function Profile() {
           </div>
           <div className="info-row">
             <span className="k">تاريخ الازدياد</span>
-            <span className="v">{intern.date_of_birth || '—'}</span>
+            <span className="v">{formatDate(intern.date_of_birth)}</span>
           </div>
           <div className="info-row">
             <span className="k">تاريخ البدء</span>
-            <span className="v">{intern.start_date || '—'}</span>
+            <span className="v">{formatDate(intern.start_date)}</span>
           </div>
           <div className="info-row">
             <span className="k">تاريخ الانتهاء</span>
-            <span className="v">{intern.end_date || '—'}</span>
+            <span className="v">{formatDate(intern.end_date)}</span>
           </div>
           <div className="info-row">
             <span className="k">الجامعة أو المعهد</span>
@@ -774,14 +776,14 @@ export function Profile() {
           {intern.evaluation?.criteria && (
             <div style={{ marginTop: '20px' }}>
               <div style={{marginBottom:14, fontSize:13}}>
-                <b>الفترة:</b> من {intern.evaluation.period_from || '—'} إلى {intern.evaluation.period_to || '—'}
+                <b>الفترة:</b> من {formatDate(intern.evaluation.period_from)} إلى {formatDate(intern.evaluation.period_to)}
               </div>
               {intern.evaluation.rotations?.length > 0 && (
                 <div style={{marginBottom:14, fontSize:12.5}}>
                   <div style={{fontWeight:700, marginBottom:6}}>فترات التدريب:</div>
                   {intern.evaluation.rotations.map((r: any, i: number) => (
                     <div key={i} style={{background:'var(--paper)', padding:'6px 10px', borderRadius:6, marginBottom:4, border:'1px solid var(--line)'}}>
-                      <b>{r.label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {r.from} إلى {r.to}
+                      <b>{r.label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {formatDate(r.from)} إلى {formatDate(r.to)}
                     </div>
                   ))}
                 </div>
@@ -811,7 +813,7 @@ export function Profile() {
                   {intern.evaluation.comments}
                 </div>
               )}
-              <div style={{fontSize:11.5, color:'var(--slate)'}}>بواسطة: {intern.evaluation.evaluator} · {intern.evaluation.date}</div>
+              <div style={{fontSize:11.5, color:'var(--slate)'}}>بواسطة: {intern.evaluation.evaluator} · {formatDate(intern.evaluation.date)}</div>
               {canEvaluateInterns && (
                 <div style={{marginTop:12}}>
                   <label className="btn btn-ghost sm" style={{cursor:'pointer', fontSize:12, display:'inline-flex', alignItems:'center', gap:6}}>
@@ -883,11 +885,7 @@ export function Profile() {
             </div>
             <div className="modal-body">
                 <div style={{marginBottom:16}}>
-                <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8}}>
-                  <label style={{fontWeight:700, fontSize:13}}>معلومات عن التدريب (فترات)</label>
-                  <button className="btn btn-ghost sm" onClick={addRotation} style={{fontSize:11}}>+ إضافة فترة</button>
-                </div>
-                {evalRotations.length === 0 && <div style={{textAlign:'center', padding:12, color:'var(--slate-light)', fontSize:12}}>لم يتم إضافة أي فترات بعد</div>}
+                <label style={{fontWeight:700, fontSize:13, display:'block', marginBottom:8}}>معلومات عن التدريب (فترات)</label>
                 {evalRotations.map((r, i) => {
                   const isCustom = r.department && !DEPARTMENTS.includes(r.department);
                   return (
@@ -935,6 +933,7 @@ export function Profile() {
                   </div>
                   );
                 })}
+                <button className="btn btn-ghost sm" onClick={addRotation} style={{fontSize:11, marginTop:8}}>+ إضافة فترة</button>
               </div>
 
               <div style={{marginBottom:16}}>

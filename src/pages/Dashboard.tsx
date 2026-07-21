@@ -3,6 +3,18 @@ import { Users, FileText, CheckCircle, WarningCircle, Archive, Plus, Eye } from 
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 
+function formatDate(d: string | undefined | null): string {
+  if (!d) return '—';
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return d;
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const yyyy = dt.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  } catch { return d || '—'; }
+}
+
 export function Dashboard() {
   const navigate = useNavigate();
   const [interns, setInterns] = useState<any[]>([]);
@@ -115,9 +127,9 @@ export function Dashboard() {
                   </td>
                   <td>
                     <div style={{ fontSize: '0.9rem' }}>
-                      <span style={{ color: 'var(--success)' }}>{intern.start_date || '—'}</span> 
+                      <span style={{ color: 'var(--success)' }}>{formatDate(intern.start_date)}</span> 
                       <span style={{ color: 'var(--slate)', margin: '0 4px' }}>إلى</span> 
-                      <span style={{ color: 'var(--danger)' }}>{intern.end_date || '—'}</span>
+                      <span style={{ color: 'var(--danger)' }}>{formatDate(intern.end_date)}</span>
                     </div>
                   </td>
                   <td>
