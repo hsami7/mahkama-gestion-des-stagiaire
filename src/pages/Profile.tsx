@@ -938,7 +938,7 @@ export function Profile() {
                   <div key={i} style={{background:'var(--paper)', padding:12, borderRadius:8, border:'1px solid var(--line)', marginBottom:8}}>
                     <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
                       <b style={{fontSize:12}}>{r.label || ('الفترة '+(i+1))}</b>
-                      <button className="btn btn-ghost sm" onClick={() => removeRotation(i)} style={{fontSize:10, color:'var(--danger)', padding:'2px 6px'}}><X size={12} /> حذف</button>
+                      {evalRotations.length > 1 && <button className="btn btn-ghost sm" onClick={() => removeRotation(i)} style={{fontSize:10, color:'var(--danger)', padding:'2px 6px'}}><X size={12} /> حذف</button>}
                     </div>
                     <div style={{display:'grid', gridTemplateColumns:'1fr', gap:8}}>
                       <div className="form-group" style={{margin:0}}>
