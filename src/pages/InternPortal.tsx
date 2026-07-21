@@ -326,10 +326,10 @@ export function InternPortal() {
               <div className="section-title" style={{marginBottom:16}}>
                 <h3 style={{fontSize:15, margin:0, color:'var(--success)'}}>الوثائق الرسمية الموقعة</h3>
               </div>
-              {lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED').length === 0 && (
+              {lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED' && d.uploaded_by === 'ADMIN').length === 0 && (
                 <div style={{textAlign:'center', padding:'20px', color:'var(--slate-light)', fontSize:13}}>لا توجد وثائق رسمية موقعة بعد</div>
               )}
-              {lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED').map(d => (
+              {lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED' && d.uploaded_by === 'ADMIN').map(d => (
                 <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)'}}>
                   <div className="di"><CheckCircle weight="fill" style={{color:'var(--success)', width:18}} /></div>
                   <div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple } from '@phosphor-icons/react';
+import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, Star } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -464,7 +464,7 @@ export function Profile() {
               + رفع وثيقة موقعة
             </button>
             <button className="btn btn-ghost sm" onClick={async () => { try { const d = await api.get('/vault'); setVaultDocs(d); setShowVaultModal(true); } catch {} }} style={{fontSize:12, padding:'6px 12px'}}>
-              📄 إضافة من الخزنة
+              <FileText size={14} /> إضافة من الخزنة
             </button>
           </div>
 
@@ -509,21 +509,21 @@ export function Profile() {
                           {d?.file_path && (
                             <>
                               <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                👁️
+                                <Eye size={14} />
                               </button>
                               <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                📥
+                                <DownloadSimple size={14} />
                               </button>
                             </>
                           )}
                           {d && d.status !== 'MISSING' && (
                             <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                              🔄
+                              <ArrowsClockwise size={14} />
                             </button>
                           )}
                           {d?.status === 'PENDING_REVIEW' && (
                             <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                              ✓
+                              <CheckCircle size={14} />
                             </button>
                           )}
                         </div>
@@ -606,7 +606,7 @@ export function Profile() {
                   }
                 }}>
                   <DownloadSimple weight="bold" size={16} style={{marginLeft:6}} />
-                  📦 تحميل أرشيف الملفات ZIP
+                  <Package size={16} /> تحميل أرشيف الملفات ZIP
                 </button>
               </div>
             </div>
@@ -623,10 +623,10 @@ export function Profile() {
           </div>
           <div style={{ display: 'flex', gap: '16px' }}>
             <button className="btn btn-ghost" onClick={handleReject} style={{ padding: '12px 24px', color: 'var(--danger)', border: '1.5px solid var(--danger-border)', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px' }}>
-              ✕ رفض الطلب
+<X size={18} /> رفض الطلب
             </button>
             <button className="btn btn-primary" onClick={handleApproveClick} style={{ padding: '12px 24px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
-              ✓ قبول الطلب وتنشيط الحساب
+<CheckCircle size={18} weight="fill" /> قبول الطلب وتنشيط الحساب
             </button>
           </div>
         </div>
@@ -641,7 +641,7 @@ export function Profile() {
             </div>
             {canEvaluateInterns && (
               <button className="btn btn-primary" onClick={openEvalModal} style={{ padding: '12px 24px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px' }}>
-                {intern.evaluation ? 'تعديل التقييم' : '★ تقييم المتدرب'}
+                {intern.evaluation ? 'تعديل التقييم' : <><Star size={18} weight="fill" /> تقييم المتدرب</>}
               </button>
             )}
           </div>
@@ -678,7 +678,7 @@ export function Profile() {
           <div className="modal">
             <div className="modal-head">
               <h3>تصدير PDF</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowExportModal(false)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowExportModal(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
               <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', color: 'var(--slate)' }}>اختر نوع التصدير</label>
@@ -723,7 +723,7 @@ export function Profile() {
           <div className="modal">
             <div className="modal-head">
               <h3>تقييم المتدرب</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowEvalModal(false)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowEvalModal(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
               {EVAL_CRITERIA.map(c => (
