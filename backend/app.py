@@ -5,13 +5,13 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 CORS(app)
 
 # Configurations
-app.config['JWT_SECRET_KEY'] = 'mahkama-secret-key-2026' # Change in production
+app.config['JWT_SECRET_KEY'] = 'mahkama-secret-key-2026!!secret!!' # Change in production
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024 # 20MB max upload
@@ -222,7 +222,7 @@ def _migrate_legacy_documents():
         'photo': 'CIN',
     }
     interns = Intern.query.all()
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     for intern in interns:
         if not intern.documents:
             continue
@@ -346,7 +346,7 @@ def update_user(user_id):
     if current_user.get('role') != 'Admin':
         return jsonify({"msg": "Unauthorized"}), 403
         
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"msg": "User not found"}), 404
         
@@ -373,7 +373,7 @@ def change_password():
     user_id = current_user.get('sub')
     data = request.json
     
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"msg": "User not found"}), 404
         
@@ -401,7 +401,7 @@ def delete_user(user_id):
     if current_user.get('role') != 'Admin':
         return jsonify({"msg": "Unauthorized"}), 403
         
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if user:
         name_deleted = user.name
         db.session.delete(user)
@@ -430,7 +430,7 @@ def get_interns():
 @app.route('/api/interns/<int:intern_id>', methods=['GET'])
 @jwt_required()
 def get_intern(intern_id):
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
         
@@ -519,7 +519,7 @@ def add_intern():
 @app.route('/api/interns/<int:intern_id>', methods=['PUT'])
 @jwt_required()
 def update_intern(intern_id):
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
         
@@ -559,7 +559,7 @@ def update_intern(intern_id):
 @app.route('/api/interns/<int:intern_id>/evaluation', methods=['POST'])
 @jwt_required()
 def save_evaluation(intern_id):
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
 
@@ -637,7 +637,7 @@ def generate_attestation(intern_id):
     except ImportError:
         return jsonify({"msg": "PDF generation library not installed"}), 500
         
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
         
@@ -686,7 +686,7 @@ def generate_attestation(intern_id):
 @app.route('/api/interns/<int:intern_id>', methods=['DELETE'])
 @jwt_required()
 def delete_intern(intern_id):
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
         
@@ -891,7 +891,7 @@ def attach_vault_to_intern(intern_id):
     current_user = get_jwt()
     if current_user.get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
     data = request.json or {}
@@ -907,7 +907,7 @@ def attach_vault_to_intern(intern_id):
     dst = os.path.join(app.config['UPLOAD_FOLDER'], dst_name)
     shutil.copy2(src, dst)
     file_url = f"/api/uploads/{dst_name}"
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
         uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
@@ -1042,13 +1042,13 @@ def create_document_request(intern_id):
         custom_title=custom_title,
         note=note,
         status='pending',
-        created_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(timezone.utc).isoformat(),
         template_path=template_path
     )
     db.session.add(new_request)
     db.session.commit()
     
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     title_str = custom_title if doc_type == 'other' else doc_type
     log_action(current_user.get('name'), f"طلب مستند ({title_str}) من المتدرب {intern.name if intern else ''}")
     
@@ -1058,7 +1058,7 @@ def create_document_request(intern_id):
 @jwt_required()
 def get_my_intern_profile():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"msg": "User not found"}), 404
         
@@ -1098,7 +1098,7 @@ def get_my_intern_profile():
 @jwt_required()
 def get_my_requests():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"msg": "User not found"}), 404
         
@@ -1126,7 +1126,7 @@ def get_my_requests():
 @jwt_required()
 def upload_requested_document(request_id):
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"msg": "User not found"}), 404
         
@@ -1136,7 +1136,7 @@ def upload_requested_document(request_id):
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
         
-    doc_request = DocumentRequest.query.get(request_id)
+    doc_request = db.session.get(DocumentRequest, request_id)
     if not doc_request or doc_request.intern_id != intern.id:
         return jsonify({"msg": "Request not found"}), 404
         
@@ -1211,7 +1211,7 @@ def upload_requested_document(request_id):
 def upload_unrequested_document():
     user_id = get_jwt_identity()
     current_user = get_jwt()
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"msg": "User not found"}), 404
         
@@ -1303,14 +1303,14 @@ def get_messages(intern_id):
 @jwt_required()
 def send_message(intern_id):
     current_user = get_jwt()
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
 
     role = current_user.get('role')
     if role == 'Intern':
         user_id = get_jwt_identity()
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         if not user or (intern.email and user.email != intern.email):
             return jsonify({"msg": "Unauthorized"}), 403
 
@@ -1354,7 +1354,7 @@ def send_message(intern_id):
         waiting_for_reply=waiting_for_reply and role != 'Intern',
         expected_format=expected_format if role != 'Intern' else None,
         replied=False,
-        created_at=datetime.utcnow().isoformat()
+        created_at=datetime.now(timezone.utc).isoformat()
     )
     db.session.add(new_msg)
     db.session.commit()
@@ -1450,7 +1450,7 @@ def render_intern_md(intern: Intern) -> str:
 @app.route('/api/interns/<int:intern_id>/profile-md', methods=['GET'])
 @jwt_required()
 def download_profile_md(intern_id):
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
     md = render_intern_md(intern)
@@ -1461,7 +1461,7 @@ def download_profile_md(intern_id):
 @app.route('/api/interns/<int:intern_id>/profile-pdf', methods=['GET'])
 @jwt_required()
 def download_profile_pdf(intern_id):
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
     mode = request.args.get('mode', 'summary').lower()
@@ -1560,7 +1560,7 @@ DOC_TYPE_LABELS = {
 
 def _seed_doc_records(intern_id):
     """Ensure one DocumentLifecycle row exists per standard doc_type for this intern."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     for dt in ['CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED', 'FINAL_REPORT', 'ATTESTATION_SIGNED']:
         existing = DocumentLifecycle.query.filter_by(intern_id=intern_id, doc_type=dt).filter(
             DocumentLifecycle.custom_title.is_(None)
@@ -1577,7 +1577,7 @@ def _get_doc_type_intern():
     claims = get_jwt()
     role = claims.get('role')
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return None, None, None
     if role == 'Intern':
@@ -1589,7 +1589,7 @@ def _get_doc_type_intern():
 @app.route('/api/interns/<int:intern_id>/documents', methods=['GET'])
 @jwt_required()
 def list_intern_documents(intern_id):
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
     _seed_doc_records(intern_id)
@@ -1621,7 +1621,7 @@ def upload_intern_document(intern_id):
         current_user = get_jwt()
         if current_user.get('role') not in ('Admin',):
             return jsonify({"msg": "Unauthorized"}), 403
-        intern = Intern.query.get(intern_id)
+        intern = db.session.get(Intern, intern_id)
         if not intern:
             return jsonify({"msg": "Intern not found"}), 404
 
@@ -1650,7 +1650,7 @@ def upload_intern_document(intern_id):
     file_url = f"/api/uploads/{filename}"
 
     custom_title = request.form.get('custom_title')
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     record = DocumentLifecycle.query.filter_by(
         intern_id=intern.id, doc_type=doc_type
@@ -1699,9 +1699,9 @@ def approve_document(intern_id, doc_id):
         return jsonify({"msg": "Document not found"}), 404
     doc.status = 'APPROVED_AND_SIGNED'
     doc.is_visible_to_intern = True
-    doc.updated_at = datetime.utcnow().isoformat()
+    doc.updated_at = datetime.now(timezone.utc).isoformat()
     db.session.commit()
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     log_action(current_user.get('name'), f"قبول مستند ({doc.doc_type}) للمتدرب {intern.name if intern else ''}")
     return jsonify({"success": True, "status": doc.status}), 200
 
@@ -1720,9 +1720,9 @@ def reject_document(intern_id, doc_id):
     doc.status = 'REVISION_REQUESTED'
     doc.rejection_reason = reason
     doc.is_visible_to_intern = False
-    doc.updated_at = datetime.utcnow().isoformat()
+    doc.updated_at = datetime.now(timezone.utc).isoformat()
     db.session.commit()
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     log_action(current_user.get('name'), f"إعادة مستند ({doc.doc_type}) للمتدرب {intern.name if intern else ''}: {reason}")
     return jsonify({"success": True, "status": doc.status}), 200
 
@@ -1734,7 +1734,7 @@ def upload_signed_document(intern_id):
     current_user = get_jwt()
     if current_user.get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
 
@@ -1764,7 +1764,7 @@ def upload_signed_document(intern_id):
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     file_url = f"/api/uploads/{filename}"
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     if custom_title:
         existing = DocumentLifecycle.query.filter_by(
@@ -1802,7 +1802,7 @@ def upload_signed_document(intern_id):
 @app.route('/api/intern-documents/<int:doc_id>/download', methods=['GET'])
 def download_intern_document(doc_id):
     """Secure download: intern can only download if is_visible_to_intern or they uploaded it."""
-    doc = DocumentLifecycle.query.get(doc_id)
+    doc = db.session.get(DocumentLifecycle, doc_id)
     if not doc or not doc.file_path:
         return jsonify({"msg": "Document not found"}), 404
 
@@ -1817,7 +1817,7 @@ def download_intern_document(doc_id):
             role = decoded.get('role')
             is_admin = role in ('Admin', 'Manager')
             if role == 'Intern':
-                user = User.query.get(int(decoded.get('sub', 0)))
+                user = db.session.get(User, int(decoded.get('sub', 0)))
                 if user:
                     intern_identity = Intern.query.filter_by(email=user.email).first()
         except Exception:
@@ -1875,7 +1875,7 @@ def export_intern_zip(intern_id):
     current_user = get_jwt()
     if current_user.get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
-    intern = Intern.query.get(intern_id)
+    intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
     import tempfile, zipfile
