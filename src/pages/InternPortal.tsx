@@ -497,9 +497,8 @@ export function InternPortal() {
             {internData?.evaluation?.criteria && (
             <div className="card" style={{ padding: '20px 24px', marginTop: 16, borderTop: '3px solid var(--success)' }}>
               <div className="section-title"><h3>بطاقة تقييم التدريب</h3></div>
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14, fontSize:13}}>
-                <div><b>مقر التدريب:</b> {internData.evaluation.training_location || '—'}</div>
-                <div><b>الفترة:</b> من {internData.evaluation.period_from || '—'} إلى {internData.evaluation.period_to || '—'}</div>
+              <div style={{marginBottom:14, fontSize:13}}>
+                <b>الفترة:</b> من {internData.evaluation.period_from || '—'} إلى {internData.evaluation.period_to || '—'}
               </div>
               {internData.evaluation.rotations?.length > 0 && (
                 <div style={{marginBottom:14, fontSize:12.5}}>

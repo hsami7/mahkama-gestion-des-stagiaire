@@ -133,7 +133,7 @@ export function Profile() {
 
   // Evaluation State
   const [showEvalForm, setShowEvalForm] = useState(false);
-  const [evalTrainingLocation, setEvalTrainingLocation] = useState('');
+
   const [evalPeriodFrom, setEvalPeriodFrom] = useState('');
   const [evalPeriodTo, setEvalPeriodTo] = useState('');
   const [evalRotations, setEvalRotations] = useState<{supervisor:string;department:string;from:string;to:string}[]>([]);
@@ -314,7 +314,6 @@ export function Profile() {
 
   const openEvalForm = () => {
     const ev = intern?.evaluation || {};
-    setEvalTrainingLocation(ev.training_location || '');
     setEvalPeriodFrom(ev.period_from || '');
     setEvalPeriodTo(ev.period_to || '');
     setEvalRotations(ev.rotations || []);
@@ -327,7 +326,6 @@ export function Profile() {
     setSavingEval(true);
     try {
       const res = await api.post(`/interns/${id}/evaluation`, {
-        training_location: evalTrainingLocation,
         period_from: evalPeriodFrom,
         period_to: evalPeriodTo,
         rotations: evalRotations,
@@ -379,7 +377,6 @@ export function Profile() {
     const ev = intern?.evaluation || {};
     const crit = evalCriteria || ev.criteria || {};
     const rots = evalRotations.length > 0 ? evalRotations : (ev.rotations || []);
-    const location = evalTrainingLocation || ev.training_location || '';
     const pFrom = evalPeriodFrom || ev.period_from || '';
     const pTo = evalPeriodTo || ev.period_to || '';
     const comments = evalComments || ev.comments || '';
@@ -397,7 +394,7 @@ export function Profile() {
       @media print{body{padding:20px}}
     </style></head><body>`);
     w.document.write(`<h1>بطاقة تقييم التدريب</h1>`);
-    w.document.write(`<table class="header-table"><tr><td><b>الاسم الكامل:</b> ${intern?.name || ''}</td><td><b>مقر التدريب:</b> ${location}</td><td><b>فترة التدريب المطلوبة:</b></td><td>من: ${pFrom}<br>إلى: ${pTo}</td></tr></table>`);
+    w.document.write(`<table class="header-table"><tr><td><b>الاسم الكامل:</b> ${intern?.name || ''}</td><td><b>فترة التدريب المطلوبة:</b></td><td>من: ${pFrom}<br>إلى: ${pTo}</td></tr></table>`);
     w.document.write(`<table><tr><th colspan="4">معلومات عن التدريب</th></tr>`);
     w.document.write(`<tr><th>المشرف على التكوين</th><th>الشعبة</th><th>الفترة</th></tr>`);
     (rots.length > 0 ? rots : [{ supervisor: '', department: '', from: '', to: '' }]).forEach((r: any, i: number) => {
@@ -768,9 +765,8 @@ export function Profile() {
 
           {intern.evaluation?.criteria && (
             <div style={{ marginTop: '20px' }}>
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14, fontSize:13}}>
-                <div><b>مقر التدريب:</b> {intern.evaluation.training_location || '—'}</div>
-                <div><b>الفترة:</b> من {intern.evaluation.period_from || '—'} إلى {intern.evaluation.period_to || '—'}</div>
+              <div style={{marginBottom:14, fontSize:13}}>
+                <b>الفترة:</b> من {intern.evaluation.period_from || '—'} إلى {intern.evaluation.period_to || '—'}
               </div>
               {intern.evaluation.rotations?.length > 0 && (
                 <div style={{marginBottom:14, fontSize:12.5}}>
@@ -878,21 +874,15 @@ export function Profile() {
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowEvalForm(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16}}>
-                <div className="form-group" style={{margin:0}}>
-                  <label>مقر التدريب</label>
-                  <input className="input" value={evalTrainingLocation} onChange={e => setEvalTrainingLocation(e.target.value)} placeholder="مقر التدريب" />
-                </div>
-                <div className="form-group" style={{margin:0}}>
-                  <label>فترة التدريب المطلوبة</label>
-                  <div style={{display:'flex', gap:8, alignItems:'center'}}>
+              <div className="form-group" style={{marginBottom:16}}>
+                <label>فترة التدريب المطلوبة</label>
+                <div style={{display:'flex', gap:8, alignItems:'center'}}>
                     <span>من</span>
                     <input className="input" type="date" value={evalPeriodFrom} onChange={e => setEvalPeriodFrom(e.target.value)} style={{flex:1}} />
                     <span>إلى</span>
                     <input className="input" type="date" value={evalPeriodTo} onChange={e => setEvalPeriodTo(e.target.value)} style={{flex:1}} />
                   </div>
                 </div>
-              </div>
 
               <div style={{marginBottom:16}}>
                 <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8}}>
