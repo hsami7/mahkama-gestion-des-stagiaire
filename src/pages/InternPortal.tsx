@@ -28,6 +28,10 @@ function formatDate(d: string | undefined | null): string {
   } catch { return d || '—'; }
 }
 
+function sanitizeTitle(t: string): string {
+  return t.replace(/\.pdf\.?$/i, '').trim();
+}
+
 export function InternPortal() {
   const [activeTab, setActiveTab] = useState('status');
   const [bellOpen, setBellOpen] = useState(false);
@@ -340,17 +344,17 @@ export function InternPortal() {
       }
       return <>
         {returnDocs.map(d => (
-          <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)'}}>
-            <div className="di"><FileText weight="fill" style={{color:'var(--gold-dark)', width:18}} /></div>
-            <div style={{flex:1}}>
-              <div className="dn">{d.label}</div>
-              <div className="ds" style={{color:'var(--gold-dark)'}}>
-                <ArrowsClockwise size={12} weight="bold" style={{marginLeft:4}} />
+          <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)', display:'flex', alignItems:'center', gap:12, padding:'14px 0'}}>
+            <FileText weight="fill" style={{color:'var(--gold-dark)', width:20, height:20, flexShrink:0}} />
+            <div style={{flex:1, minWidth:0}}>
+              <div className="dn" style={{fontSize:13.5, fontWeight:700, marginBottom:4}}>{sanitizeTitle(d.label)}</div>
+              <span style={{display:'inline-flex', alignItems:'center', gap:4, background: d.returned_file_path ? '#E7F8EE' : '#FEF3C7', color: d.returned_file_path ? '#15803D' : '#B45309', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
+                <ArrowsClockwise size={12} weight="bold" />
                 {d.returned_file_path ? 'تم إرجاع النسخة المعبأة' : 'يتطلب التعبئة والإرجاع'}
-              </div>
+              </span>
             </div>
-            <div className="du" style={{display:'flex', gap:6, alignItems:'center'}}>
-              {d.file_path && (
+            <div style={{display:'flex', gap:6, alignItems:'center', flexShrink:0}}>
+              {d.file_path && !d.returned_file_path && (
                 <a href={api.downloadDocument(d.id)} download className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
                   <DownloadSimple size={14} /> تحميل النموذج
                 </a>
@@ -379,21 +383,21 @@ export function InternPortal() {
           </div>
         ))}
         {adminSigned.map(d => (
-          <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)'}}>
-            <div className="di"><CheckCircle weight="fill" style={{color:'var(--success)', width:18}} /></div>
-            <div>
-              <div className="dn">{d.label}</div>
-              <div className="ds" style={{color:'var(--success)'}}>
+          <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)', display:'flex', alignItems:'center', gap:12, padding:'14px 0'}}>
+            <CheckCircle weight="fill" style={{color:'var(--success)', width:20, height:20, flexShrink:0}} />
+            <div style={{flex:1, minWidth:0}}>
+              <div className="dn" style={{fontSize:13.5, fontWeight:700, marginBottom:4}}>{sanitizeTitle(d.label)}</div>
+              <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
                 تم التوقيع — {formatDate(d.updated_at)}
-              </div>
+              </span>
             </div>
-            <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
+            <div style={{display:'flex', gap:6, alignItems:'center', flexShrink:0}}>
               {d.file_path && (
                 <>
-                  <a href={api.downloadDocument(d.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm">
-                    معاينة
+                  <a href={api.downloadDocument(d.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                    <Eye size={14} /> معاينة
                   </a>
-                  <a href={api.downloadDocument(d.id)} download className="btn btn-ink sm" style={{padding:'6px 14px'}}>
+                  <a href={api.downloadDocument(d.id)} download className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
                     <DownloadSimple size={14} /> تحميل
                   </a>
                 </>
