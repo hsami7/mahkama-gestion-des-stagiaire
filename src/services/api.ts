@@ -120,8 +120,8 @@ export const api = {
   rejectDocument: (internId: number, docId: number, reason: string) =>
     api.post(`/interns/${internId}/documents/${docId}/reject`, { rejection_reason: reason }),
 
-  uploadSignedDocument: (internId: number, docType: string, file: File) =>
-    api.uploadFile(`/interns/${internId}/documents/signed`, file, { doc_type: docType }),
+  uploadSignedDocument: (internId: number, docType: string, file: File, customTitle?: string) =>
+    api.uploadFile(`/interns/${internId}/documents/signed`, file, { doc_type: docType, ...(customTitle ? { custom_title: customTitle } : {}) }),
 
   getMyDocuments: () => api.get('/intern/documents'),
 

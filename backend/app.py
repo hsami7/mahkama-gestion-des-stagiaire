@@ -1599,7 +1599,7 @@ def list_intern_documents(intern_id):
         result.append({
             "id": d.id,
             "doc_type": d.doc_type,
-            "label": DOC_TYPE_LABELS.get(d.doc_type, d.custom_title or d.doc_type),
+            "label": d.custom_title or DOC_TYPE_LABELS.get(d.doc_type, d.doc_type),
             "file_path": d.file_path,
             "uploaded_by": d.uploaded_by,
             "status": d.status,
@@ -1742,6 +1742,8 @@ def upload_signed_document(intern_id):
     if not doc_type or doc_type not in DOC_TYPES:
         return jsonify({"msg": "Invalid doc_type"}), 400
 
+    custom_title = request.form.get('custom_title', '').strip() or None
+
     if 'file' not in request.files:
         return jsonify({"msg": "No file part"}), 400
     file = request.files['file']
@@ -1763,14 +1765,23 @@ def upload_signed_document(intern_id):
     file_url = f"/api/uploads/{filename}"
 
     now = datetime.utcnow().isoformat()
-    existing = DocumentLifecycle.query.filter_by(intern_id=intern.id, doc_type=doc_type).filter(
-        DocumentLifecycle.custom_title.is_(None)
-    ).first()
+
+    if custom_title:
+        existing = DocumentLifecycle.query.filter_by(
+            intern_id=intern.id, doc_type=doc_type, custom_title=custom_title
+        ).first()
+    else:
+        existing = DocumentLifecycle.query.filter_by(intern_id=intern.id, doc_type=doc_type).filter(
+            DocumentLifecycle.custom_title.is_(None)
+        ).first()
+
     if existing:
         existing.file_path = file_url
         existing.status = 'APPROVED_AND_SIGNED'
         existing.uploaded_by = 'ADMIN'
         existing.is_visible_to_intern = True
+        if custom_title:
+            existing.custom_title = custom_title
         existing.updated_at = now
         db.session.commit()
         log_action(current_user.get('name'), f"رفع نسخة موقعة من {doc_type} للمتدرب {intern.name}")
@@ -1779,7 +1790,8 @@ def upload_signed_document(intern_id):
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
         uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
-        is_visible_to_intern=True, created_at=now, updated_at=now
+        is_visible_to_intern=True, custom_title=custom_title,
+        created_at=now, updated_at=now
     )
     db.session.add(record)
     db.session.commit()
@@ -1835,7 +1847,7 @@ def list_my_documents():
         entry = {
             "id": d.id,
             "doc_type": d.doc_type,
-            "label": DOC_TYPE_LABELS.get(d.doc_type, d.custom_title or d.doc_type),
+            "label": d.custom_title or DOC_TYPE_LABELS.get(d.doc_type, d.doc_type),
             "file_path": d.file_path,
             "uploaded_by": d.uploaded_by,
             "status": d.status,
