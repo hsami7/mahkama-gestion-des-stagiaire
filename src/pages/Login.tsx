@@ -49,11 +49,11 @@ export function Login({ setAuthToken }: { setAuthToken: (token: string) => void 
 
           <form onSubmit={handleLogin}>
             <div className="form-group">
-              <label>البريد الإلكتروني</label>
+              <label>البريد الإلكتروني / اسم المستخدم</label>
               <div style={{ position: 'relative' }}>
                 <EnvelopeSimple size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-light)' }} />
                 <input 
-                  type="email" 
+                  type="text" 
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
