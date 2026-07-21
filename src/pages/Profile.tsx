@@ -538,7 +538,7 @@ export function Profile() {
 
           {/* Section 2: الوثائق الموقعة من الإدارة (Outgoing Signed Docs) */}
           <div style={{marginBottom:16}}>
-            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--success)'}}>الوثائق من الإدارة</h4></div>
+            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--success)'}}>وثائق من الإدارة</h4></div>
             <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
               <thead>
                 <tr style={{borderBottom:'1px solid var(--line)'}}>

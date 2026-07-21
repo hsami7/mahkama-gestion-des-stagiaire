@@ -329,7 +329,7 @@ export function InternPortal() {
   {/* Card 1: الوثائق من الإدارة */}
   <div className="card" style={{padding:24, marginBottom: 18, borderTop:'3px solid var(--success)'}}>
     <div className="section-title" style={{marginBottom:16}}>
-      <h3 style={{fontSize:15, margin:0, color:'var(--success)'}}>الوثائق من الإدارة</h3>
+      <h3 style={{fontSize:15, margin:0, color:'var(--success)'}}>وثائق من الإدارة</h3>
     </div>
     {(() => {
       const adminSigned = lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED' && d.uploaded_by === 'ADMIN' && !d.requires_return);
