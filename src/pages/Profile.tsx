@@ -997,52 +997,41 @@ export function Profile() {
 
       {showApproveModal && (
         <div className="overlay on" style={{ display: 'flex' }}>
-          <div className="modal">
-            <div className="modal-head">
-              <h3>تأكيد قبول المتدرب</h3>
+          <div className="modal" style={{maxWidth:480}}>
+            <div className="modal-head" style={{padding:'14px 20px'}}>
+              <h3 style={{fontSize:15}}>تأكيد قبول المتدرب</h3>
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowApproveModal(false)}><X size={14} /></button>
             </div>
             
-            <div className="modal-body">
-              <p style={{ color: 'var(--slate)', fontSize: '13.5px', marginTop: 0, marginBottom: '20px' }}>
-                أنت على وشك تنشيط حساب المتدرب وبدء فترة تدريبه. يرجى تأكيد تواريخ التدريب ليتم تفعيل الحضور والانصراف بناءً عليها.
+            <div className="modal-body" style={{padding:'12px 20px'}}>
+              <p style={{ color: 'var(--slate)', fontSize: '13px', margin: '0 0 16px', lineHeight:1.6 }}>
+                أنت على وشك تنشيط حساب المتدرب وبدء فترة تدريبه. يرجى تأكيد تواريخ التدريب.
               </p>
               
-              <div className="form-group">
-                <label>تاريخ البدء</label>
-                <input 
-                  type="date" 
-                  className="input" 
-                  value={approveStartDate}
-                  onChange={e => setApproveStartDate(e.target.value)}
-                />
-              </div>
-              
-              <div className="form-group">
-                <label>تاريخ الانتهاء</label>
-                <input 
-                  type="date" 
-                  className="input" 
-                  value={approveEndDate}
-                  onChange={e => setApproveEndDate(e.target.value)}
-                />
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12}}>
+                <div className="form-group" style={{margin:0}}>
+                  <label style={{fontSize:12}}>تاريخ البدء</label>
+                  <input type="date" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveStartDate} onChange={e => setApproveStartDate(e.target.value)} />
+                </div>
+                <div className="form-group" style={{margin:0}}>
+                  <label style={{fontSize:12}}>تاريخ الانتهاء</label>
+                  <input type="date" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveEndDate} onChange={e => setApproveEndDate(e.target.value)} />
+                </div>
               </div>
 
               {durationStr && (
-                <div style={{ background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', marginTop: '8px' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--slate)' }}>مدة التدريب المحسوبة:</span>
-                  <div style={{ fontWeight: 'bold', color: 'var(--gold-dark)', marginTop: '4px' }}>
-                    {durationStr}
-                  </div>
+                <div style={{ background:'var(--paper)', padding:'10px 14px', borderRadius:8, border:'1px solid var(--line)', marginTop:12, display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:13 }}>
+                  <span style={{ color:'var(--slate)' }}>مدة التدريب المحسوبة:</span>
+                  <span style={{ fontWeight:700, color:'var(--gold-dark)' }}>{durationStr}</span>
                 </div>
               )}
             </div>
             
-            <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={() => setShowApproveModal(false)}>
+            <div className="modal-foot" style={{padding:'12px 20px'}}>
+              <button className="btn btn-ghost" style={{padding:'7px 16px', fontSize:13}} onClick={() => setShowApproveModal(false)}>
                 إلغاء
               </button>
-              <button className="btn btn-success" style={{ background: 'var(--success)', color: '#fff', border: 'none' }} onClick={confirmApprove}>
+              <button className="btn btn-success" style={{ background: 'var(--success)', color: '#fff', border: 'none', padding:'7px 16px', fontSize:13 }} onClick={confirmApprove}>
                 تأكيد وبدء التدريب
               </button>
             </div>
