@@ -3,12 +3,20 @@ import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple,
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
+import TextArea from '../components/TextArea';
 
 const EVAL_CRITERIA = [
   { key: 'punctuality', label: 'المواظبة واحترام الوقت' },
   { key: 'skills', label: 'المهارات السلوكية والعملية' },
   { key: 'conduct', label: 'حسن التعامل' },
   { key: 'seriousness', label: 'الجدية في العمل' },
+];
+
+const DEPARTMENTS = [
+  'المكتب الإداري والتوزيع',
+  'فتح الملفات والصندوق',
+  'الجلسات',
+  'الخبرة والمسح الضوئي',
 ];
 
 function toDateInputValue(value?: string): string {
@@ -396,9 +404,9 @@ export function Profile() {
     w.document.write(`<h1>بطاقة تقييم التدريب</h1>`);
     w.document.write(`<table class="header-table"><tr><td><b>الاسم الكامل:</b> ${intern?.name || ''}</td><td><b>فترة التدريب المطلوبة:</b></td><td>من: ${pFrom}<br>إلى: ${pTo}</td></tr></table>`);
     w.document.write(`<table><tr><th colspan="4">معلومات عن التدريب</th></tr>`);
-    w.document.write(`<tr><th>المشرف على التكوين</th><th>الشعبة</th><th>الفترة</th></tr>`);
+    w.document.write(`<tr><th>الشعبة</th><th>المشرف على التكوين</th><th>الفترة</th></tr>`);
     (rots.length > 0 ? rots : [{ supervisor: '', department: '', from: '', to: '' }]).forEach((r: any, i: number) => {
-      w.document.write(`<tr><td>${r.supervisor || ''}</td><td>${r.department || ''}</td><td>${r.label || ('الفترة ' + (i+1))}<br>من: ${r.from || ''} إلى: ${r.to || ''}</td></tr>`);
+      w.document.write(`<tr><td>${r.department || ''}</td><td>${r.supervisor || ''}</td><td>${r.label || ('الفترة ' + (i+1))}<br>من: ${r.from || ''} إلى: ${r.to || ''}</td></tr>`);
     });
     w.document.write(`</table>`);
     w.document.write(`<table><tr><th>لا</th><th>نعم</th><th>تقييم المتدرب</th></tr>`);
@@ -874,48 +882,59 @@ export function Profile() {
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowEvalForm(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
-              <div className="form-group" style={{marginBottom:16}}>
-                <label>فترة التدريب المطلوبة</label>
-                <div style={{display:'flex', gap:8, alignItems:'center'}}>
-                    <span>من</span>
-                    <input className="input" type="date" value={evalPeriodFrom} onChange={e => setEvalPeriodFrom(e.target.value)} style={{flex:1}} />
-                    <span>إلى</span>
-                    <input className="input" type="date" value={evalPeriodTo} onChange={e => setEvalPeriodTo(e.target.value)} style={{flex:1}} />
-                  </div>
-                </div>
-
-              <div style={{marginBottom:16}}>
+                <div style={{marginBottom:16}}>
                 <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8}}>
                   <label style={{fontWeight:700, fontSize:13}}>معلومات عن التدريب (فترات)</label>
                   <button className="btn btn-ghost sm" onClick={addRotation} style={{fontSize:11}}>+ إضافة فترة</button>
                 </div>
                 {evalRotations.length === 0 && <div style={{textAlign:'center', padding:12, color:'var(--slate-light)', fontSize:12}}>لم يتم إضافة أي فترات بعد</div>}
-                {evalRotations.map((r, i) => (
+                {evalRotations.map((r, i) => {
+                  const isCustom = r.department && !DEPARTMENTS.includes(r.department);
+                  return (
                   <div key={i} style={{background:'var(--paper)', padding:12, borderRadius:8, border:'1px solid var(--line)', marginBottom:8}}>
                     <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
                       <b style={{fontSize:12}}>{r.label || ('الفترة '+(i+1))}</b>
                       <button className="btn btn-ghost sm" onClick={() => removeRotation(i)} style={{fontSize:10, color:'var(--danger)', padding:'2px 6px'}}><X size={12} /> حذف</button>
                     </div>
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr', gap:8}}>
+                      <div className="form-group" style={{margin:0}}>
+                        <label style={{fontSize:11}}>الشعبة</label>
+                        <div style={{display:'flex', gap:6, alignItems:'center'}}>
+                          <select className="input" style={{fontSize:12, width:'100%'}} value={isCustom ? 'أخرى' : (r.department || '')} onChange={e => {
+                            const val = e.target.value;
+                            if (val === 'أخرى') {
+                              updateRotation(i, 'department', '');
+                            } else {
+                              updateRotation(i, 'department', val);
+                            }
+                          }}>
+                            <option value="">اختر الشعبة</option>
+                            {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                            <option value="أخرى">أخرى (كتابة يدوية)</option>
+                          </select>
+                          {isCustom && (
+                            <input className="input" style={{fontSize:12, flex:1}} value={r.department} onChange={e => updateRotation(i, 'department', e.target.value)} placeholder="اكتب اسم الشعبة" />
+                          )}
+                        </div>
+                      </div>
+                      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+                        <div className="form-group" style={{margin:0}}>
+                          <label style={{fontSize:11}}>من</label>
+                          <input className="input" style={{fontSize:12}} type="date" value={r.from} onChange={e => updateRotation(i, 'from', e.target.value)} />
+                        </div>
+                        <div className="form-group" style={{margin:0}}>
+                          <label style={{fontSize:11}}>إلى</label>
+                          <input className="input" style={{fontSize:12}} type="date" value={r.to} onChange={e => updateRotation(i, 'to', e.target.value)} />
+                        </div>
+                      </div>
                       <div className="form-group" style={{margin:0}}>
                         <label style={{fontSize:11}}>المشرف على التكوين</label>
                         <input className="input" style={{fontSize:12}} value={r.supervisor} onChange={e => updateRotation(i, 'supervisor', e.target.value)} placeholder="المشرف" />
                       </div>
-                      <div className="form-group" style={{margin:0}}>
-                        <label style={{fontSize:11}}>الشعبة</label>
-                        <input className="input" style={{fontSize:12}} value={r.department} onChange={e => updateRotation(i, 'department', e.target.value)} placeholder="الشعبة" />
-                      </div>
-                      <div className="form-group" style={{margin:0}}>
-                        <label style={{fontSize:11}}>من</label>
-                        <input className="input" style={{fontSize:12}} type="date" value={r.from} onChange={e => updateRotation(i, 'from', e.target.value)} />
-                      </div>
-                      <div className="form-group" style={{margin:0}}>
-                        <label style={{fontSize:11}}>إلى</label>
-                        <input className="input" style={{fontSize:12}} type="date" value={r.to} onChange={e => updateRotation(i, 'to', e.target.value)} />
-                      </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div style={{marginBottom:16}}>
@@ -945,10 +964,7 @@ export function Profile() {
                 </table>
               </div>
 
-              <div className="form-group">
-                <label>ملاحظات</label>
-                <textarea className="input" rows={4} value={evalComments} onChange={e => setEvalComments(e.target.value)} placeholder="ملاحظات..." style={{resize:'vertical'}} />
-              </div>
+              <TextArea label="ملاحظات" value={evalComments} onChange={e => setEvalComments(e.target.value)} placeholder="ملاحظات..." />
             </div>
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={() => setShowEvalForm(false)}>إلغاء</button>
