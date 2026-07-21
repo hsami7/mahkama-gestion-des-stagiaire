@@ -282,7 +282,11 @@ export function Profile() {
   };
 
   const handleApproveClick = () => {
-    const missingDocs = Object.keys(docNames).filter(key => !intern.documents?.[key]);
+    const requiredTypes = ['CIN', 'CV', 'INSURANCE', 'DEMANDE'];
+    const missingDocs = requiredTypes.filter(dt => {
+      const doc = docsLifecycle.find(d => d.doc_type === dt);
+      return !doc || !doc.file_path || doc.status === 'MISSING';
+    });
     if (missingDocs.length > 0) {
       toast.warning('لا يمكن قبول المتدرب. يرجى التأكد من رفع جميع المستندات المطلوبة أولاً.');
       return;
