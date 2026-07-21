@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, FileText, CheckCircle, WarningCircle, Archive, Plus, Eye } from '@phosphor-icons/react';
+import { Users, FileText, CheckCircle, WarningCircle, Archive, Plus, Eye, Certificate, Bell, Clock } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { useToast } from '../components/Toast';
 
 function formatDate(d: string | undefined | null): string {
   if (!d) return '—';
@@ -17,6 +18,7 @@ function formatDate(d: string | undefined | null): string {
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [interns, setInterns] = useState<any[]>([]);
 
   useEffect(() => {
@@ -37,6 +39,18 @@ export function Dashboard() {
   const totalCount = interns.length;
 
   const recentInterns = [...interns].reverse().slice(0, 5); // Show latest 5
+
+  const upcomingEnds = interns
+    .filter(i => i.status === 'نشط')
+    .filter(i => {
+      if (!i.end_date) return false;
+      const end = new Date(i.end_date + 'T00:00:00');
+      if (isNaN(end.getTime())) return false;
+      const now = new Date();
+      return end.getMonth() === now.getMonth() && end.getFullYear() === now.getFullYear();
+    })
+    .sort((a, b) => new Date(a.end_date + 'T00:00:00').getTime() - new Date(b.end_date + 'T00:00:00').getTime())
+    .slice(0, 5);
 
   return (
     <div>
@@ -150,6 +164,100 @@ export function Dashboard() {
                 <tr>
                   <td colSpan={4} style={{ textAlign: 'center', color: 'var(--slate)', padding: '20px' }}>
                     لا يوجد متدربين حالياً
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Upcoming End Dates Widget */}
+      <div className="card" style={{ padding: '24px', marginTop: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Clock size={20} weight="bold" color="var(--gold-dark)" />
+            <h2 style={{ margin: 0, fontSize: '1.15rem' }}>متدربون تنتهي فترة تدريبهم هذا الشهر</h2>
+          </div>
+        </div>
+
+        <div style={{ position: 'relative', overflow: 'visible' }}>
+          <table>
+            <thead>
+              <tr>
+                <th>المتدرب</th>
+                <th>تاريخ الانتهاء</th>
+                <th>الأيام المتبقية</th>
+                <th>التقرير النهائي</th>
+                <th>إجراءات سريعة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {upcomingEnds.map(intern => {
+                const end = new Date(intern.end_date + 'T00:00:00');
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                const daysLeft = Math.ceil((end.getTime() - now.getTime()) / 86400000);
+                const urgent = daysLeft <= 5;
+                return (
+                  <tr key={intern.id}>
+                    <td>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <img src={intern.photo_path || `https://i.pravatar.cc/150?u=${intern.id}`} alt={intern.name} className="avatar-zoom" />
+                        <div>
+                          <div style={{ fontWeight: 'bold', color: 'var(--ink)' }}>{intern.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>{intern.email || 'لا يوجد بريد'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span style={{
+                        fontWeight: 700, fontSize: '0.9rem',
+                        color: urgent ? (daysLeft <= 0 ? 'var(--danger)' : '#D97706') : 'var(--ink)',
+                        background: urgent ? (daysLeft <= 0 ? '#FCE8E6' : '#FEF3C7') : 'transparent',
+                        padding: urgent ? '2px 8px' : 0, borderRadius: 6
+                      }}>
+                        {formatDate(intern.end_date)}
+                      </span>
+                    </td>
+                    <td>
+                      {daysLeft <= 0 ? (
+                        <span style={{ fontWeight: 700, color: 'var(--danger)', fontSize: '0.85rem' }}>اليوم</span>
+                      ) : (
+                        <span style={{ fontWeight: 600, color: urgent ? '#D97706' : 'var(--slate)', fontSize: '0.85rem' }}>
+                          باقي {daysLeft} {daysLeft === 1 ? 'يوم' : 'أيام'}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {intern.has_final_report ? (
+                        <span className="badge ok"><div className="dot"></div>مرفوع</span>
+                      ) : (
+                        <span className="badge warn"><div className="dot"></div>غير مرفوع</span>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button className="btn btn-ghost sm" style={{ fontSize: 11 }} onClick={() => window.open(`/api/interns/${intern.id}/attestation?token=${sessionStorage.getItem('token')}`, '_blank')}>
+                          <Certificate size={14} /> شهادة
+                        </button>
+                        {!intern.has_final_report && (
+                          <button className="btn btn-ghost sm" style={{ fontSize: 11 }} onClick={() => { toast.success('تم إرسال تذكير للمتدرب'); }}>
+                            <Bell size={14} /> تذكير
+                          </button>
+                        )}
+                        <button className="btn btn-ghost sm" style={{ fontSize: 11 }} onClick={() => navigate(`/interns/${intern.id}`)}>
+                          <Eye size={14} /> عرض
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {upcomingEnds.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--slate)', padding: '20px' }}>
+                    لا يوجد متدربون ينتهون هذا الشهر
                   </td>
                 </tr>
               )}

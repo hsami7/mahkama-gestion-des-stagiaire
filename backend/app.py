@@ -449,7 +449,8 @@ def get_interns():
         "photo_path": i.photo_path,
         "start_date": i.start_date,
         "end_date": i.end_date,
-        "department": i.department
+        "department": i.department,
+        "has_final_report": DocumentLifecycle.query.filter_by(intern_id=i.id, doc_type='FINAL_REPORT').first() is not None
     } for i in interns])
 
 @app.route('/api/interns/<int:intern_id>', methods=['GET'])
