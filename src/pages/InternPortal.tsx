@@ -318,6 +318,11 @@ export function InternPortal() {
 
           {/* DOCUMENTS — unified view */}
           <div className={`view ${activeTab === 'documents' ? 'on' : ''}`}>
+            {internData?.status !== 'نشط' ? (
+              <div className="card" style={{padding: 24, textAlign: 'center', color: 'var(--slate)', fontSize: 14}}>
+                المستندات غير متاحة حاليًا. يتم تفعيل هذه الخدمة بعد قبول طلبك.
+              </div>
+            ) : (<>
             <div className="section-title"><h2 style={{fontSize:19, margin:0}}>المستندات والوثائق</h2></div>
             <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>الوثائق الرسمية الموقعة من الإدارة والمستندات المطلوب منك رفعها</p>
 
@@ -419,6 +424,7 @@ export function InternPortal() {
                 </tbody>
               </table>
             </div>
+          </>)}
           </div>
 
           {/* PROFILE */}
@@ -450,10 +456,12 @@ export function InternPortal() {
           <div className={`bn-item ${activeTab === 'status' ? 'active' : ''}`} onClick={() => setActiveTab('status')}>
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>الحالة
           </div>
+          {internData?.status === 'نشط' && (
           <div className={`bn-item ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => setActiveTab('documents')}>
             {pendingCount > 0 && <span className="bn-dot" style={{ background: REQ_DOT, borderColor: REQ_DOT }}></span>}
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>المستندات
           </div>
+          )}
           <div className={`bn-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>ملفي
           </div>

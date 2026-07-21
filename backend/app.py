@@ -185,9 +185,17 @@ def init_db():
         try:
             for u in User.query.filter_by(username=None).all():
                 if u.email:
-                    u.username = u.email
+                    u.username = u.email.split('@')[0]
                 else:
                     u.username = f"user_{u.id}"
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        # Fix existing users where username equals email
+        try:
+            for u in User.query.all():
+                if u.username and u.email and u.username == u.email:
+                    u.username = u.email.split('@')[0]
             db.session.commit()
         except Exception:
             db.session.rollback()
@@ -500,7 +508,7 @@ def add_intern():
             from werkzeug.security import generate_password_hash
             hashed_pw = generate_password_hash('password123')
             new_user = User(
-                username=new_intern.email,
+                username=new_intern.email.split('@')[0],
                 name=new_intern.name,
                 email=new_intern.email,
                 password=hashed_pw,
@@ -802,7 +810,7 @@ def public_submit():
             from werkzeug.security import generate_password_hash
             hashed_pw = generate_password_hash('password123')
             new_user = User(
-                username=email,
+                username=email.split('@')[0],
                 name=name,
                 email=email,
                 password=hashed_pw,
@@ -1106,6 +1114,8 @@ def get_my_requests():
     intern = Intern.query.filter_by(email=user_email).first()
     if not intern:
         return jsonify({"msg": "Intern not found for this account"}), 404
+    if intern.status != 'نشط':
+        return jsonify({"msg": "Account not yet activated"}), 403
         
     reqs = DocumentRequest.query.filter_by(intern_id=intern.id, status='pending').all()
     
@@ -1135,6 +1145,8 @@ def upload_requested_document(request_id):
     intern = Intern.query.filter_by(email=user_email).first()
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
+    if intern.status != 'نشط':
+        return jsonify({"msg": "Account not yet activated"}), 403
         
     doc_request = db.session.get(DocumentRequest, request_id)
     if not doc_request or doc_request.intern_id != intern.id:
@@ -1220,6 +1232,8 @@ def upload_unrequested_document():
     intern = Intern.query.filter_by(email=user_email).first()
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
+    if intern.status != 'نشط':
+        return jsonify({"msg": "Account not yet activated"}), 403
         
     doc_type = request.form.get('document_type')
     if not doc_type:
@@ -1624,6 +1638,8 @@ def upload_intern_document(intern_id):
         intern = db.session.get(Intern, intern_id)
         if not intern:
             return jsonify({"msg": "Intern not found"}), 404
+    elif intern.status != 'نشط' and claims.get('role') == 'Intern':
+        return jsonify({"msg": "Account not yet activated"}), 403
 
     doc_type = request.form.get('doc_type')
     if not doc_type or doc_type not in DOC_TYPES:
@@ -1832,6 +1848,8 @@ def download_intern_document(doc_id):
     if not is_admin:
         if not intern_identity or intern_identity.id != doc.intern_id:
             return jsonify({"msg": "Unauthorized"}), 403
+        if intern_identity.status != 'نشط':
+            return jsonify({"msg": "Account not yet activated"}), 403
         if not doc.is_visible_to_intern and doc.uploaded_by == 'ADMIN':
             return jsonify({"msg": "Unauthorized"}), 403
 
@@ -1846,6 +1864,8 @@ def list_my_documents():
     intern, claims, user = _get_doc_type_intern()
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
+    if intern.status != 'نشط':
+        return jsonify({"msg": "Account not yet activated"}), 403
     _seed_doc_records(intern.id)
     docs = DocumentLifecycle.query.filter_by(intern_id=intern.id).order_by(DocumentLifecycle.doc_type).all()
     result = []
