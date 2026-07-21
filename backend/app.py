@@ -145,6 +145,8 @@ class DocumentLifecycle(db.Model):
     rejection_reason = db.Column(db.Text, nullable=True)
     is_visible_to_intern = db.Column(db.Boolean, default=False)
     custom_title = db.Column(db.String(150), nullable=True)
+    requires_return = db.Column(db.Boolean, default=False)
+    returned_file_path = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.String(50), nullable=True)
     updated_at = db.Column(db.String(50), nullable=True)
 
@@ -204,6 +206,21 @@ def init_db():
             _migrate_legacy_documents()
         except Exception as e:
             print(f"Document migration skipped: {e}")
+        # Add requires_return column if missing
+        try:
+            with db.engine.connect() as conn:
+                from sqlalchemy import text
+                conn.execute(text("ALTER TABLE document_lifecycle ADD COLUMN requires_return BOOLEAN DEFAULT 0"))
+                conn.commit()
+        except Exception:
+            db.session.rollback()
+        try:
+            with db.engine.connect() as conn:
+                from sqlalchemy import text
+                conn.execute(text("ALTER TABLE document_lifecycle ADD COLUMN returned_file_path VARCHAR(255)"))
+                conn.commit()
+        except Exception:
+            db.session.rollback()
         # Create default Admin user if none exists
         admin = User.query.filter_by(username='admin').first()
         if not admin:
@@ -905,6 +922,7 @@ def attach_vault_to_intern(intern_id):
     data = request.json or {}
     vault_name = data.get('vault_name')
     doc_type = data.get('doc_type', 'OTHER')
+    requires_return = data.get('requires_return', False)
     if not vault_name:
         return jsonify({"msg": "vault_name required"}), 400
     src = os.path.join(VAULT_FOLDER, vault_name)
@@ -916,15 +934,17 @@ def attach_vault_to_intern(intern_id):
     shutil.copy2(src, dst)
     file_url = f"/api/uploads/{dst_name}"
     now = datetime.now(timezone.utc).isoformat()
+    label = f'نموذج: {vault_name}' + (' (يتطلب التعبئة)' if requires_return else '')
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
         uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
-        is_visible_to_intern=True, custom_title=f'نموذج: {vault_name}',
+        is_visible_to_intern=True, custom_title=label,
+        requires_return=requires_return,
         created_at=now, updated_at=now
     )
     db.session.add(record)
     db.session.commit()
-    log_action(current_user.get('name'), f"أضاف مستند من الخزنة ({vault_name}) للمتدرب {intern.name}")
+    log_action(current_user.get('name'), f"أضاف مستند من الخزنة ({vault_name}){' مع طلب التعبئة' if requires_return else ''} للمتدرب {intern.name}")
     return jsonify({"msg": "تمت الإضافة من الخزنة", "doc_id": record.id}), 200
 
 # --- INTERN PROFILE DOCUMENT UPLOADS ---
@@ -1620,6 +1640,8 @@ def list_intern_documents(intern_id):
             "rejection_reason": d.rejection_reason,
             "is_visible_to_intern": d.is_visible_to_intern,
             "custom_title": d.custom_title,
+            "requires_return": d.requires_return,
+            "returned_file_path": d.returned_file_path,
             "created_at": d.created_at,
             "updated_at": d.updated_at,
         })
@@ -1815,6 +1837,51 @@ def upload_signed_document(intern_id):
     return jsonify({"msg": "Signed document uploaded", "doc_id": record.id}), 201
 
 
+@app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/return-upload', methods=['POST'])
+@jwt_required()
+def upload_returned_document(intern_id, doc_id):
+    """Intern uploads the filled version of a requires_return document."""
+    intern, claims, user = _get_doc_type_intern()
+    if not intern or intern.id != intern_id:
+        current_user = get_jwt()
+        if current_user.get('role') not in ('Admin',):
+            return jsonify({"msg": "Unauthorized"}), 403
+        intern = db.session.get(Intern, intern_id)
+        if not intern:
+            return jsonify({"msg": "Intern not found"}), 404
+
+    doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
+    if not doc:
+        return jsonify({"msg": "Document not found"}), 404
+    if not doc.requires_return:
+        return jsonify({"msg": "This document does not require a return upload"}), 400
+
+    if 'file' not in request.files:
+        return jsonify({"msg": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "No selected file"}), 400
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"msg": "PDF files only"}), 400
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    if size > 15 * 1024 * 1024:
+        return jsonify({"msg": "File too large (max 15MB)"}), 400
+
+    filename = safe_filename('return', file.filename)
+    if not filename.lower().endswith('.pdf'):
+        filename += '.pdf'
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    file_url = f"/api/uploads/{filename}"
+
+    doc.returned_file_path = file_url
+    doc.updated_at = datetime.now(timezone.utc).isoformat()
+    db.session.commit()
+
+    return jsonify({"msg": "تم استلام النسخة المعبأة", "doc_id": doc.id}), 200
+
+
 @app.route('/api/intern-documents/<int:doc_id>/download', methods=['GET'])
 def download_intern_document(doc_id):
     """Secure download: intern can only download if is_visible_to_intern or they uploaded it."""
@@ -1853,7 +1920,11 @@ def download_intern_document(doc_id):
         if not doc.is_visible_to_intern and doc.uploaded_by == 'ADMIN':
             return jsonify({"msg": "Unauthorized"}), 403
 
-    name = doc.file_path.replace('/api/uploads/', '').replace('/', '')
+    is_returned = request.args.get('returned') == '1'
+    file_path = doc.returned_file_path if (is_returned and doc.returned_file_path) else doc.file_path
+    if not file_path:
+        return jsonify({"msg": "File not found"}), 404
+    name = file_path.replace('/api/uploads/', '').replace('/', '')
     return send_from_directory(app.config['UPLOAD_FOLDER'], name)
 
 
@@ -1880,6 +1951,8 @@ def list_my_documents():
             "rejection_reason": d.rejection_reason,
             "is_visible_to_intern": d.is_visible_to_intern,
             "custom_title": d.custom_title,
+            "requires_return": d.requires_return,
+            "returned_file_path": d.returned_file_path,
             "created_at": d.created_at,
             "updated_at": d.updated_at,
         }

@@ -58,6 +58,7 @@ export function Profile() {
   const [revisionReason, setRevisionReason] = useState('');
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [vaultDocs, setVaultDocs] = useState<any[]>([]);
+  const [vaultRequiresReturn, setVaultRequiresReturn] = useState(false);
   const [showVaultModal, setShowVaultModal] = useState(false);
 
   const DOC_TYPE_LABELS: Record<string, string> = {
@@ -537,7 +538,7 @@ export function Profile() {
 
           {/* Section 2: الوثائق الموقعة من الإدارة (Outgoing Signed Docs) */}
           <div style={{marginBottom:16}}>
-            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--success)'}}>الوثائق الموقعة من الإدارة</h4></div>
+            <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--success)'}}>الوثائق من الإدارة</h4></div>
             <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
               <thead>
                 <tr style={{borderBottom:'1px solid var(--line)'}}>
@@ -547,24 +548,54 @@ export function Profile() {
                 </tr>
               </thead>
               <tbody>
-                {(() => {
-                  const signedDocs = docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED' && (d.uploaded_by === 'ADMIN' || d.doc_type === 'CONVENTION_SIGNED'));
-                  return signedDocs.length === 0 ? (
-                    <tr><td colSpan={3} style={{textAlign:'center', padding:'16px 4px', color:'var(--slate-light)'}}>لم يتم إصدار أي وثائق موقعة بعد</td></tr>
-                  ) : signedDocs.map(d => (
-                    <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
-                      <td style={{padding:'8px 4px', fontWeight:600}}>{d.label}</td>
-                      <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
-                        {formatDate(d.updated_at)}
-                      </td>
-                      <td style={{textAlign:'left', padding:'8px 4px'}}>
-                        <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          <DownloadSimple size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ));
-                })()}
+                  {(() => {
+                    const signedDocs = docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED' && (d.uploaded_by === 'ADMIN' || d.doc_type === 'CONVENTION_SIGNED') && !d.requires_return);
+                    const returnDocs = docsLifecycle.filter(d => d.requires_return === true);
+                    const hasAny = signedDocs.length > 0 || returnDocs.length > 0;
+                    if (!hasAny) {
+                      return <tr><td colSpan={3} style={{textAlign:'center', padding:'16px 4px', color:'var(--slate-light)'}}>لم يتم إصدار أي وثائق بعد</td></tr>;
+                    }
+                    return <>
+                      {returnDocs.map(d => (
+                        <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
+                          <td style={{padding:'8px 4px', fontWeight:600}}>
+                            {d.label}
+                            {d.returned_file_path && <div style={{fontSize:11, color:'var(--success)', marginTop:2}}><CheckCircle size={11} weight="fill" style={{marginLeft:4}} />تم إرجاع النسخة المعبأة</div>}
+                          </td>
+                          <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
+                            {formatDate(d.updated_at)}
+                          </td>
+                          <td style={{textAlign:'left', padding:'8px 4px'}}>
+                            <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                              {d.file_path && (
+                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل النموذج" style={{width:28,height:28,padding:0}}>
+                                  <DownloadSimple size={14} />
+                                </button>
+                              )}
+                              {d.returned_file_path && (
+                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '?returned=1', '_blank')} title="معاينة النسخة المعبأة" style={{width:28,height:28,padding:0}}>
+                                  <Eye size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {signedDocs.map(d => (
+                        <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
+                          <td style={{padding:'8px 4px', fontWeight:600}}>{d.label}</td>
+                          <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
+                            {formatDate(d.updated_at)}
+                          </td>
+                          <td style={{textAlign:'left', padding:'8px 4px'}}>
+                            <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <DownloadSimple size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </>;
+                  })()}
               </tbody>
             </table>
           </div>
@@ -922,18 +953,24 @@ export function Profile() {
           <div className="modal" style={{maxWidth:500}}>
             <div className="modal-head">
               <h3>إضافة من خزنة المستندات</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowVaultModal(false)}><X size={14} /></button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => { setShowVaultModal(false); setVaultRequiresReturn(false); }}><X size={14} /></button>
             </div>
             <div className="modal-body">
+              <label style={{display:'flex', alignItems:'center', gap:8, marginBottom:12, padding:'8px 12px', background:'#FFF6E5', borderRadius:8, border:'1px solid #F2D49B', fontSize:12.5, cursor:'pointer'}}>
+                <input type="checkbox" checked={vaultRequiresReturn} onChange={e => setVaultRequiresReturn(e.target.checked)} />
+                <ArrowsClockwise size={16} weight="bold" style={{color:'var(--gold-dark)'}} />
+                طلب تعبئة الوثيقة وإعادة رفعها من المتدرب
+              </label>
               {vaultDocs.length === 0 && <div style={{textAlign:'center',padding:20,color:'var(--slate-light)'}}>الخزنة فارغة</div>}
               {vaultDocs.map((vd: any) => (
                 <div key={vd.name} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 4px',borderBottom:'1px solid var(--line)'}}>
                   <div style={{fontWeight:600,fontSize:13,flex:1}}>{vd.name}</div>
                   <button className="btn btn-ghost sm" style={{padding:'4px 10px',fontSize:11}} onClick={async () => {
                     try {
-                      await api.post(`/interns/${id}/vault-attach`, { vault_name: vd.name, doc_type: 'OTHER' });
+                      await api.post(`/interns/${id}/vault-attach`, { vault_name: vd.name, doc_type: 'OTHER', requires_return: vaultRequiresReturn });
                       toast.success('تمت إضافة المستند من الخزنة');
                       setShowVaultModal(false);
+                      setVaultRequiresReturn(false);
                       fetchDocsLifecycle();
                     } catch (err) {
                       toast.error('فشلت الإضافة من الخزنة');
@@ -945,7 +982,7 @@ export function Profile() {
               ))}
             </div>
             <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={() => setShowVaultModal(false)}>إغلاق</button>
+              <button className="btn btn-ghost" onClick={() => { setShowVaultModal(false); setVaultRequiresReturn(false); }}>إغلاق</button>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye } from '@phosphor-icons/react';
+import { CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise } from '@phosphor-icons/react';
 import { api, API_BASE } from '../services/api';
 import { InternSidebar } from '../components/InternSidebar';
 import { Header } from '../components/Header';
@@ -324,40 +324,86 @@ export function InternPortal() {
               </div>
             ) : (<>
             <div className="section-title"><h2 style={{fontSize:19, margin:0}}>المستندات والوثائق</h2></div>
-            <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>الوثائق الرسمية الموقعة من الإدارة والمستندات المطلوب منك رفعها</p>
+            <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>الوثائق الصادرة من الإدارة والمستندات المطلوب منك رفعها</p>
 
-            {/* Card 1: الوثائق الرسمية الموقعة */}
-            <div className="card" style={{padding:24, marginBottom: 18, borderTop:'3px solid var(--success)'}}>
-              <div className="section-title" style={{marginBottom:16}}>
-                <h3 style={{fontSize:15, margin:0, color:'var(--success)'}}>الوثائق الرسمية الموقعة</h3>
+  {/* Card 1: الوثائق من الإدارة */}
+  <div className="card" style={{padding:24, marginBottom: 18, borderTop:'3px solid var(--success)'}}>
+    <div className="section-title" style={{marginBottom:16}}>
+      <h3 style={{fontSize:15, margin:0, color:'var(--success)'}}>الوثائق من الإدارة</h3>
+    </div>
+    {(() => {
+      const adminSigned = lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED' && d.uploaded_by === 'ADMIN' && !d.requires_return);
+      const returnDocs = lifecycleDocs.filter(d => d.requires_return === true);
+      const hasAny = adminSigned.length > 0 || returnDocs.length > 0;
+      if (!hasAny) {
+        return <div style={{textAlign:'center', padding:'20px', color:'var(--slate-light)', fontSize:13}}>لا توجد وثائق من الإدارة بعد</div>;
+      }
+      return <>
+        {returnDocs.map(d => (
+          <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)'}}>
+            <div className="di"><FileText weight="fill" style={{color:'var(--gold-dark)', width:18}} /></div>
+            <div style={{flex:1}}>
+              <div className="dn">{d.label}</div>
+              <div className="ds" style={{color:'var(--gold-dark)'}}>
+                <ArrowsClockwise size={12} weight="bold" style={{marginLeft:4}} />
+                {d.returned_file_path ? 'تم إرجاع النسخة المعبأة' : 'يتطلب التعبئة والإرجاع'}
               </div>
-              {lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED' && d.uploaded_by === 'ADMIN').length === 0 && (
-                <div style={{textAlign:'center', padding:'20px', color:'var(--slate-light)', fontSize:13}}>لا توجد وثائق رسمية موقعة بعد</div>
-              )}
-              {lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED' && d.uploaded_by === 'ADMIN').map(d => (
-                <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)'}}>
-                  <div className="di"><CheckCircle weight="fill" style={{color:'var(--success)', width:18}} /></div>
-                  <div>
-                    <div className="dn">{d.label}</div>
-                    <div className="ds" style={{color:'var(--success)'}}>
-                      تم التوقيع — {formatDate(d.updated_at)}
-                    </div>
-                  </div>
-                  <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
-                    {d.file_path && (
-                      <>
-                        <a href={api.downloadDocument(d.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm">
-                          معاينة
-                        </a>
-                        <a href={api.downloadDocument(d.id)} download className="btn btn-ink sm" style={{padding:'6px 14px'}}>
-                          <DownloadSimple size={14} /> تحميل
-                        </a>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
             </div>
+            <div className="du" style={{display:'flex', gap:6, alignItems:'center'}}>
+              {d.file_path && (
+                <a href={api.downloadDocument(d.id)} download className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                  <DownloadSimple size={14} /> تحميل النموذج
+                </a>
+              )}
+              {!d.returned_file_path ? (
+                <>
+                  <input type="file" id={`return-upload-${d.id}`} style={{display:'none'}} accept=".pdf" onChange={e => {
+                    if (!e.target.files?.[0]) return;
+                    const formData = new FormData();
+                    formData.append('file', e.target.files[0]);
+                    api.post(`/interns/${internData?.id}/documents/${d.id}/return-upload`, formData).then(() => {
+                      showToast('تم استلام النسخة المعبأة', 'success');
+                      fetchLifecycleDocs();
+                    }).catch(() => showToast('فشل رفع النسخة المعبأة', 'error'));
+                  }} />
+                  <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}} onClick={() => document.getElementById(`return-upload-${d.id}`)?.click()}>
+                    <UploadSimple size={14} /> رفع النسخة المعبأة
+                  </button>
+                </>
+              ) : (
+                <a href={api.downloadDocument(d.id) + '?returned=1'} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                  <Eye size={14} /> معاينة
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+        {adminSigned.map(d => (
+          <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)'}}>
+            <div className="di"><CheckCircle weight="fill" style={{color:'var(--success)', width:18}} /></div>
+            <div>
+              <div className="dn">{d.label}</div>
+              <div className="ds" style={{color:'var(--success)'}}>
+                تم التوقيع — {formatDate(d.updated_at)}
+              </div>
+            </div>
+            <div className="du" style={{marginRight:'auto', display:'flex', gap:8, alignItems:'center'}}>
+              {d.file_path && (
+                <>
+                  <a href={api.downloadDocument(d.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm">
+                    معاينة
+                  </a>
+                  <a href={api.downloadDocument(d.id)} download className="btn btn-ink sm" style={{padding:'6px 14px'}}>
+                    <DownloadSimple size={14} /> تحميل
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </>;
+    })()}
+  </div>
 
             {/* Card 2: المستندات المطلوبة مني */}
             <div className="card" style={{padding:24, borderTop:'3px solid var(--gold-dark)'}}>
