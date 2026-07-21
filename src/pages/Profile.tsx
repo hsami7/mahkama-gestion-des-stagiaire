@@ -43,6 +43,10 @@ function formatDate(d: string | undefined | null): string {
   } catch { return d || '—'; }
 }
 
+function sanitizeTitle(t: string): string {
+  return t.replace(/\.pdf\.?$/i, '').trim();
+}
+
 export function Profile() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -648,22 +652,32 @@ export function Profile() {
                       {returnDocs.map(d => (
                         <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
                           <td style={{padding:'8px 4px', fontWeight:600}}>
-                            {d.label}
-                            {d.returned_file_path && <div style={{fontSize:11, color:'var(--success)', marginTop:2}}><CheckCircle size={11} weight="fill" style={{marginLeft:4}} />تم إرجاع النسخة المعبأة</div>}
+                            {sanitizeTitle(d.label)}
+                            <div style={{marginTop:4}}>
+                              {d.returned_file_path ? (
+                                <span style={{display:'inline-flex', alignItems:'center', gap:3, background:'#E7F8EE', color:'#15803D', fontSize:10.5, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
+                                  <CheckCircle size={10} weight="fill" /> تم إرجاع النسخة المعبأة
+                                </span>
+                              ) : (
+                                <span style={{display:'inline-flex', alignItems:'center', gap:3, background:'#FEF3C7', color:'#B45309', fontSize:10.5, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
+                                  يتطلب التعبئة
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
                             {formatDate(d.updated_at)}
                           </td>
                           <td style={{textAlign:'left', padding:'8px 4px'}}>
                             <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                              {d.file_path && (
-                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل النموذج" style={{width:28,height:28,padding:0}}>
-                                  <DownloadSimple size={14} />
+                              {d.file_path && !d.returned_file_path && (
+                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                  <DownloadSimple size={14} /> تحميل النموذج
                                 </button>
                               )}
                               {d.returned_file_path && (
-                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '?returned=1', '_blank')} title="معاينة النسخة المعبأة" style={{width:28,height:28,padding:0}}>
-                                  <Eye size={14} />
+                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '?returned=1', '_blank')} style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                  <Eye size={14} /> معاينة
                                 </button>
                               )}
                             </div>
@@ -672,14 +686,16 @@ export function Profile() {
                       ))}
                       {signedDocs.map(d => (
                         <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
-                          <td style={{padding:'8px 4px', fontWeight:600}}>{d.label}</td>
+                          <td style={{padding:'8px 4px', fontWeight:600}}>{sanitizeTitle(d.label)}</td>
                           <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
                             {formatDate(d.updated_at)}
                           </td>
                           <td style={{textAlign:'left', padding:'8px 4px'}}>
-                            <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                              <DownloadSimple size={14} />
-                            </button>
+                            <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                <DownloadSimple size={14} /> تحميل
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
