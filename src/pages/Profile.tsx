@@ -676,7 +676,7 @@ export function Profile() {
                                 </button>
                               )}
                               {d.returned_file_path && (
-                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '?returned=1', '_blank')} style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
                                   <Eye size={14} /> معاينة
                                 </button>
                               )}

@@ -375,7 +375,7 @@ export function InternPortal() {
                   </button>
                 </>
               ) : (
-                <a href={api.downloadDocument(d.id) + '?returned=1'} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                <a href={api.downloadDocument(d.id) + '&returned=1'} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
                   <Eye size={14} /> معاينة
                 </a>
               )}
