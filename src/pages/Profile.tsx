@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
 import TextArea from '../components/TextArea';
+import CoverageChart from '../components/CoverageChart';
 
 const EVAL_CRITERIA = [
   { key: 'punctuality', label: 'المواظبة واحترام الوقت' },
@@ -778,6 +779,7 @@ export function Profile() {
       </div>
 
       {canApproveInterns && intern.status !== 'نشط' && intern.status !== 'مرفوض' && (
+        <>
         <div className="card" style={{ padding: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '20px', borderTop: '4px solid var(--gold)', background: 'linear-gradient(to left, var(--paper), var(--bg))' }}>
           <div>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>القرار النهائي للملف</h3>
@@ -792,6 +794,8 @@ export function Profile() {
             </button>
           </div>
         </div>
+        <CoverageChart internId={Number(id)} />
+        </>
       )}
 
       {intern.status === 'نشط' && (canEvaluateInterns || intern.evaluation?.criteria) && (
