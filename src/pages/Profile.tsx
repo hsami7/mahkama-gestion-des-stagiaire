@@ -442,15 +442,13 @@ export function Profile() {
   };
 
   const handlePrintEval = () => {
-    const w = window.open('', '_blank');
-    if (!w) return;
     const ev = intern?.evaluation || {};
     const crit = evalCriteria || ev.criteria || {};
     const rots = evalRotations.length > 0 ? evalRotations : (ev.rotations || []);
     const pFrom = evalPeriodFrom || ev.period_from || '';
     const pTo = evalPeriodTo || ev.period_to || '';
     const comments = evalComments || ev.comments || '';
-    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>بطاقة تقييم التدريب</title><style>
+    const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>بطاقة تقييم التدريب</title><style>
       body{font-family:'Traditional Arabic','Arial',sans-serif;padding:40px;font-size:14px;line-height:1.8}
       .header{text-align:center;font-size:13px;margin-bottom:4px}
       h1{text-align:center;font-size:22px;margin:8px 0 24px}
@@ -462,30 +460,41 @@ export function Profile() {
       .notes{margin-top:20px;min-height:100px;border:1px dashed #999;padding:12px;white-space:pre-wrap}
       .check{font-family:'Arial';font-size:16px}
       @media print{body{padding:20px}}
-    </style></head><body>`);
-    w.document.write(`<div class="header">المملكة المغربية &mdash; وزارة العدل &mdash; محكمة الإستئناف الإدارية بفاس</div>`);
-    w.document.write(`<div class="header" style="margin-bottom:20px">كتابة الضبط بمحكمة الاستئناف الإدارية بفاس</div>`);
-    w.document.write(`<h1>بطاقة تقييم التدريب</h1>`);
-    w.document.write(`<table><tr><td style="border:none;padding:4px 0"><b>الاسم الكامل:</b> ${intern?.name || ''}</td><td style="border:none;padding:4px 0"><b>فترة التدريب المطلوبة:</b> من: ${pFrom} إلى: ${pTo}</td></tr></table>`);
-    w.document.write(`<table><tr><th colspan="3">معلومات عن التدريب</th></tr>`);
-    w.document.write(`<tr><th>المشرف على التكوين</th><th>الشعبة</th><th>الفترة</th></tr>`);
-    (rots.length > 0 ? rots : [{ supervisor: '', department: '', from: '', to: '' }]).forEach((r: any, i: number) => {
-      w.document.write(`<tr><td>${r.supervisor || ''}</td><td>${r.department || ''}</td><td>${r.label || ('الفترة ' + (i+1))}<br>من: ${r.from || ''} إلى: ${r.to || ''}</td></tr>`);
-    });
-    w.document.write(`</table>`);
-    w.document.write(`<table><tr><th>لا</th><th>نعم</th><th>تقييم المتدرب</th></tr>`);
-    EVAL_CRITERIA.forEach(c => {
+    </style></head><body>
+    <div class="header">المملكة المغربية &mdash; وزارة العدل &mdash; محكمة الإستئناف الإدارية بفاس</div>
+    <div class="header" style="margin-bottom:20px">كتابة الضبط بمحكمة الاستئناف الإدارية بفاس</div>
+    <h1>بطاقة تقييم التدريب</h1>
+    <table><tr><td style="border:none;padding:4px 0"><b>الاسم الكامل:</b> ${intern?.name || ''}</td><td style="border:none;padding:4px 0"><b>فترة التدريب المطلوبة:</b> من: ${pFrom} إلى: ${pTo}</td></tr></table>
+    <table><tr><th colspan="3">معلومات عن التدريب</th></tr>
+    <tr><th>المشرف على التكوين</th><th>الشعبة</th><th>الفترة</th></tr>
+    ${(rots.length > 0 ? rots : [{ supervisor: '', department: '', from: '', to: '' }]).map((r: any, i: number) =>
+      `<tr><td>${r.supervisor || ''}</td><td>${r.department || ''}</td><td>${r.label || ('الفترة ' + (i+1))}<br>من: ${r.from || ''} إلى: ${r.to || ''}</td></tr>`
+    ).join('')}
+    </table>
+    <table><tr><th>لا</th><th>نعم</th><th>تقييم المتدرب</th></tr>
+    ${EVAL_CRITERIA.map(c => {
       const val = crit[c.key] || { yes: false, no: false };
-      w.document.write(`<tr><td style="text-align:center;font-size:18px">${val.no ? '☑' : '☐'}</td><td style="text-align:center;font-size:18px">${val.yes ? '☑' : '☐'}</td><td>${c.label}</td></tr>`);
-    });
-    w.document.write(`</table>`);
-    w.document.write(`<div class="section" style="padding:8px;margin-bottom:8px;text-align:center;background:#e8e8e8;font-weight:700">ملاحظات</div>`);
-    w.document.write(`<div class="notes">${comments || ''}</div>`);
-    w.document.write(`<div class="signature">توقيع المسؤول الإداري: ........................................</div>`);
-    w.document.write(`</body></html>`);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 500);
+      return `<tr><td style="text-align:center;font-size:18px">${val.no ? '☑' : '☐'}</td><td style="text-align:center;font-size:18px">${val.yes ? '☑' : '☐'}</td><td>${c.label}</td></tr>`;
+    }).join('')}
+    </table>
+    <div class="section" style="padding:8px;margin-bottom:8px;text-align:center;background:#e8e8e8;font-weight:700">ملاحظات</div>
+    <div class="notes">${comments || ''}</div>
+    <div class="signature">توقيع المسؤول الإداري: ........................................</div>
+    </body></html>`;
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.top = '-9999px';
+    iframe.style.left = '-9999px';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    document.body.appendChild(iframe);
+    iframe.contentWindow?.document.open();
+    iframe.contentWindow?.document.write(html);
+    iframe.contentWindow?.document.close();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 500);
+    }, 500);
   };
 
   const handleReject = async () => {
