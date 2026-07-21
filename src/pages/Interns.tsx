@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MagnifyingGlass, Funnel, Hash, CaretDown, Plus, X, CalendarCheck, ClipboardText, Certificate, FilePlus } from '@phosphor-icons/react';
+import { MagnifyingGlass, Funnel, Hash, CaretDown, Plus, X, CalendarCheck, ClipboardText, Certificate, FilePlus, CheckCircle } from '@phosphor-icons/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { TestModeAutofill } from '../components/TestModeAutofill';
@@ -494,7 +494,7 @@ const filteredInterns = useMemo(() => {
                         padding: '10px', borderRadius: '8px', fontSize: '12px', transition: 'all 0.2s', margin: 0 
                       }}>
                         <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={(e) => handleFileUpload(e, doc.id)} />
-                        {newIntern.documents[doc.id as keyof typeof newIntern.documents] ? 'تم الرفع ✓' : 'اختر ملف PDF...'}
+                        {newIntern.documents[doc.id as keyof typeof newIntern.documents] ? <>تم الرفع <CheckCircle size={12} weight="fill" /></> : 'اختر ملف PDF...'}
                       </label>
                       {newIntern.documents[doc.id as keyof typeof newIntern.documents] && (
                         <button type="button" onClick={() => removeDocument(doc.id as any)} style={{ flexShrink: 0, padding: '4px', background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="حذف">
@@ -535,7 +535,7 @@ const filteredInterns = useMemo(() => {
                           padding: '8px', borderRadius: '4px', fontSize: '12px', transition: 'all 0.2s', margin: 0 
                         }}>
                           <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={(e) => handleFileUpload(e, 'other', idx)} />
-                          {otherDoc.file ? 'تم الرفع ✓' : 'اختر ملف PDF...'}
+                          {otherDoc.file ? <>تم الرفع <CheckCircle size={12} weight="fill" /></> : 'اختر ملف PDF...'}
                         </label>
                         {otherDoc.file && (
                           <button type="button" onClick={() => {

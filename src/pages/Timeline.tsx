@@ -451,7 +451,7 @@ export function Timeline() {
                       <b style={{ color: 'var(--ink)', fontFamily: "'Cairo', sans-serif" }}>{fmtRange(o.start)}</b> إلى{' '}
                       <b style={{ color: 'var(--ink)', fontFamily: "'Cairo', sans-serif" }}>{fmtRange(o.end)}</b>.
                       <div style={{ marginTop: 4 }}>
-                        {accepted === 2 && <span style={{ color: '#15803D', fontWeight: 700 }}>الاثنان مقبولان ✓ — غطاء مضمون خلال هذه الفترة.</span>}
+                        {accepted === 2 && <span style={{ color: '#15803D', fontWeight: 700 }}>الاثنان مقبولان <Check size={14} weight="bold" style={{display:'inline'}} /> — غطاء مضمون خلال هذه الفترة.</span>}
                         {accepted === 1 && <span style={{ color: '#B45309', fontWeight: 700 }}>واحد فقط مقبول — يُنصح بقبول الآخر لتأمين التغطية.</span>}
                         {accepted === 0 && <span style={{ color: '#B91C1C', fontWeight: 700 }}>الاثنان غير مكتملين — لا يوجد غطاء مؤكد بعد.</span>}
                       </div>

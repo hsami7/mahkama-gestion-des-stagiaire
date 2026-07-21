@@ -502,7 +502,7 @@ export function Profile() {
                          d.status === 'REVISION_REQUESTED' ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> : null}
                       </td>
                       <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
-                        {d?.created_at ? formatDate(d.created_at) : '—'}
+                        {d?.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
                       </td>
                       <td style={{textAlign:'left', padding:'8px 4px'}}>
                         <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
@@ -511,7 +511,7 @@ export function Profile() {
                               <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                 <Eye size={14} />
                               </button>
-                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                 <DownloadSimple size={14} />
                               </button>
                             </>
@@ -558,7 +558,7 @@ export function Profile() {
                         {formatDate(d.updated_at)}
                       </td>
                       <td style={{textAlign:'left', padding:'8px 4px'}}>
-                        <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                           <DownloadSimple size={14} />
                         </button>
                       </td>
@@ -586,7 +586,7 @@ export function Profile() {
                     <span style={{fontWeight:600, fontSize:12.5}}>شهادة التدريب</span>
                   </div>
                   <div style={{display:'flex', gap:4}}>
-                    <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(att.id), '_blank')} title="تحميل" style={{width:28,height:28,padding:0}}>
+                    <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(att.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0}}>
                       <DownloadSimple size={14} />
                     </button>
                   </div>
@@ -776,9 +776,7 @@ export function Profile() {
           <div className="modal">
             <div className="modal-head">
               <h3>تأكيد قبول المتدرب</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowApproveModal(false)}>
-                ✕
-              </button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowApproveModal(false)}><X size={14} /></button>
             </div>
             
             <div className="modal-body">
@@ -833,7 +831,7 @@ export function Profile() {
           <div className="modal">
             <div className="modal-head">
               <h3>رفع وثيقة موقعة</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowAssignModal(false)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowAssignModal(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -888,7 +886,7 @@ export function Profile() {
           <div className="modal">
             <div className="modal-head">
               <h3>طلب إعادة رفع المستند</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowRevisionModal(false)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowRevisionModal(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -924,7 +922,7 @@ export function Profile() {
           <div className="modal" style={{maxWidth:500}}>
             <div className="modal-head">
               <h3>إضافة من خزنة المستندات</h3>
-              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowVaultModal(false)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowVaultModal(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
               {vaultDocs.length === 0 && <div style={{textAlign:'center',padding:20,color:'var(--slate-light)'}}>الخزنة فارغة</div>}

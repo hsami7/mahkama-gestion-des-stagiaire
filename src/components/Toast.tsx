@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { Check, X, Info, Warning } from '@phosphor-icons/react';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -19,11 +20,18 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-const COLORS: Record<ToastType, { bg: string; fg: string; icon: string }> = {
-  success: { bg: '#1e8e3e', fg: '#fff', icon: '✓' },
-  error: { bg: '#d93025', fg: '#fff', icon: '✕' },
-  info: { bg: '#1a73e8', fg: '#fff', icon: 'i' },
-  warning: { bg: '#f9ab00', fg: '#202124', icon: '!' },
+const ICON_MAP: Record<ToastType, React.ReactNode> = {
+  success: <Check size={14} weight="bold" />,
+  error: <X size={14} weight="bold" />,
+  info: <Info size={14} weight="bold" />,
+  warning: <Warning size={14} weight="bold" />,
+};
+
+const COLORS: Record<ToastType, { bg: string; fg: string }> = {
+  success: { bg: '#1e8e3e', fg: '#fff' },
+  error: { bg: '#d93025', fg: '#fff' },
+  info: { bg: '#1a73e8', fg: '#fff' },
+  warning: { bg: '#f9ab00', fg: '#202124' },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -100,7 +108,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   flexShrink: 0,
                 }}
               >
-                {c.icon}
+                {ICON_MAP[t.type]}
               </span>
               <span>{t.message}</span>
             </div>

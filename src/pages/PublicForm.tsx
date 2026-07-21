@@ -214,8 +214,8 @@ export default function PublicForm() {
                       required={field.required && !formData[field.label]}
                     />
                     {formData[field.label] && (
-                      <div style={{ marginTop: '6px', fontSize: '13px', color: 'var(--success)', fontWeight: 'bold' }}>
-                        تم الرفع بنجاح ✓
+                      <div style={{ marginTop: '6px', fontSize: '13px', color: 'var(--success)', fontWeight: 'bold', display:'flex', alignItems:'center', gap:4 }}>
+                        تم الرفع بنجاح <CheckCircle size={14} weight="fill" />
                       </div>
                     )}
                   </div>

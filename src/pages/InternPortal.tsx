@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { CheckCircle, DownloadSimple } from '@phosphor-icons/react';
+import { CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye } from '@phosphor-icons/react';
 import { api, API_BASE } from '../services/api';
 import { InternSidebar } from '../components/InternSidebar';
 import { Header } from '../components/Header';
@@ -215,7 +215,7 @@ export function InternPortal() {
               <div className="welcome-photo">
                 {internData?.photo_path ? <img src={internData.photo_path} alt="avatar" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'100%', height:'100%', padding:'15%', color:'var(--slate)'}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
               </div>
-              <div><h2>مرحبًا، {internData?.name || user?.name} 👋</h2><p>{internData?.email || user?.email}</p></div>
+              <div><h2>مرحبًا، {internData?.name || user?.name} <HandWaving size={22} weight="fill" style={{display:'inline'}} /></h2><p>{internData?.email || user?.email}</p></div>
             </div>
 
             {/* PENDING STATE */}
@@ -237,8 +237,8 @@ export function InternPortal() {
                 
                 <div className="card" style={{marginBottom:18, padding:24}}>
                   <div className="intern-stepper" style={{display:'flex', alignItems:'center'}}>
-                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}>✓</div><small style={{display:'block',color:'var(--slate)'}}>إنشاء الحساب</small></div>
-                    <div className={`intern-step ${missingCount > 0 ? 'active' : 'done'}`} style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:missingCount>0?'var(--gold)':'var(--success)',color:missingCount>0?'#2A2005':'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2, boxShadow:missingCount>0?'0 0 0 5px rgba(201,162,39,.18)':'none'}}>{missingCount>0?'2':'✓'}</div><small style={{display:'block',color:'var(--slate)'}}>رفع المستندات</small></div>
+                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}><CheckCircle weight="fill" size={18} /></div><small style={{display:'block',color:'var(--slate)'}}>إنشاء الحساب</small></div>
+                    <div className={`intern-step ${missingCount > 0 ? 'active' : 'done'}`} style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:missingCount>0?'var(--gold)':'var(--success)',color:missingCount>0?'#2A2005':'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2, boxShadow:missingCount>0?'0 0 0 5px rgba(201,162,39,.18)':'none'}}>{missingCount>0?'2':<CheckCircle weight="fill" size={18} />}</div><small style={{display:'block',color:'var(--slate)'}}>رفع المستندات</small></div>
                     <div className={`intern-step ${missingCount === 0 ? 'active' : ''}`} style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:missingCount===0?'var(--gold)':'var(--paper)',border:missingCount===0?'none':'2px solid var(--line)',color:missingCount===0?'#2A2005':'var(--slate-light)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2, boxShadow:missingCount===0?'0 0 0 5px rgba(201,162,39,.18)':'none'}}>3</div><small style={{display:'block',color:'var(--slate)'}}>المراجعة والقبول</small></div>
                   </div>
                 </div>
@@ -266,7 +266,7 @@ export function InternPortal() {
               <div className="state-block on">
                 <div className="hero-accept" style={{position:'relative', overflow:'hidden', borderRadius:16, padding:'30px 28px', marginBottom:20, color:'#fff', background:'linear-gradient(120deg, #1E5631 0%, #2F9E44 100%)'}}>
                   <div className="hcontent" style={{position:'relative'}}>
-                    <div className="htag" style={{display:'inline-flex', alignItems:'center', gap:6, background:'rgba(255,255,255,.18)', padding:'5px 12px', borderRadius:20, fontSize:11.5, fontWeight:700, marginBottom:14}}>🎉 مبروك</div>
+                    <div className="htag" style={{display:'inline-flex', alignItems:'center', gap:6, background:'rgba(255,255,255,.18)', padding:'5px 12px', borderRadius:20, fontSize:11.5, fontWeight:700, marginBottom:14}}><Confetti size={14} weight="fill" /> مبروك</div>
                     <h2 style={{fontSize:23, margin:'0 0 6px'}}>تم قبولك رسميًا في برنامج التدريب!</h2>
                     <p style={{margin:0, fontSize:13.5, color:'#DCF3E1', maxWidth:520, lineHeight:1.8}}>يسعدنا إخبارك بأن طلبك قد لقي القبول. ستجد أدناه كل ما تحتاجه للاستعداد ليوم انطلاقك الأول.</p>
                   </div>
@@ -274,9 +274,9 @@ export function InternPortal() {
 
                 <div className="card" style={{marginBottom:18, padding:24}}>
                   <div className="intern-stepper" style={{display:'flex', alignItems:'center'}}>
-                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}>✓</div><small style={{display:'block',color:'var(--slate)'}}>الإرسال</small></div>
-                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}>✓</div><small style={{display:'block',color:'var(--slate)'}}>المراجعة</small></div>
-                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}>✓</div><small style={{display:'block',color:'var(--slate)'}}>القبول</small></div>
+                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}><CheckCircle weight="fill" size={18} /></div><small style={{display:'block',color:'var(--slate)'}}>الإرسال</small></div>
+                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}><CheckCircle weight="fill" size={18} /></div><small style={{display:'block',color:'var(--slate)'}}>المراجعة</small></div>
+                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}><CheckCircle weight="fill" size={18} /></div><small style={{display:'block',color:'var(--slate)'}}>القبول</small></div>
                     <div className="intern-step active" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--gold)',color:'#2A2005',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2, boxShadow:'0 0 0 5px rgba(201,162,39,.18)'}}>4</div><small style={{display:'block',color:'var(--slate)'}}>بدء التدريب</small></div>
                   </div>
                 </div>
@@ -365,7 +365,7 @@ export function InternPortal() {
                 <div style={{background:'#FFF6E5', border:'1.5px solid #F2D49B', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:12.5, color:'#9A6B00', fontWeight:600}}>
                   {lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).map(d => (
                     <div key={d.id} style={{marginTop:d.rejection_reason ? 6 : 0}}>
-                      ⚠️ ملاحظة الإدارة: {d.label} — {d.rejection_reason}
+                      <Warning size={14} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة: {d.label} — {d.rejection_reason}
                     </div>
                   ))}
                 </div>
@@ -384,7 +384,6 @@ export function InternPortal() {
                     const doc = lifecycleDocs.find(d => d.doc_type === docType);
                     const req = requests.find(r => r.document_type === docType);
                     const status = doc?.status === 'APPROVED_AND_SIGNED' ? 'approved' : doc?.status === 'REVISION_REQUESTED' ? 'rejected' : doc?.file_path ? 'pending' : 'missing';
-                    const statusLabel = status === 'approved' ? 'مقبول ✓' : status === 'rejected' ? 'مطلوب إعادة الرفع' : status === 'pending' ? 'قيد المراجعة' : 'غير مرفوع';
                     const statusColor = status === 'approved' ? 'var(--success)' : status === 'rejected' ? 'var(--danger)' : status === 'pending' ? 'var(--gold)' : 'var(--slate-light)';
                     return (
                       <tr key={docType} style={{borderBottom:'1px solid var(--line)'}}>
@@ -392,23 +391,23 @@ export function InternPortal() {
                           {DOC_TYPE_LABELS[docType]}
                           {doc?.rejection_reason && status === 'rejected' && (
                             <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
-                              <span style={{fontWeight:600}}>⚠️ ملاحظة الإدارة:</span> {doc.rejection_reason}
+                              <span style={{fontWeight:600}}><Warning size={12} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة:</span> {doc.rejection_reason}
                             </div>
                           )}
                         </td>
-                        <td style={{textAlign:'center', padding:'10px 4px', color: statusColor, fontWeight:600, fontSize:12}}>{statusLabel}</td>
+                        <td style={{textAlign:'center', padding:'10px 4px', color: statusColor, fontWeight:600, fontSize:12}}>{status === 'approved' ? <>مقبول <CheckCircle size={12} weight="fill" style={{display:'inline'}} /></> : status === 'rejected' ? 'مطلوب إعادة الرفع' : status === 'pending' ? 'قيد المراجعة' : 'غير مرفوع'}</td>
                         <td style={{textAlign:'left', padding:'10px 4px'}}>
                           <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
                             {doc?.file_path && (
                               <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                                <DownloadSimple size={14} /> معاينة
+                                <Eye size={14} /> معاينة
                               </a>
                             )}
                             {(status === 'missing' || status === 'rejected') && (
                               <>
                                 <input type="file" id={`doc-upload-${docType}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleProactiveUpload(docType, e.target.files[0]); }} />
                                 <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`doc-upload-${docType}`)?.click()} disabled={uploading === docType}>
-                                  📤 {uploading === docType ? 'جاري...' : 'رفع'}
+                                  <UploadSimple size={14} /> {uploading === docType ? 'جاري...' : 'رفع'}
                                 </button>
                               </>
                             )}
