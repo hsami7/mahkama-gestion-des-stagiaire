@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, ClipboardText } from '@phosphor-icons/react';
+import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, ClipboardText, CalendarBlank } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -46,6 +46,7 @@ function formatDate(d: string | undefined | null): string {
 
 const RotDateInput = React.memo(({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) => {
   const [text, setText] = useState(value ? formatDate(value) : '');
+  const hiddenRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setText(value ? formatDate(value) : ''); }, [value]);
   const commit = (raw: string) => {
     let clean = raw.replace(/[^\d]/g, '').slice(0, 8);
@@ -60,7 +61,11 @@ const RotDateInput = React.memo(({ value, onChange, placeholder }: { value: stri
     } else onChange('');
   };
   return (
-    <input type="text" inputMode="numeric" className="input" style={{fontSize:12}} value={text} onChange={e => commit(e.target.value)} onBlur={e => commit(e.target.value)} placeholder={placeholder} />
+    <div style={{display:'flex', gap:4, alignItems:'center'}}>
+      <input type="text" inputMode="numeric" className="input" style={{fontSize:12, flex:1}} value={text} onChange={e => commit(e.target.value)} onBlur={e => commit(e.target.value)} placeholder={placeholder} />
+      <button type="button" onClick={() => hiddenRef.current?.showPicker()} style={{width:32,height:32,borderRadius:8,border:'1px solid var(--line)',background:'var(--paper)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><CalendarBlank size={16} /></button>
+      <input type="date" ref={hiddenRef} style={{display:'none'}} onChange={e => { const iso = e.target.value; if (iso) { onChange(iso); setText(formatDate(iso)); }}} />
+    </div>
   );
 });
 
