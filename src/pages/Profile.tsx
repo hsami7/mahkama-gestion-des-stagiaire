@@ -481,20 +481,11 @@ export function Profile() {
     <div class="notes">${comments || ''}</div>
     <div class="signature">توقيع المسؤول الإداري: ........................................</div>
     </body></html>`;
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.top = '-9999px';
-    iframe.style.left = '-9999px';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    document.body.appendChild(iframe);
-    iframe.contentWindow?.document.open();
-    iframe.contentWindow?.document.write(html);
-    iframe.contentWindow?.document.close();
-    setTimeout(() => {
-      iframe.contentWindow?.print();
-      setTimeout(() => document.body.removeChild(iframe), 500);
-    }, 500);
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if (!w) { URL.revokeObjectURL(url); return; }
+    w.onload = () => { w.focus(); setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 500); };
   };
 
   const handleReject = async () => {
