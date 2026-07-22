@@ -1,51 +1,34 @@
 const fs = require('fs');
 const PizZip = require('pizzip');
 
+// Always start from a clean backup of the original template if possible, or read public/evaluation_template.docx
 const zip = new PizZip(fs.readFileSync('public/evaluation_template.docx'));
 let xml = zip.file('word/document.xml').asText();
 
-// 1. Fix overall period "من: 03/11/2025 إلى: 30/04/2026" -> "من: {from} إلى: {to}"
+// 1. Fix overall period dates in paragraph 501BA750 (من: ...) and paragraph 4FEE88CB (إلى: ...)
 xml = xml.replace(
-  /<w:t>03<\/w:t><\/w:r><w:r><w:rPr>[^<]*<\/w:rPr><w:t>\/<\/w:t><\/w:r><w:r><w:rPr>[^<]*<\/w:rPr><w:t>11<\/w:t><\/w:r><w:r><w:rPr>[^<]*<\/w:rPr><w:t>\/<\/w:t><\/w:r><w:r><w:rPr>[^<]*<\/w:rPr><w:t>2025<\/w:t>/g,
-  '<w:t>{from}</w:t>'
-);
-xml = xml.replace(
-  /<w:t>30<\/w:t><\/w:r><w:r><w:rPr>[^<]*<\/w:rPr><w:t>\/<\/w:t><\/w:r><w:r><w:rPr>[^<]*<\/w:rPr><w:t>04<\/w:t><\/w:r><w:r><w:rPr>[^<]*<\/w:rPr><w:t>\/2026<\/w:t>/g,
-  '<w:t>{to}</w:t>'
+  /<w:p w14:paraId="501BA750"[^>]*>.*?<\/w:p>/s,
+  `<w:p w14:paraId="501BA750"><w:pPr><w:jc w:val="center"/><w:rPr><w:rFonts w:cs="Samir_Khouaja_Maghribi"/><w:b/><w:bCs/><w:sz w:val="24"/><w:szCs w:val="24"/><w:rtl/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:cs="Samir_Khouaja_Maghribi"/><w:b/><w:bCs/><w:sz w:val="24"/><w:szCs w:val="24"/><w:rtl/></w:rPr><w:t xml:space="preserve">من: {from}</w:t></w:r></w:p>`
 );
 
-// 2. Fix Period 1 dates "من: 03/11/2025 إلى: 28/11/2025" -> "من: {f1} إلى: {t1}"
 xml = xml.replace(
-  /<w:t>03<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>11<\/w:t><\/w:r><w:r><w:t>\/2025 إلى: <\/w:t><\/w:r><w:r><w:t>28<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>11<\/w:t><\/w:r><w:r><w:t>\/2025<\/w:t>/g,
-  '<w:t>{f1} إلى: {t1}</w:t>'
+  /<w:p w14:paraId="4FEE88CB"[^>]*>.*?<\/w:p>/s,
+  `<w:p w14:paraId="4FEE88CB"><w:pPr><w:jc w:val="center"/><w:rPr><w:rFonts w:cs="Samir_Khouaja_Maghribi"/><w:b/><w:bCs/><w:sz w:val="24"/><w:szCs w:val="24"/><w:rtl/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:cs="Samir_Khouaja_Maghribi"/><w:b/><w:bCs/><w:sz w:val="24"/><w:szCs w:val="24"/><w:rtl/></w:rPr><w:t xml:space="preserve">إلى: {to}</w:t></w:r></w:p>`
 );
 
-// 3. Fix Period 2 dates "من: 01/12/2025 إلى: 31/12/2025" -> "من: {f2} إلى: {t2}"
-xml = xml.replace(
-  /<w:t>01<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>12<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>2025<\/w:t><\/w:r><w:r><w:t> إلى: <\/w:t><\/w:r><w:r><w:t>31<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>12<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>2025<\/w:t>/g,
-  '<w:t>{f2} إلى: {t2}</w:t>'
-);
+// 2. Replace static rotation rows (ROW 3, ROW 4, ROW 5, ROW 6) with a single dynamic {#rots} row!
+// Let's locate the table rows in document.xml
+const trs = xml.match(/<w:tr[^>]*>.*?<\/w:tr>/gs);
+if (trs && trs.length >= 7) {
+  // ROW 3 is trs[3], ROW 4 is trs[4], ROW 5 is trs[5], ROW 6 is trs[6]
+  const dynamicRow = `<w:tr w:rsidR="002D44BB" w14:paraId="47CACE77"><w:trPr><w:trHeight w:val="892"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="3369" w:type="dxa"/><w:gridSpan w:val="2"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr></w:pPr><w:r><w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr><w:t>{#rots}المشرف على التكوين</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t>{supervisor}</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3298" w:type="dxa"/><w:gridSpan w:val="3"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr></w:pPr><w:r><w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr><w:t>الشعبة</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t>{department}</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3294" w:type="dxa"/><w:gridSpan w:val="2"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr></w:pPr><w:r><w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr><w:t xml:space="preserve">الفترة {num}</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="center"/><w:rPr><w:rtl/></w:rPr></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space="preserve">من: {from} إلى: {to}{/rots}</w:t></w:r></w:p></w:tc></w:tr>`;
 
-// 4. Fix Period 3 dates "من: 02/01/2026 إلى: 10/04/2026"
-xml = xml.replace(
-  /<w:t>02<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>01<\/w:t><\/w:r><w:r><w:t>\/2026 إلى: <\/w:t><\/w:r><w:r><w:t>10<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>04<\/w:t><\/w:r><w:r><w:t>\/2026<\/w:t>/g,
-  '<w:t>{f3} إلى: {t3}</w:t>'
-);
+  // Replace trs[3], trs[4], trs[5], trs[6] block with dynamicRow
+  const blockToReplace = trs[3] + trs[4] + trs[5] + trs[6];
+  xml = xml.replace(blockToReplace, dynamicRow);
+}
 
-// 5. Fix Period 4 dates "من: 13/04/2026 إلى: 30/04/2026"
-xml = xml.replace(
-  /<w:t>13<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>04<\/w:t><\/w:r><w:r><w:t>\/2026 إلى: <\/w:t><\/w:r><w:r><w:t>30<\/w:t><\/w:r><w:r><w:t>\/<\/w:t><\/w:r><w:r><w:t>04<\/w:t><\/w:r><w:r><w:t>\/2026<\/w:t>/g,
-  '<w:t>{f4} إلى: {t4}</w:t>'
-);
-
-// 6. Hardcoded supervisors in P3 and P4:
-xml = xml.replace(/إناس بنبراهيم/g, '{sup3}');
-xml = xml.replace(/نوفل العيساوي/g, '{sup4}');
-xml = xml.replace(/الخبرة والمسح الضوئي/g, '{dep4}');
-
-// 7. Checkboxes: replace w14:checkbox controls with {cX_yes} and {cX_no}
-// We have 4 rows of criteria, each row has 2 checkboxes (yes / no or no / yes).
-// Let's replace each <w14:checkbox>...</w14:checkbox> block or <w:sdt>...</w:sdt> block sequentially.
+// 3. Fix checkboxes if needed (already converted to {c1_no}, {c1_yes}, etc.)
 let cbIndex = 0;
 const cbTags = [
   '{c1_no}', '{c1_yes}',
@@ -59,10 +42,17 @@ xml = xml.replace(/<w:sdt>(?:(?!<\/w:sdt>).)*?<w14:checkbox>(?:(?!<\/w:sdt>).)*?
   return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${tag}</w:t></w:r></w:p>`;
 });
 
-// 8. Notes dots replacement:
-xml = xml.replace(/<w:t>\s*\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\s*<\/w:t>/g, '<w:t>{notes}</w:t>');
+// 4. Notes: Remove all the trailing dots lines and replace with a clean {notes} tag
+xml = xml.replace(/<w:t>\s*\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\s*<\/w:t>/g, '');
+xml = xml.replace(/<w:t>\s*\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\.\s*<\/w:t>/g, '');
+
+// Ensure {notes} is in paragraph 3ADB25F8 (where ملاحظات header is)
+xml = xml.replace(
+  /<w:p w14:paraId="4396676C"[^>]*>.*?<\/w:p>/s,
+  `<w:p w14:paraId="4396676C"><w:pPr><w:jc w:val="right"/><w:rPr><w:rFonts w:cs="Samir_Khouaja_Maghribi"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:rtl/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:cs="Samir_Khouaja_Maghribi"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:rtl/></w:rPr><w:t>{notes}</w:t></w:r></w:p>`
+);
 
 zip.file('word/document.xml', xml);
 const buffer = zip.generate({ type: 'nodebuffer' });
 fs.writeFileSync('public/evaluation_template.docx', buffer);
-console.log('Template fixed successfully!');
+console.log('Template dynamically updated!');

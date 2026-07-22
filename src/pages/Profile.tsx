@@ -724,28 +724,19 @@ export function Profile() {
         linebreaks: true,
       });
 
-      const getRot = (idx: number) => rots[idx] || { supervisor: '', department: '', from: '', to: '' };
+      const formattedRots = (rots.length > 0 ? rots : [{ supervisor: '', department: '', from: '', to: '' }]).map((r: any, idx: number) => ({
+        num: idx + 1,
+        department: r.department || '—',
+        supervisor: r.supervisor || '—',
+        from: r.from ? formatDate(r.from) : '—',
+        to: r.to ? formatDate(r.to) : '—'
+      }));
       
       doc.render({
         name: intern?.name || '',
         from: pFrom,
         to: pTo,
-        sup1: getRot(0).supervisor || '—',
-        dep1: getRot(0).department || '—',
-        f1: getRot(0).from ? formatDate(getRot(0).from) : '—',
-        t1: getRot(0).to ? formatDate(getRot(0).to) : '—',
-        sup2: getRot(1).supervisor || '—',
-        dep2: getRot(1).department || '—',
-        f2: getRot(1).from ? formatDate(getRot(1).from) : '—',
-        t2: getRot(1).to ? formatDate(getRot(1).to) : '—',
-        sup3: getRot(2).supervisor || '—',
-        dep3: getRot(2).department || '—',
-        f3: getRot(2).from ? formatDate(getRot(2).from) : '—',
-        t3: getRot(2).to ? formatDate(getRot(2).to) : '—',
-        sup4: getRot(3).supervisor || '—',
-        dep4: getRot(3).department || '—',
-        f4: getRot(3).from ? formatDate(getRot(3).from) : '—',
-        t4: getRot(3).to ? formatDate(getRot(3).to) : '—',
+        rots: formattedRots,
         
         c1_no: crit['punctuality']?.no ? '☑' : '☐',
         c1_yes: crit['punctuality']?.yes ? '☑' : '☐',
