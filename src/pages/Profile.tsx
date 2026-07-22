@@ -4,7 +4,7 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
 import html2pdf from 'html2pdf.js';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
 import TextArea from '../components/TextArea';
@@ -82,6 +82,7 @@ function sanitizeTitle(t: string): string {
 export function Profile() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
   const toast = useToast();
   const [intern, setIntern] = useState<any>(null);
   const [attendance, setAttendance] = useState<any[]>([]);
@@ -270,6 +271,20 @@ export function Profile() {
   }, [id]);
 
   useEffect(() => {
+    if (location.search.includes('tab=evaluation') && intern?.status === 'نشط') {
+      setTimeout(() => {
+        const evalSection = document.getElementById('evaluation-section');
+        if (evalSection) {
+          evalSection.scrollIntoView({ behavior: 'smooth' });
+          if (!intern.evaluation?.criteria) {
+             setShowEvalForm(true);
+          }
+        }
+      }, 500);
+    }
+  }, [location.search, intern?.status, intern?.evaluation?.criteria]);
+
+  useEffect(() => {
     if (showAssignModal && assignDocType && !assignCustomTitle) {
       setAssignCustomTitle(DOC_TYPE_LABELS[assignDocType] || '');
     }
@@ -450,10 +465,12 @@ export function Profile() {
 
   const generateEvalHtml = () => {
     const ev = intern?.evaluation || {};
-    const crit = evalCriteria || ev.criteria || {};
+    const crit = Object.keys(evalCriteria).length > 0 ? evalCriteria : (ev.criteria || {});
     const rots = evalRotations.length > 0 ? evalRotations : (ev.rotations || []);
-    const pFrom = evalPeriodFrom || ev.period_from || '';
-    const pTo = evalPeriodTo || ev.period_to || '';
+    const pFromStr = evalPeriodFrom || ev.period_from || intern?.start_date || '';
+    const pToStr = evalPeriodTo || ev.period_to || intern?.end_date || '';
+    const pFrom = pFromStr ? formatDate(pFromStr) : '';
+    const pTo = pToStr ? formatDate(pToStr) : '';
     const comments = evalComments || ev.comments || '';
 
     return `<!DOCTYPE html>
@@ -529,16 +546,21 @@ export function Profile() {
       border: 3px solid #000;
       border-top: none;
       min-height: 150px;
+      display: flex;
+      page-break-inside: avoid;
+    }
+    .notes-right {
+      flex: 1;
       padding: 15px;
       display: flex;
       flex-direction: column;
-      page-break-inside: avoid;
     }
-    .notes-header {
+    .notes-left {
+      width: 35%;
+      border-right: 2px solid #000;
+      padding: 15px;
       display: flex;
-      justify-content: space-between;
-      font-weight: bold;
-      font-size: 18px;
+      flex-direction: column;
     }
     .checkbox-cell {
       font-size: 24px;
@@ -575,7 +597,7 @@ export function Profile() {
   <table>
     <tr class="bg-yellow">
       <td style="width: 15%;">الاسم الكامل</td>
-      <td style="width: 35%; background-color: #fff !important;">${intern?.name || ''}</td>
+      <td style="width: 35%;">${intern?.name || ''}</td>
       <td style="width: 15%;">مقر التدريب</td>
       <td style="width: 35%;">كتابة الضبط بمحكمة الاستئناف الإدارية بفاس</td>
     </tr>
@@ -626,16 +648,19 @@ export function Profile() {
   </table>
   
   <div class="notes-box">
-    <div class="notes-header">
-      <span>ملاحظات</span>
-      <span>توقيع المسؤول الإداري</span>
+    <div class="notes-right">
+      <div style="font-weight: bold; font-size: 18px; text-align: right;">ملاحظات</div>
+      <div style="font-weight: normal; margin-top: 15px; flex-grow: 1; white-space: pre-wrap;">${comments || ''}</div>
+      ${!comments ? `
+      <div class="dotted-line"></div>
+      <div class="dotted-line"></div>
+      <div class="dotted-line"></div>
+      <div class="dotted-line"></div>
+      ` : ''}
     </div>
-    <div style="font-weight: normal; margin-top: 15px; flex-grow: 1; white-space: pre-wrap;">${comments || ''}</div>
-    ${!comments ? `
-    <div class="dotted-line"></div>
-    <div class="dotted-line"></div>
-    <div class="dotted-line"></div>
-    ` : ''}
+    <div class="notes-left">
+      <div style="font-weight: bold; font-size: 18px; text-align: center;">توقيع المسؤول الإداري</div>
+    </div>
   </div>
 </body>
 </html>`;
@@ -682,10 +707,10 @@ export function Profile() {
   const handleDownloadWord = async () => {
     try {
       const ev = intern?.evaluation || {};
-      const crit = evalCriteria || ev.criteria || {};
+      const crit = Object.keys(evalCriteria).length > 0 ? evalCriteria : (ev.criteria || {});
       const rots = evalRotations.length > 0 ? evalRotations : (ev.rotations || []);
-      const pFrom = evalPeriodFrom || ev.period_from || '';
-      const pTo = evalPeriodTo || ev.period_to || '';
+      const pFrom = evalPeriodFrom || ev.period_from || (intern?.start_date ? formatDate(intern.start_date) : '');
+      const pTo = evalPeriodTo || ev.period_to || (intern?.end_date ? formatDate(intern.end_date) : '');
       const comments = evalComments || ev.comments || '';
 
       const res = await fetch('/evaluation_template.docx');
@@ -705,22 +730,22 @@ export function Profile() {
         name: intern?.name || '',
         from: pFrom,
         to: pTo,
-        sup1: getRot(0).supervisor,
-        dep1: getRot(0).department,
-        f1: getRot(0).from,
-        t1: getRot(0).to,
-        sup2: getRot(1).supervisor,
-        dep2: getRot(1).department,
-        f2: getRot(1).from,
-        t2: getRot(1).to,
-        sup3: getRot(2).supervisor,
-        dep3: getRot(2).department,
-        f3: getRot(2).from,
-        t3: getRot(2).to,
-        sup4: getRot(3).supervisor,
-        dep4: getRot(3).department,
-        f4: getRot(3).from,
-        t4: getRot(3).to,
+        sup1: getRot(0).supervisor || '—',
+        dep1: getRot(0).department || '—',
+        f1: getRot(0).from ? formatDate(getRot(0).from) : '—',
+        t1: getRot(0).to ? formatDate(getRot(0).to) : '—',
+        sup2: getRot(1).supervisor || '—',
+        dep2: getRot(1).department || '—',
+        f2: getRot(1).from ? formatDate(getRot(1).from) : '—',
+        t2: getRot(1).to ? formatDate(getRot(1).to) : '—',
+        sup3: getRot(2).supervisor || '—',
+        dep3: getRot(2).department || '—',
+        f3: getRot(2).from ? formatDate(getRot(2).from) : '—',
+        t3: getRot(2).to ? formatDate(getRot(2).to) : '—',
+        sup4: getRot(3).supervisor || '—',
+        dep4: getRot(3).department || '—',
+        f4: getRot(3).from ? formatDate(getRot(3).from) : '—',
+        t4: getRot(3).to ? formatDate(getRot(3).to) : '—',
         
         c1_no: crit['punctuality']?.no ? '☑' : '☐',
         c1_yes: crit['punctuality']?.yes ? '☑' : '☐',
@@ -1037,15 +1062,79 @@ export function Profile() {
               </table>
           </div>
 
-          {/* Section 3: ختام التدريب والأرشيف (Exit Docs) — visible only after documents are uploaded */}
+          {/* Section 3: وثائق نهاية التدريب والأرشيف (Exit Docs) */}
           {(() => {
             const att = docsLifecycle.find(d => d.doc_type === 'ATTESTATION_SIGNED');
             const final = docsLifecycle.find(d => d.doc_type === 'FINAL_REPORT');
-            const hasExitDocs = att?.file_path || final?.file_path;
+            const hasExitDocs = att?.file_path || final?.file_path || intern?.status === 'نشط' || intern?.status === 'مكتمل'; // show section for active/completed interns
             if (!hasExitDocs) return null;
             return (
             <div style={{marginBottom:8}}>
-              <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--brand)'}}>ختام التدريب والأرشيف</h4></div>
+              <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--danger)'}}>وثائق نهاية التدريب والأرشيف</h4></div>
+              
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5, marginBottom:16}}>
+                <thead>
+                  <tr style={{borderBottom:'1px solid var(--line)'}}>
+                    <th style={{textAlign:'right', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
+                    <th style={{textAlign:'center', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
+                    <th style={{textAlign:'center', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>تاريخ الرفع</th>
+                    <th style={{textAlign:'left', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const uploadedDocs = [final].filter(d => d && d.status !== 'MISSING' && d.file_path);
+                    if (uploadedDocs.length === 0) {
+                      return <tr><td colSpan={4} style={{textAlign:'center', padding:'16px 8px', color:'var(--slate-light)'}}>لم يتم إصدار أي وثائق بعد</td></tr>;
+                    }
+                    return uploadedDocs.map((d, idx) => (
+                      <tr key={idx} style={{borderBottom:'1px solid var(--line)'}}>
+                        <td style={{padding:'10px 8px'}}>
+                          <div style={{fontWeight:600, color:'var(--ink)'}}>التقرير النهائي</div>
+                          {d?.rejection_reason && d.status === 'REVISION_REQUESTED' && (
+                            <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
+                              <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{textAlign:'center', padding:'10px 8px'}}>
+                          {d.status === 'PENDING_REVIEW' ? <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span> :
+                           d.status === 'APPROVED_AND_SIGNED' ? <span className="badge badge-success" style={{fontSize:11}}>مقبول</span> :
+                           d.status === 'REVISION_REQUESTED' ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> : null}
+                        </td>
+                        <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)'}}>
+                          {d?.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                        </td>
+                        <td style={{textAlign:'left', padding:'10px 8px'}}>
+                          <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                            {d?.file_path && (
+                              <>
+                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                  <Eye size={14} />
+                                </button>
+                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                  <DownloadSimple size={14} />
+                                </button>
+                              </>
+                            )}
+                            {d && d.status !== 'MISSING' && d.file_path && (
+                              <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                                <ArrowsClockwise size={14} />
+                              </button>
+                            )}
+                            {d?.status === 'PENDING_REVIEW' && (
+                              <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                                <CheckCircle size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+
               <div style={{display:'flex', flexDirection:'column', gap:8}}>
                 {att?.file_path && (
                 <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 6px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
@@ -1060,6 +1149,7 @@ export function Profile() {
                   </div>
                 </div>
                 )}
+                {(att?.file_path || final?.file_path) && (
                 <button className="btn btn-ghost" style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:12.5, border:'1.5px dashed var(--line)', borderRadius:8, color:'var(--slate)'}} onClick={async () => {
                   if (!id) return;
                   try {
@@ -1076,6 +1166,7 @@ export function Profile() {
                   <DownloadSimple weight="bold" size={16} style={{marginLeft:6}} />
                   <Package size={16} /> تحميل أرشيف الملفات ZIP
                 </button>
+                )}
               </div>
             </div>
             );
@@ -1104,7 +1195,7 @@ export function Profile() {
       )}
 
       {intern.status === 'نشط' && (canEvaluateInterns || intern.evaluation?.criteria) && (
-        <div className="card" style={{ padding: '28px', marginTop: '24px', borderTop: '4px solid var(--success)' }}>
+        <div id="evaluation-section" className="card" style={{ padding: '28px', marginTop: '24px', borderTop: '4px solid var(--success)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
             <div>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>بطاقة تقييم التدريب</h3>
@@ -1122,7 +1213,7 @@ export function Profile() {
           {intern.evaluation?.criteria && (
             <div style={{ marginTop: '20px' }}>
               <div style={{marginBottom:14, fontSize:13}}>
-                <b>الفترة:</b> من {formatDate(intern.evaluation.period_from)} إلى {formatDate(intern.evaluation.period_to)}
+                <b>الفترة:</b> من {formatDate(intern.evaluation.period_from || intern.start_date)} إلى {formatDate(intern.evaluation.period_to || intern.end_date)}
               </div>
               {intern.evaluation.rotations?.length > 0 && (
                 <div style={{marginBottom:14, fontSize:12.5}}>
@@ -1193,6 +1284,26 @@ export function Profile() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Exit Docs & Archive */}
+      {(intern.status === 'نشط' || intern.status === 'مكتمل') && (
+        <div className="card" style={{ padding: '28px', marginTop: '24px', borderTop: '4px solid var(--danger)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>ختام التدريب والأرشيف</h3>
+              <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>إصدار شهادة التدريب وتحميل الأرشيف الكامل لملفات المتدرب.</p>
+            </div>
+            <div style={{display:'flex', gap:8}}>
+              <a href={api.exportInternZip(intern.id)} download className="btn btn-ghost" style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px', border: '1px solid var(--line)' }}>
+                <Package size={18} weight="fill" /> تحميل أرشيف الملفات ZIP
+              </a>
+              <button className="btn btn-primary" onClick={() => toast.info('جاري إعداد قالب الشهادة')} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px', background: 'var(--danger)', color: '#fff', border: 'none' }}>
+                <Certificate size={18} weight="fill" /> إصدار شهادة التدريب
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

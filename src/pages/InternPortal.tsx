@@ -212,9 +212,9 @@ export function InternPortal() {
       <div className="main">
         <Header title={getPageTitle(activeTab)} missingCount={missingCount} />
 
-        <div className="view on">
+        <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', background: 'var(--paper)' }}>
           {/* STATUS */}
-          <div className={`view ${activeTab === 'status' ? 'on' : ''}`}>
+          <div className={`view ${activeTab === 'status' ? 'on' : ''} p-wrap`}>
             <div className="welcome-row">
               <div className="welcome-photo">
                 {internData?.photo_path ? <img src={internData.photo_path} alt="avatar" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'100%', height:'100%', padding:'15%', color:'var(--slate)'}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
@@ -321,7 +321,7 @@ export function InternPortal() {
           </div>
 
           {/* DOCUMENTS — unified view */}
-          <div className={`view ${activeTab === 'documents' ? 'on' : ''}`}>
+          <div className={`view ${activeTab === 'documents' ? 'on' : ''} p-wrap`}>
             {internData?.status === 'مرفوض' ? (
               <div className="card" style={{padding: 24, textAlign: 'center', color: 'var(--slate)', fontSize: 14}}>
                 المستندات غير متاحة حاليًا. تم رفض طلبك.
@@ -344,7 +344,7 @@ export function InternPortal() {
       }
       return <>
         {returnDocs.map(d => (
-          <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)', display:'flex', alignItems:'center', gap:12, padding:'14px 0'}}>
+          <div key={d.id} className="doc-item">
             <FileText weight="fill" style={{color:'var(--gold-dark)', width:20, height:20, flexShrink:0}} />
             <div style={{flex:1, minWidth:0}}>
               <div className="dn" style={{fontSize:13.5, fontWeight:700, marginBottom:4}}>{sanitizeTitle(d.label)}</div>
@@ -383,7 +383,7 @@ export function InternPortal() {
           </div>
         ))}
         {adminSigned.map(d => (
-          <div key={d.id} className="doc-item" style={{borderBottom:'1px solid var(--line)', display:'flex', alignItems:'center', gap:12, padding:'14px 0'}}>
+          <div key={d.id} className="doc-item">
             <CheckCircle weight="fill" style={{color:'var(--success)', width:20, height:20, flexShrink:0}} />
             <div style={{flex:1, minWidth:0}}>
               <div className="dn" style={{fontSize:13.5, fontWeight:700, marginBottom:4}}>{sanitizeTitle(d.label)}</div>
@@ -435,7 +435,61 @@ export function InternPortal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {['CIN','CV','INSURANCE','DEMANDE','FINAL_REPORT'].map(docType => {
+                  {['CIN','CV','INSURANCE','DEMANDE'].map(docType => {
+                    const doc = lifecycleDocs.find(d => d.doc_type === docType);
+                    const req = requests.find(r => r.document_type === docType);
+                    const status = doc?.status === 'APPROVED_AND_SIGNED' ? 'approved' : doc?.status === 'REVISION_REQUESTED' ? 'rejected' : doc?.file_path ? 'pending' : 'missing';
+                    const statusColor = status === 'approved' ? 'var(--success)' : status === 'rejected' ? 'var(--danger)' : status === 'pending' ? 'var(--gold)' : 'var(--slate-light)';
+                    return (
+                      <tr key={docType} style={{borderBottom:'1px solid var(--line)'}}>
+                        <td style={{padding:'10px 4px', fontWeight:600}}>
+                          {DOC_TYPE_LABELS[docType]}
+                          {doc?.rejection_reason && status === 'rejected' && (
+                            <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
+                              <span style={{fontWeight:600}}><Warning size={12} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة:</span> {doc.rejection_reason}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{textAlign:'center', padding:'10px 4px', color: statusColor, fontWeight:600, fontSize:12}}>{status === 'approved' ? <>مقبول <CheckCircle size={12} weight="fill" style={{display:'inline'}} /></> : status === 'rejected' ? 'مطلوب إعادة الرفع' : status === 'pending' ? 'قيد المراجعة' : 'غير مرفوع'}</td>
+                        <td style={{textAlign:'left', padding:'10px 4px'}}>
+                          <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                            {doc?.file_path && (
+                              <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                <Eye size={14} /> معاينة
+                              </a>
+                            )}
+                            {(status === 'missing' || status === 'rejected') && (
+                              <>
+                                <input type="file" id={`doc-upload-${docType}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleProactiveUpload(docType, e.target.files[0]); }} />
+                                <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`doc-upload-${docType}`)?.click()} disabled={uploading === docType}>
+                                  <UploadSimple size={14} /> {uploading === docType ? 'جاري...' : 'رفع'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Card 3: وثائق نهاية التدريب */}
+            <div className="card" style={{padding:24, marginTop:18, borderTop:'3px solid var(--danger)'}}>
+              <div className="section-title" style={{marginBottom:16}}>
+                <h3 style={{fontSize:15, margin:0, color:'var(--danger)'}}>وثائق نهاية التدريب</h3>
+              </div>
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
+                <thead>
+                  <tr style={{borderBottom:'1px solid var(--line)'}}>
+                    <th style={{textAlign:'right', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
+                    <th style={{textAlign:'center', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
+                    <th style={{textAlign:'left', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {['FINAL_REPORT'].map(docType => {
                     const doc = lifecycleDocs.find(d => d.doc_type === docType);
                     const req = requests.find(r => r.document_type === docType);
                     const status = doc?.status === 'APPROVED_AND_SIGNED' ? 'approved' : doc?.status === 'REVISION_REQUESTED' ? 'rejected' : doc?.file_path ? 'pending' : 'missing';
@@ -478,7 +532,7 @@ export function InternPortal() {
           </div>
 
           {/* PROFILE */}
-          <div className={`view ${activeTab === 'profile' ? 'on' : ''}`}>
+          <div className={`view ${activeTab === 'profile' ? 'on' : ''} p-wrap`}>
             <div className="profile-head">
               <div className="profile-photo-wrap">
                 {internData?.photo_path ? <img src={internData.photo_path} alt="avatar" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'100%', height:'100%', padding:'15%', color:'var(--slate)'}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
@@ -502,7 +556,7 @@ export function InternPortal() {
             <div className="card" style={{ padding: '20px 24px', marginTop: 16, borderTop: '3px solid var(--success)' }}>
               <div className="section-title"><h3>بطاقة تقييم التدريب</h3></div>
               <div style={{marginBottom:14, fontSize:13}}>
-                <b>الفترة:</b> من {formatDate(internData.evaluation.period_from)} إلى {formatDate(internData.evaluation.period_to)}
+                <b>الفترة:</b> من {formatDate(internData.evaluation.period_from || internData.start_date)} إلى {formatDate(internData.evaluation.period_to || internData.end_date)}
               </div>
               {internData.evaluation.rotations?.length > 0 && (
                 <div style={{marginBottom:14, fontSize:12.5}}>
