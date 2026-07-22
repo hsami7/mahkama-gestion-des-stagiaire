@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, ClipboardText, CalendarBlank } from '@phosphor-icons/react';
+import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, ClipboardText, CalendarBlank, FileDoc } from '@phosphor-icons/react';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
+import { saveAs } from 'file-saver';
+import html2pdf from 'html2pdf.js';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { useToast } from '../components/Toast';
 import TextArea from '../components/TextArea';
 import CoverageChart from '../components/CoverageChart';
+import { LOGO_BASE64 } from '../utils/logoBase64';
 
 const EVAL_CRITERIA = [
   { key: 'punctuality', label: 'المواظبة واحترام الوقت' },
@@ -443,47 +448,201 @@ export function Profile() {
     finally { setUploadingSigned(false); }
   };
 
-  const handlePrintEval = () => {
+  const generateEvalHtml = () => {
     const ev = intern?.evaluation || {};
     const crit = evalCriteria || ev.criteria || {};
     const rots = evalRotations.length > 0 ? evalRotations : (ev.rotations || []);
     const pFrom = evalPeriodFrom || ev.period_from || '';
     const pTo = evalPeriodTo || ev.period_to || '';
     const comments = evalComments || ev.comments || '';
-    const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>بطاقة تقييم التدريب</title><style>
-      body{font-family:'Traditional Arabic','Arial',sans-serif;padding:40px;font-size:14px;line-height:1.8}
-      .header{text-align:center;font-size:13px;margin-bottom:4px}
-      h1{text-align:center;font-size:22px;margin:8px 0 24px}
-      table{width:100%;border-collapse:collapse;margin-bottom:20px}
-      td,th{border:1px solid #333;padding:8px 12px;text-align:right}
-      th{background:#f0f0f0;font-weight:700}
-      .section{font-weight:700;background:#e8e8e8;text-align:center}
-      .signature{margin-top:60px;text-align:left;font-weight:700}
-      .notes{margin-top:20px;min-height:100px;border:1px dashed #999;padding:12px;white-space:pre-wrap}
-      .check{font-family:'Arial';font-size:16px}
-      @media print{body{padding:20px}}
-    </style></head><body>
-    <div class="header">المملكة المغربية &mdash; وزارة العدل &mdash; محكمة الإستئناف الإدارية بفاس</div>
-    <div class="header" style="margin-bottom:20px">كتابة الضبط بمحكمة الاستئناف الإدارية بفاس</div>
-    <h1>بطاقة تقييم التدريب</h1>
-    <table><tr><td style="border:none;padding:4px 0"><b>الاسم الكامل:</b> ${intern?.name || ''}</td><td style="border:none;padding:4px 0"><b>فترة التدريب المطلوبة:</b> من: ${pFrom} إلى: ${pTo}</td></tr></table>
-    <table><tr><th colspan="3">معلومات عن التدريب</th></tr>
-    <tr><th>المشرف على التكوين</th><th>الشعبة</th><th>الفترة</th></tr>
-    ${(rots.length > 0 ? rots : [{ supervisor: '', department: '', from: '', to: '' }]).map((r: any, i: number) =>
-      `<tr><td>${r.supervisor || ''}</td><td>${r.department || ''}</td><td>${r.label || ('الفترة ' + (i+1))}<br>من: ${r.from || ''} إلى: ${r.to || ''}</td></tr>`
-    ).join('')}
-    </table>
-    <table><tr><th>لا</th><th>نعم</th><th>تقييم المتدرب</th></tr>
-    ${EVAL_CRITERIA.map(c => {
-      const val = crit[c.key] || { yes: false, no: false };
-      return `<tr><td style="text-align:center;font-size:18px">${val.no ? '☑' : '☐'}</td><td style="text-align:center;font-size:18px">${val.yes ? '☑' : '☐'}</td><td>${c.label}</td></tr>`;
+
+    return `<!DOCTYPE html>
+<html dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>بطاقة تقييم التدريب</title>
+  <style>
+    @font-face {
+      font-family: 'Tifinagh';
+      src: local('Segoe UI Historic'), local('Noto Sans Tifinagh');
+    }
+    @page { margin: 10mm; }
+    body {
+      font-family: 'Traditional Arabic', 'Arial', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      color: #000;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .header-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .header-text {
+      text-align: center;
+      font-weight: bold;
+      font-size: 15px;
+    }
+    .header-tifinagh {
+      text-align: center;
+      font-weight: bold;
+      font-size: 14px;
+      font-family: 'Tifinagh', sans-serif;
+      direction: ltr;
+    }
+    .header-logo {
+      width: 90px;
+      height: 90px;
+      object-fit: contain;
+    }
+    h1 {
+      text-align: center;
+      font-size: 32px;
+      font-weight: bold;
+      margin: 10px 0 20px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 3px solid #000;
+      margin-bottom: 0;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 8px 12px;
+      text-align: center;
+      vertical-align: middle;
+      font-weight: bold;
+    }
+    .bg-yellow {
+      background-color: #FACC2E !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .notes-box {
+      border: 3px solid #000;
+      border-top: none;
+      min-height: 150px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      page-break-inside: avoid;
+    }
+    .notes-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .checkbox-cell {
+      font-size: 24px;
+      font-family: Arial, sans-serif;
+    }
+    .content-row td {
+      font-size: 15px;
+    }
+    .dotted-line {
+      border-bottom: 2px dotted #000;
+      margin: 20px 0;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-container">
+    <div class="header-text">
+      المملكة المغربية<br>
+      وزارة العدل<br>
+      محكمة الإستئناف الإدارية بفاس
+    </div>
+    <img src="${LOGO_BASE64}" class="header-logo" alt="Logo" />
+    <div class="header-tifinagh">
+      ⵜⴰⴳⵍⴷⵉⵜ ⵏ ⵍⵎⵖⵔⵉⴱ<br>
+      ⵜⴰⵎⴰⵡⵙⵜ ⵏ ⵜⵥⵔⴼⵜ<br>
+      ⵜⴰⵙⵏⴱⴹⴰⵢⵜ ⵏ ⵡⴰⵍⴰⵙ ⵜⴰⵎⵙⵙⵓⴳⵓⵔⵜ<br>
+      ⴷⵉ ⴼⴰⵙ
+    </div>
+  </div>
+
+  <h1>بطاقة تقييم التدريب</h1>
+
+  <table>
+    <tr class="bg-yellow">
+      <td style="width: 15%;">الاسم الكامل</td>
+      <td style="width: 35%; background-color: #fff !important;">${intern?.name || ''}</td>
+      <td style="width: 15%;">مقر التدريب</td>
+      <td style="width: 35%;">كتابة الضبط بمحكمة الاستئناف الإدارية بفاس</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="font-size: 22px;">فترة التدريب المطلوبة</td>
+      <td colspan="2" style="text-align: center; font-size: 18px; direction: rtl;">
+        <div style="display: flex; justify-content: center; gap: 30px;">
+          <span>من: ${pFrom || '...................'}</span>
+          <span>إلى: ${pTo || '...................'}</span>
+        </div>
+      </td>
+    </tr>
+    <tr class="bg-yellow">
+      <td colspan="4" style="font-size: 20px;">معلومات عن التدريب</td>
+    </tr>
+    <tr class="bg-yellow content-row">
+      <td>الفترة</td>
+      <td>الشعبة</td>
+      <td colspan="2">المشرف على التكوين</td>
+    </tr>
+    ${(rots.length > 0 ? rots : [{ supervisor: '', department: '', from: '', to: '' }]).map((r: any, i: number) => {
+      return `
+      <tr class="content-row">
+        <td>
+          الفترة ${i+1}<br>
+          من: ${r.from || '...................'} إلى: ${r.to || '...................'}
+        </td>
+        <td>${r.department || '<br>'}</td>
+        <td colspan="2">${r.supervisor || '<br>'}</td>
+      </tr>`;
     }).join('')}
-    </table>
-    <div class="section" style="padding:8px;margin-bottom:8px;text-align:center;background:#e8e8e8;font-weight:700">ملاحظات</div>
-    <div class="notes">${comments || ''}</div>
-    <div class="signature">توقيع المسؤول الإداري: ........................................</div>
-    </body></html>`;
-    printHTML(html);
+    
+    <tr class="bg-yellow content-row">
+      <td colspan="2">تقييم المتدرب</td>
+      <td style="width: 10%;">نعم</td>
+      <td style="width: 10%;">لا</td>
+    </tr>
+    ${EVAL_CRITERIA.map((c, i) => {
+      const val = crit[c.key] || { yes: false, no: false };
+      return `
+      <tr class="content-row">
+        ${i === 0 ? `<td rowspan="${EVAL_CRITERIA.length}" style="width: 20%; font-size: 18px;">المهارات السلوكية والعملية</td>` : ''}
+        <td ${i === 0 ? 'style="width: 60%;"' : ''}>${c.label}</td>
+        <td class="checkbox-cell">${val.yes ? '☑' : '☐'}</td>
+        <td class="checkbox-cell">${val.no ? '☑' : '☐'}</td>
+      </tr>`;
+    }).join('')}
+  </table>
+  
+  <div class="notes-box">
+    <div class="notes-header">
+      <span>ملاحظات</span>
+      <span>توقيع المسؤول الإداري</span>
+    </div>
+    <div style="font-weight: normal; margin-top: 15px; flex-grow: 1; white-space: pre-wrap;">${comments || ''}</div>
+    ${!comments ? `
+    <div class="dotted-line"></div>
+    <div class="dotted-line"></div>
+    <div class="dotted-line"></div>
+    ` : ''}
+  </div>
+</body>
+</html>`;
+  };
+
+  const handlePrintEval = () => {
+    printHTML(generateEvalHtml());
   };
 
   const printHTML = (html: string) => {
@@ -518,6 +677,89 @@ export function Profile() {
         cleanup();
       }, 400);
     };
+  };
+
+  const handleDownloadWord = async () => {
+    try {
+      const ev = intern?.evaluation || {};
+      const crit = evalCriteria || ev.criteria || {};
+      const rots = evalRotations.length > 0 ? evalRotations : (ev.rotations || []);
+      const pFrom = evalPeriodFrom || ev.period_from || '';
+      const pTo = evalPeriodTo || ev.period_to || '';
+      const comments = evalComments || ev.comments || '';
+
+      const res = await fetch('/evaluation_template.docx');
+      if (!res.ok) throw new Error('Template not found');
+      const blob = await res.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+
+      const zip = new PizZip(arrayBuffer);
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+
+      const getRot = (idx: number) => rots[idx] || { supervisor: '', department: '', from: '', to: '' };
+      
+      doc.render({
+        name: intern?.name || '',
+        from: pFrom,
+        to: pTo,
+        sup1: getRot(0).supervisor,
+        dep1: getRot(0).department,
+        f1: getRot(0).from,
+        t1: getRot(0).to,
+        sup2: getRot(1).supervisor,
+        dep2: getRot(1).department,
+        f2: getRot(1).from,
+        t2: getRot(1).to,
+        sup3: getRot(2).supervisor,
+        dep3: getRot(2).department,
+        f3: getRot(2).from,
+        t3: getRot(2).to,
+        sup4: getRot(3).supervisor,
+        dep4: getRot(3).department,
+        f4: getRot(3).from,
+        t4: getRot(3).to,
+        
+        c1_no: crit['punctuality']?.no ? '☑' : '☐',
+        c1_yes: crit['punctuality']?.yes ? '☑' : '☐',
+        c2_no: crit['skills']?.no ? '☑' : '☐',
+        c2_yes: crit['skills']?.yes ? '☑' : '☐',
+        c3_no: crit['conduct']?.no ? '☑' : '☐',
+        c3_yes: crit['conduct']?.yes ? '☑' : '☐',
+        c4_no: crit['seriousness']?.no ? '☑' : '☐',
+        c4_yes: crit['seriousness']?.yes ? '☑' : '☐',
+        
+        notes: comments,
+      });
+
+      const out = doc.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+      saveAs(out, `بطاقة_تقييم_${intern?.name || 'متدرب'}.docx`);
+    } catch (err) {
+      console.error(err);
+      toast.error('حدث خطأ أثناء إنشاء ملف Word');
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    const html = generateEvalHtml();
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    
+    const opt = {
+      margin: 10,
+      filename: `بطاقة_تقييم_${intern?.name || 'متدرب'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(container).save();
   };
 
   const handleReject = async () => {
@@ -936,9 +1178,17 @@ export function Profile() {
                       <Eye size={14} /> معاينة الموقع
                     </a>
                   )}
-                  <button className="btn btn-ghost sm" onClick={handlePrintEval} style={{fontSize:12}}>
-                    <DownloadSimple size={14} /> طباعة البطاقة
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button className="btn btn-ghost sm" onClick={handlePrintEval} style={{fontSize:12}}>
+                      <DownloadSimple size={14} /> طباعة البطاقة
+                    </button>
+                    <button className="btn btn-ghost sm" onClick={handleDownloadWord} title="تحميل DOCX" style={{fontSize:12, color:'#2b579a'}}>
+                      <FileDoc size={14} /> DOCX
+                    </button>
+                    <button className="btn btn-ghost sm" onClick={handleDownloadPdf} title="تحميل PDF" style={{fontSize:12, color:'#d32f2f'}}>
+                      <FilePdf size={14} /> PDF
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1080,11 +1330,13 @@ export function Profile() {
 
               <TextArea label="ملاحظات" value={evalComments} onChange={e => setEvalComments(e.target.value)} placeholder="ملاحظات..." />
             </div>
-            <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={() => setShowEvalForm(false)}>إلغاء</button>
-              <button className="btn btn-ink" onClick={saveEvaluation} disabled={savingEval}>
-                {savingEval ? 'جاري الحفظ...' : 'حفظ التقييم'}
-              </button>
+            <div className="modal-foot" style={{justifyContent: 'flex-end'}}>
+              <div style={{display:'flex', gap:8}}>
+                <button className="btn btn-ghost" onClick={() => setShowEvalForm(false)}>إلغاء</button>
+                <button className="btn btn-ink" onClick={saveEvaluation} disabled={savingEval}>
+                  {savingEval ? 'جاري الحفظ...' : 'حفظ التقييم'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
