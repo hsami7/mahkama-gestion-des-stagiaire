@@ -184,6 +184,7 @@ export function Profile() {
   const [evalComments, setEvalComments] = useState('');
   const [savingEval, setSavingEval] = useState(false);
   const [uploadingSigned, setUploadingSigned] = useState(false);
+  const [signedUploaded, setSignedUploaded] = useState(false);
 
   // Calculate duration whenever dates change
   useEffect(() => {
@@ -436,6 +437,7 @@ export function Profile() {
       const res = await api.post(`/interns/${id}/evaluation/signed-upload`, fd);
       const ev = { ...(intern?.evaluation || {}), signed_file_path: res.signed_file_path };
       setIntern({ ...intern, evaluation: ev });
+      setSignedUploaded(true);
       toast.success('تم رفع النسخة الموقعة');
     } catch { toast.error('فشل رفع النسخة الموقعة'); }
     finally { setUploadingSigned(false); }
@@ -654,143 +656,143 @@ export function Profile() {
           <div style={{marginBottom:16}}>
             <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--gold-dark)'}}>المستندات المطلوبة من المتدرب</h4></div>
             {['CIN','CV','INSURANCE','DEMANDE'].filter(t => !['CONVENTION_SIGNED','ATTESTATION_SIGNED'].includes(t)).length === 0 && <div/>}
-            <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
-              <thead>
-                <tr style={{borderBottom:'1px solid var(--line)'}}>
-                  <th style={{textAlign:'right', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
-                  <th style={{textAlign:'center', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
-                  <th style={{textAlign:'center', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>تاريخ الرفع</th>
-                  <th style={{textAlign:'left', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
-                </tr>
-              </thead>
-              <tbody>
-                {['CIN','CV','INSURANCE','DEMANDE'].map(dt => {
-                  const d = docsLifecycle.find(x => x.doc_type === dt);
-                  if (!d) return null;
-                  return (
-                    <tr key={dt} style={{borderBottom:'1px solid var(--line)'}}>
-                      <td style={{padding:'8px 4px'}}>
-                        <div style={{fontWeight:600, color:'var(--ink)'}}>{DOC_TYPE_LABELS[dt]}</div>
-                        {d?.rejection_reason && d.status === 'REVISION_REQUESTED' && (
-                          <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
-                            <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
+                <thead>
+                  <tr style={{borderBottom:'1px solid var(--line)'}}>
+                    <th style={{textAlign:'right', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
+                    <th style={{textAlign:'center', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
+                    <th style={{textAlign:'center', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>تاريخ الرفع</th>
+                    <th style={{textAlign:'left', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {['CIN','CV','INSURANCE','DEMANDE'].map(dt => {
+                    const d = docsLifecycle.find(x => x.doc_type === dt);
+                    if (!d) return null;
+                    return (
+                      <tr key={dt} style={{borderBottom:'1px solid var(--line)'}}>
+                        <td style={{padding:'10px 8px'}}>
+                          <div style={{fontWeight:600, color:'var(--ink)'}}>{DOC_TYPE_LABELS[dt]}</div>
+                          {d?.rejection_reason && d.status === 'REVISION_REQUESTED' && (
+                            <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
+                              <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{textAlign:'center', padding:'10px 8px'}}>
+                          {!d || d.status === 'MISSING' ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>غير مرفوع</span> :
+                           d.status === 'PENDING_REVIEW' ? <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span> :
+                           d.status === 'APPROVED_AND_SIGNED' ? <span className="badge badge-success" style={{fontSize:11}}>مقبول</span> :
+                           d.status === 'REVISION_REQUESTED' ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> : null}
+                        </td>
+                        <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)'}}>
+                          {d?.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                        </td>
+                        <td style={{textAlign:'left', padding:'10px 8px'}}>
+                          <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                            {d?.file_path && (
+                              <>
+                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                  <Eye size={14} />
+                                </button>
+                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                  <DownloadSimple size={14} />
+                                </button>
+                              </>
+                            )}
+                            {d && d.status !== 'MISSING' && (
+                              <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                                <ArrowsClockwise size={14} />
+                              </button>
+                            )}
+                            {d?.status === 'PENDING_REVIEW' && (
+                              <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                                <CheckCircle size={14} />
+                              </button>
+                            )}
                           </div>
-                        )}
-                      </td>
-                      <td style={{textAlign:'center', padding:'8px 4px'}}>
-                        {!d || d.status === 'MISSING' ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>غير مرفوع</span> :
-                         d.status === 'PENDING_REVIEW' ? <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span> :
-                         d.status === 'APPROVED_AND_SIGNED' ? <span className="badge badge-success" style={{fontSize:11}}>مقبول</span> :
-                         d.status === 'REVISION_REQUESTED' ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> : null}
-                      </td>
-                      <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
-                        {d?.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
-                      </td>
-                      <td style={{textAlign:'left', padding:'8px 4px'}}>
-                        <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                          {d?.file_path && (
-                            <>
-                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                <Eye size={14} />
-                              </button>
-                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                <DownloadSimple size={14} />
-                              </button>
-                            </>
-                          )}
-                          {d && d.status !== 'MISSING' && (
-                            <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                              <ArrowsClockwise size={14} />
-                            </button>
-                          )}
-                          {d?.status === 'PENDING_REVIEW' && (
-                            <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                              <CheckCircle size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
           </div>
 
           {/* Section 2: الوثائق الموقعة من الإدارة (Outgoing Signed Docs) */}
           <div style={{marginBottom:16}}>
             <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--success)'}}>وثائق من الإدارة</h4></div>
-            <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
-              <thead>
-                <tr style={{borderBottom:'1px solid var(--line)'}}>
-                  <th style={{textAlign:'right', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>الوثيقة</th>
-                  <th style={{textAlign:'center', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>تاريخ الإرسال</th>
-                  <th style={{textAlign:'left', padding:'6px 4px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
-                </tr>
-              </thead>
-              <tbody>
-                  {(() => {
-                    const signedDocs = docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED' && (d.uploaded_by === 'ADMIN' || d.doc_type === 'CONVENTION_SIGNED') && !d.requires_return);
-                    const returnDocs = docsLifecycle.filter(d => d.requires_return === true);
-                    const hasAny = signedDocs.length > 0 || returnDocs.length > 0;
-                    if (!hasAny) {
-                      return <tr><td colSpan={3} style={{textAlign:'center', padding:'16px 4px', color:'var(--slate-light)'}}>لم يتم إصدار أي وثائق بعد</td></tr>;
-                    }
-                    return <>
-                      {returnDocs.map(d => (
-                        <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
-                          <td style={{padding:'8px 4px', fontWeight:600}}>
-                            {sanitizeTitle(d.label)}
-                            <div style={{marginTop:4}}>
-                              {d.returned_file_path ? (
-                                <span style={{display:'inline-flex', alignItems:'center', gap:3, background:'#E7F8EE', color:'#15803D', fontSize:10.5, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
-                                  <CheckCircle size={10} weight="fill" /> تم إرجاع النسخة المعبأة
-                                </span>
-                              ) : (
-                                <span style={{display:'inline-flex', alignItems:'center', gap:3, background:'#FEF3C7', color:'#B45309', fontSize:10.5, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
-                                  يتطلب التعبئة
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
-                            {formatDate(d.updated_at)}
-                          </td>
-                          <td style={{textAlign:'left', padding:'8px 4px'}}>
-                            <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                              {d.file_path && !d.returned_file_path && (
-                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                                  <DownloadSimple size={14} /> تحميل النموذج
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
+                <thead>
+                  <tr style={{borderBottom:'1px solid var(--line)'}}>
+                    <th style={{textAlign:'right', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>الوثيقة</th>
+                    <th style={{textAlign:'center', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>تاريخ الإرسال</th>
+                    <th style={{textAlign:'left', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                    {(() => {
+                      const signedDocs = docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED' && (d.uploaded_by === 'ADMIN' || d.doc_type === 'CONVENTION_SIGNED') && !d.requires_return);
+                      const returnDocs = docsLifecycle.filter(d => d.requires_return === true);
+                      const hasAny = signedDocs.length > 0 || returnDocs.length > 0;
+                      if (!hasAny) {
+                        return <tr><td colSpan={3} style={{textAlign:'center', padding:'16px 8px', color:'var(--slate-light)'}}>لم يتم إصدار أي وثائق بعد</td></tr>;
+                      }
+                      return <>
+                        {returnDocs.map(d => (
+                          <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
+                            <td style={{padding:'10px 8px', fontWeight:600}}>
+                              {sanitizeTitle(d.label)}
+                              <div style={{marginTop:6}}>
+                                {d.returned_file_path ? (
+                                  <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
+                                    <CheckCircle size={11} weight="fill" /> تم إرجاع النسخة المعبأة
+                                  </span>
+                                ) : (
+                                  <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#FEF3C7', color:'#B45309', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
+                                    يتطلب التعبئة
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)'}}>
+                              {formatDate(d.updated_at)}
+                            </td>
+                            <td style={{textAlign:'left', padding:'10px 8px'}}>
+                              <div style={{display:'flex', gap:6, justifyContent:'flex-end'}}>
+                                {d.file_path && !d.returned_file_path && (
+                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} style={{padding:'6px 12px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                    <DownloadSimple size={14} /> تحميل النموذج
+                                  </button>
+                                )}
+                                {d.returned_file_path && (
+                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} style={{padding:'6px 12px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                    <Eye size={14} /> معاينة
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {signedDocs.map(d => (
+                          <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
+                            <td style={{padding:'10px 8px', fontWeight:600}}>{sanitizeTitle(d.label)}</td>
+                            <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)'}}>
+                              {formatDate(d.updated_at)}
+                            </td>
+                            <td style={{textAlign:'left', padding:'10px 8px'}}>
+                              <div style={{display:'flex', gap:6, justifyContent:'flex-end'}}>
+                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} style={{padding:'6px 12px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                  <DownloadSimple size={14} /> تحميل
                                 </button>
-                              )}
-                              {d.returned_file_path && (
-                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                                  <Eye size={14} /> معاينة
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {signedDocs.map(d => (
-                        <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
-                          <td style={{padding:'8px 4px', fontWeight:600}}>{sanitizeTitle(d.label)}</td>
-                          <td style={{textAlign:'center', padding:'8px 4px', color:'var(--slate)'}}>
-                            {formatDate(d.updated_at)}
-                          </td>
-                          <td style={{textAlign:'left', padding:'8px 4px'}}>
-                            <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                                <DownloadSimple size={14} /> تحميل
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </>;
-                  })()}
-              </tbody>
-            </table>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </>;
+                    })()}
+                </tbody>
+              </table>
           </div>
 
           {/* Section 3: ختام التدريب والأرشيف (Exit Docs) — visible only after documents are uploaded */}
@@ -868,11 +870,6 @@ export function Profile() {
             </div>
             {canEvaluateInterns && (
               <div style={{display:'flex', gap:8}}>
-                {intern.evaluation?.signed_file_path && (
-                  <a href={intern.evaluation.signed_file_path} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'8px 14px', fontSize:12}}>
-                    <Eye size={14} /> معاينة الموقع
-                  </a>
-                )}
                 <button className="btn btn-primary" onClick={openEvalForm} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px' }}>
                   <ClipboardText size={18} weight="fill" /> {intern.evaluation?.criteria ? 'تعديل التقييم' : 'تقييم المتدرب'}
                 </button>
@@ -922,13 +919,24 @@ export function Profile() {
               )}
               <div style={{fontSize:11.5, color:'var(--slate)'}}>بواسطة: {intern.evaluation.evaluator} · {formatDate(intern.evaluation.date)}</div>
               {canEvaluateInterns && (
-                <div style={{marginTop:12}}>
-                  <label className="btn btn-ghost sm" style={{cursor:'pointer', fontSize:12, display:'inline-flex', alignItems:'center', gap:6}}>
-                    <UploadSimple size={14} />
-                    {uploadingSigned ? 'جاري الرفع...' : 'رفع النسخة الموقعة (PDF)'}
-                    <input type="file" accept=".pdf" style={{display:'none'}} onChange={handleUploadSigned} disabled={uploadingSigned} />
-                  </label>
-                  <button className="btn btn-ghost sm" onClick={handlePrintEval} style={{marginRight:8, fontSize:12}}>
+                <div style={{marginTop:12, display:'flex', gap:8, alignItems:'center'}}>
+                  {(intern.evaluation?.signed_file_path || signedUploaded) ? (
+                    <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:12, fontWeight:600, color:'var(--success)'}}>
+                      <CheckCircle size={15} weight="fill" /> تم رفع النسخة الموقعة
+                    </span>
+                  ) : (
+                    <label className="btn btn-ghost sm" style={{cursor:'pointer', fontSize:12, display:'inline-flex', alignItems:'center', gap:6, border: uploadingSigned ? '1px dashed var(--gold)' : undefined}}>
+                      <UploadSimple size={14} />
+                      {uploadingSigned ? 'جاري الرفع...' : 'رفع النسخة الموقعة (PDF)'}
+                      <input type="file" accept=".pdf" style={{display:'none'}} onChange={handleUploadSigned} disabled={uploadingSigned} />
+                    </label>
+                  )}
+                  {intern.evaluation?.signed_file_path && (
+                    <a href={intern.evaluation.signed_file_path} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'6px 12px', fontSize:12, display:'inline-flex', alignItems:'center', gap:4}}>
+                      <Eye size={14} /> معاينة الموقع
+                    </a>
+                  )}
+                  <button className="btn btn-ghost sm" onClick={handlePrintEval} style={{fontSize:12}}>
                     <DownloadSimple size={14} /> طباعة البطاقة
                   </button>
                 </div>
