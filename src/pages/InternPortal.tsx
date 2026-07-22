@@ -416,15 +416,19 @@ export function InternPortal() {
               </div>
 
               {/* Revision requests banner */}
-              {lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length > 0 && (
-                <div style={{background:'#FFF6E5', border:'1.5px solid #F2D49B', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:12.5, color:'#9A6B00', fontWeight:600}}>
-                  {lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).map(d => (
-                    <div key={d.id} style={{marginTop:d.rejection_reason ? 6 : 0}}>
-                      <Warning size={14} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة: {d.label} — {d.rejection_reason}
-                    </div>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                const reqDocs = lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason && ['CIN','CV','INSURANCE','DEMANDE'].includes(d.doc_type));
+                if (reqDocs.length === 0) return null;
+                return (
+                  <div style={{background:'#FFF6E5', border:'1.5px solid #F2D49B', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:12.5, color:'#9A6B00', fontWeight:600}}>
+                    {reqDocs.map(d => (
+                      <div key={d.id} style={{marginTop:d.rejection_reason ? 6 : 0}}>
+                        <Warning size={14} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة: {d.label || DOC_TYPE_LABELS[d.doc_type as keyof typeof DOC_TYPE_LABELS]} — {d.rejection_reason}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
 
               <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
                 <thead>
@@ -480,6 +484,22 @@ export function InternPortal() {
               <div className="section-title" style={{marginBottom:16}}>
                 <h3 style={{fontSize:15, margin:0, color:'var(--danger)'}}>وثائق نهاية التدريب</h3>
               </div>
+              
+              {/* Revision requests banner for FINAL_REPORT */}
+              {(() => {
+                const reqDocs = lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason && d.doc_type === 'FINAL_REPORT');
+                if (reqDocs.length === 0) return null;
+                return (
+                  <div style={{background:'#FFF6E5', border:'1.5px solid #F2D49B', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:12.5, color:'#9A6B00', fontWeight:600}}>
+                    {reqDocs.map(d => (
+                      <div key={d.id} style={{marginTop:d.rejection_reason ? 6 : 0}}>
+                        <Warning size={14} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة: {d.label || DOC_TYPE_LABELS[d.doc_type as keyof typeof DOC_TYPE_LABELS]} — {d.rejection_reason}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
               <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
                 <thead>
                   <tr style={{borderBottom:'1px solid var(--line)'}}>

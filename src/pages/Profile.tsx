@@ -1564,7 +1564,7 @@ export function Profile() {
             <div className="modal-body">
               <div className="form-group">
                 <label>سبب طلب إعادة الرفع</label>
-                <textarea className="input" rows={4} value={revisionReason} onChange={e => setRevisionReason(e.target.value)} placeholder="يرجى توضيح سبب طلب إعادة الرفع للمتدرب..." style={{resize:'vertical'}} />
+                <TextArea value={revisionReason} onChange={e => setRevisionReason(e.target.value)} placeholder="يرجى توضيح سبب طلب إعادة الرفع للمتدرب..." />
                 <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>سيظهر السبب للمتدرب في لوحة المستندات الخاصة به</small>
               </div>
             </div>

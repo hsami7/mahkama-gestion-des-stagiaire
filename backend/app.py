@@ -2021,18 +2021,52 @@ def export_intern_zip(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
-    import tempfile, zipfile
-    docs = DocumentLifecycle.query.filter_by(intern_id=intern_id).filter(
-        DocumentLifecycle.file_path.isnot(None)
-    ).all()
+    import tempfile, zipfile, json
+    
+    docs = DocumentLifecycle.query.filter_by(intern_id=intern_id).all()
+    
+    old_docs = {}
+    if intern.documents:
+        try:
+            old_docs = json.loads(intern.documents)
+        except:
+            pass
+
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
     with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zf:
+        added_files = set()
+        
+        # Add old documents
+        for k, v in old_docs.items():
+            if v and isinstance(v, str):
+                fname = v.replace('/api/uploads/', '').replace('/', '')
+                fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+                if os.path.exists(fpath):
+                    arcname = f"old_{k}_{fname}"
+                    if arcname not in added_files:
+                        zf.write(fpath, arcname)
+                        added_files.add(arcname)
+        
+        # Add lifecycle documents
         for d in docs:
-            fname = d.file_path.replace('/api/uploads/', '').replace('/', '')
-            fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
-            if os.path.exists(fpath):
-                arcname = f"{d.doc_type or 'doc'}_{d.id}_{fname}"
-                zf.write(fpath, arcname)
+            if d.file_path:
+                fname = d.file_path.replace('/api/uploads/', '').replace('/', '')
+                fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+                if os.path.exists(fpath):
+                    arcname = f"{d.doc_type or 'doc'}_{d.id}_{fname}"
+                    if arcname not in added_files:
+                        zf.write(fpath, arcname)
+                        added_files.add(arcname)
+            
+            if d.returned_file_path:
+                fname = d.returned_file_path.replace('/api/uploads/', '').replace('/', '')
+                fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+                if os.path.exists(fpath):
+                    arcname = f"Returned_{d.doc_type or 'doc'}_{d.id}_{fname}"
+                    if arcname not in added_files:
+                        zf.write(fpath, arcname)
+                        added_files.add(arcname)
+                        
     tmp.close()
     return send_file(tmp.name, as_attachment=True, download_name=f"Intern_{intern_id}_Archive.zip", mimetype='application/zip')
 
