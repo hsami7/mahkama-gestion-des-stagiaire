@@ -212,16 +212,7 @@ export function Dashboard() {
     }
   };
 
-  const handleReject = async (id: number, reason: string) => {
-    try {
-      await api.post(`/submissions/${id}/reject`, { reason });
-      toast.success('تم رفض الطلب');
-      setSelectedSub(null);
-      loadSubmissions();
-    } catch (e) {
-      toast.error('حدث خطأ أثناء الرفض');
-    }
-  };
+  // Old handleReject removed, handled below
 
   const handleSync = async () => {
     setSyncing(true);
@@ -240,7 +231,69 @@ export function Dashboard() {
     }
   };
 
-  const pendingCount = interns.filter(i => i.status === 'قيد المراجعة').length;
+  // --- UNIFIED PENDING TABLE LOGIC ---
+  const pendingInterns = interns.filter(i => i.status === 'قيد المراجعة');
+  
+  const unifiedPending = [
+    ...submissions.map(sub => {
+      const data = sub.submitted_data || {};
+      const nameField = Object.entries(data).find(([k]) => /اسم|name/i.test(k));
+      const emailField = Object.entries(data).find(([k]) => /بريد|email/i.test(k));
+      return {
+        type: 'submission',
+        id: sub.id,
+        name: nameField ? String(nameField[1]) : `طلب #${sub.id}`,
+        email: emailField ? String(emailField[1]) : '',
+        source: sub.form_title || 'نموذج جوجل',
+        date: sub.submitted_at,
+        raw: sub
+      };
+    }),
+    ...pendingInterns.map(intern => ({
+      type: 'intern',
+      id: intern.id,
+      name: intern.name,
+      email: intern.email || '',
+      source: 'إضافة يدوية',
+      date: intern.start_date || '', // fallback
+      raw: intern
+    }))
+  ];
+
+  const handleApproveUnified = async (item: any) => {
+    try {
+      if (item.type === 'submission') {
+        await api.post(`/submissions/${item.id}/approve`, {});
+        toast.success('تمت الموافقة وإنشاء ملف المتدرب');
+      } else {
+        await api.put(`/interns/${item.id}`, { status: 'نشط' });
+        toast.success('تم تنشيط ملف المتدرب');
+      }
+      loadInterns();
+      loadSubmissions();
+    } catch (e) {
+      toast.error('حدث خطأ أثناء القبول');
+    }
+  };
+
+  const handleRejectUnifiedSubmit = async (item: any, reason: string) => {
+    try {
+      if (item.type === 'submission') {
+        await api.post(`/submissions/${item.id}/reject`, { reason });
+      } else {
+        await api.put(`/interns/${item.id}`, { status: 'مرفوض' });
+      }
+      toast.success('تم رفض الطلب');
+      setSelectedSub(null); 
+      loadInterns();
+      loadSubmissions();
+    } catch (e) {
+      toast.error('حدث خطأ أثناء الرفض');
+    }
+  };
+  // -----------------------------------
+
+  const pendingCount = pendingInterns.length;
   const missingCount = interns.filter(i => i.status === 'مستندات ناقصة').length;
   const activeCount = interns.filter(i => i.status === 'نشط').length;
   const totalCount = interns.length;
@@ -342,11 +395,11 @@ export function Dashboard() {
               </div>
               <div>
                 <h2 style={{ margin: 0, fontSize: '1.1rem' }}>طلبات التسجيل المعلقة</h2>
-                <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>من نموذج التسجيل العام (Google Forms)</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>نماذج جوجل والطلبات اليدوية قيد المراجعة</div>
               </div>
-              {submissions.length > 0 && (
+              {unifiedPending.length > 0 && (
                 <span style={{ background: 'var(--warning)', color: '#fff', borderRadius: 12, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
-                  {submissions.length}
+                  {unifiedPending.length}
                 </span>
               )}
               <button 
@@ -380,57 +433,67 @@ export function Dashboard() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: submissions.length > 0 ? '1fr 260px' : '1fr', gap: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: unifiedPending.length > 0 ? '1fr 260px' : '1fr', gap: 24 }}>
             {/* Submissions table */}
             <div style={{ position: 'relative', overflow: 'visible' }}>
               <table>
                 <thead>
                   <tr>
                     <th>مقدم الطلب</th>
-                    <th>النموذج</th>
-                    <th>تاريخ التقديم</th>
+                    <th>المصدر</th>
+                    <th>التاريخ</th>
                     <th>الإجراء</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {submissions.map(sub => {
-                    const data = sub.submitted_data || {};
-                    const nameField = Object.entries(data).find(([k]) => /اسم|name/i.test(k));
-                    const emailField = Object.entries(data).find(([k]) => /بريد|email/i.test(k));
-                    const displayName = nameField ? String(nameField[1]) : `طلب #${sub.id}`;
-                    const displayEmail = emailField ? String(emailField[1]) : '';
-                    return (
-                      <tr key={sub.id}>
-                        <td>
-                          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gold)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}>
-                              {displayName.charAt(0)}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: '0.9rem' }}>{displayName}</div>
-                              {displayEmail && <div style={{ fontSize: '0.75rem', color: 'var(--slate)' }}>{displayEmail}</div>}
-                            </div>
+                  {unifiedPending.map(item => (
+                    <tr key={`${item.type}-${item.id}`}>
+                      <td>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gold)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}>
+                            {item.name.charAt(0)}
                           </div>
-                        </td>
-                        <td style={{ fontSize: '0.85rem', color: 'var(--slate)' }}>{sub.form_title || '—'}</td>
-                        <td style={{ fontSize: '0.85rem', color: 'var(--slate)', whiteSpace: 'nowrap' }}>{formatSubmittedAt(sub.submitted_at)}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn btn-ghost sm" onClick={() => setSelectedSub(sub)}>
-                              <Eye size={14} /> عرض
-                            </button>
-                            <button className="btn btn-gold sm" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => handleApprove(sub.id)}>
-                              <CheckCircle size={14} weight="fill" /> قبول
-                            </button>
-                            <button className="btn btn-ghost sm" style={{ color: 'var(--danger)' }} onClick={() => { setSelectedSub(sub); }}>
-                              <X size={14} /> رفض
-                            </button>
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: '0.9rem' }}>{item.name}</div>
+                            {item.email && <div style={{ fontSize: '0.75rem', color: 'var(--slate)' }}>{item.email}</div>}
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {submissions.length === 0 && (
+                        </div>
+                      </td>
+                      <td style={{ fontSize: '0.85rem', color: 'var(--slate)' }}>
+                        <span style={{ background: item.type === 'submission' ? '#F0FDF4' : '#EFF6FF', color: item.type === 'submission' ? '#166534' : '#1E40AF', padding: '2px 8px', borderRadius: 12, fontSize: '0.75rem' }}>
+                          {item.source}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '0.85rem', color: 'var(--slate)', whiteSpace: 'nowrap' }}>{formatSubmittedAt(item.date)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-ghost sm" onClick={() => {
+                            if (item.type === 'submission') setSelectedSub(item.raw);
+                            // For interns, open the edit profile modal
+                            else setEditingIntern(item.raw);
+                          }}>
+                            <Eye size={14} /> عرض
+                          </button>
+                          <button className="btn btn-gold sm" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => handleApproveUnified(item)}>
+                            <CheckCircle size={14} weight="fill" /> قبول
+                          </button>
+                          <button className="btn btn-ghost sm" style={{ color: 'var(--danger)' }} onClick={() => {
+                            if (item.type === 'submission') {
+                              setSelectedSub(item.raw); // The modal will call handleRejectUnifiedSubmit
+                            } else {
+                              const reason = window.prompt('سبب الرفض (اختياري):');
+                              if (reason !== null) {
+                                handleRejectUnifiedSubmit(item, reason);
+                              }
+                            }
+                          }}>
+                            <X size={14} /> رفض
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {unifiedPending.length === 0 && (
                     <tr>
                       <td colSpan={4} style={{ textAlign: 'center', color: 'var(--slate)', padding: '28px 0' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
@@ -641,7 +704,10 @@ export function Dashboard() {
           sub={selectedSub}
           onClose={() => setSelectedSub(null)}
           onApprove={handleApprove}
-          onReject={handleReject}
+          onReject={(id, reason) => {
+            const item = unifiedPending.find(i => i.type === 'submission' && i.id === id);
+            if (item) handleRejectUnifiedSubmit(item, reason);
+          }}
         />
       )}
     </div>
