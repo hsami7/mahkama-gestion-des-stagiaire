@@ -260,15 +260,16 @@ export function FormBuilder() {
       </div>
 
       {/* Form title */}
-      <div className="card" style={{ padding: '16px 22px', marginBottom: 20 }}>
-        <label className="form-label">عنوان النموذج</label>
-        <input
-          type="text"
-          className="input"
-          value={formTitle}
-          onChange={e => setFormTitle(e.target.value)}
-          placeholder="مثال: نموذج تسجيل دفعة 2026"
-        />
+      <div className="card" style={{ padding: '22px', marginBottom: 20 }}>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label>عنوان النموذج</label>
+          <input
+            type="text"
+            value={formTitle}
+            onChange={e => setFormTitle(e.target.value)}
+            placeholder="مثال: نموذج تسجيل دفعة 2026"
+          />
+        </div>
       </div>
 
       {/* Generated link */}
