@@ -440,25 +440,6 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Decision helpers row */}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {availableSlotsHint && (
-                <div style={{ background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 8, padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <CheckCircle size={14} weight="fill" />
-                  {availableSlotsHint}
-                </div>
-              )}
-              {leastLoadedDept && (
-                <div style={{ background: 'var(--paper)', color: 'var(--slate)', border: '1px solid var(--line)', borderRadius: 8, padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Buildings size={14} />
-                  أقل قسم مكتظاً: <strong style={{ color: 'var(--ink)' }}>{leastLoadedDept[0]}</strong>
-                </div>
-              )}
-              <div style={{ background: 'var(--paper)', color: 'var(--slate)', border: '1px solid var(--line)', borderRadius: 8, padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <BookOpen size={14} />
-                متدربون نشطون: <strong style={{ color: 'var(--ink)' }}>{activeCount}</strong>
-              </div>
-            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: unifiedPending.length > 0 ? '1fr 260px' : '1fr', gap: 24 }}>
