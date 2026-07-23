@@ -65,10 +65,11 @@ function CapacityChart({ interns }: { interns: any[] }) {
 }
 
 // Submission detail drawer
-function SubmissionDrawer({ sub, onClose, onApprove, onReject }: {
+function SubmissionDrawer({ sub, onClose, onApprove, onReject, isAdmin }: {
   sub: any, onClose: () => void,
   onApprove: (id: number) => void,
-  onReject: (id: number, reason: string) => void
+  onReject: (id: number, reason: string) => void,
+  isAdmin?: boolean
 }) {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
@@ -124,33 +125,35 @@ function SubmissionDrawer({ sub, onClose, onApprove, onReject }: {
           )}
         </div>
 
-        {!rejecting ? (
-          <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--line)' }}>
-            <button className="btn btn-gold" style={{ flex: 1, justifyContent: 'center' }} onClick={() => onApprove(sub.id)}>
-              <CheckCircle size={16} weight="fill" /> قبول وإنشاء ملف
-            </button>
-            <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center', color: 'var(--danger)' }} onClick={() => setRejecting(true)}>
-              <X size={16} /> رفض
-            </button>
-          </div>
-        ) : (
-          <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>سبب الرفض (اختياري)</label>
-            <textarea
-              className="input"
-              rows={3}
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              placeholder="اكتب سبب الرفض ليُرسل عبر البريد الإلكتروني..."
-              style={{ resize: 'vertical' }}
-            />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-ghost" style={{ color: 'var(--danger)', flex: 1, justifyContent: 'center' }} onClick={() => onReject(sub.id, reason)}>
-                <X size={16} /> تأكيد الرفض
+        {isAdmin && (
+          !rejecting ? (
+            <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+              <button className="btn btn-gold" style={{ flex: 1, justifyContent: 'center' }} onClick={() => onApprove(sub.id)}>
+                <CheckCircle size={16} weight="fill" /> قبول وإنشاء ملف
               </button>
-              <button className="btn btn-ghost sm" onClick={() => setRejecting(false)}>إلغاء</button>
+              <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center', color: 'var(--danger)' }} onClick={() => setRejecting(true)}>
+                <X size={16} /> رفض
+              </button>
             </div>
-          </div>
+          ) : (
+            <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>سبب الرفض (اختياري)</label>
+              <textarea
+                className="input"
+                rows={3}
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="اكتب سبب الرفض ليُرسل عبر البريد الإلكتروني..."
+                style={{ resize: 'vertical' }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost" style={{ color: 'var(--danger)', flex: 1, justifyContent: 'center' }} onClick={() => onReject(sub.id, reason)}>
+                  <X size={16} /> تأكيد الرفض
+                </button>
+                <button className="btn btn-ghost sm" onClick={() => setRejecting(false)}>إلغاء</button>
+              </div>
+            </div>
+          )
         )}
       </div>
     </div>
@@ -160,6 +163,11 @@ function SubmissionDrawer({ sub, onClose, onApprove, onReject }: {
 export function Dashboard() {
   const navigate = useNavigate();
   const toast = useToast();
+  
+  const userStr = sessionStorage.getItem('user') || localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const isAdmin = user?.role === 'Admin';
+
   const [interns, setInterns] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectedSub, setSelectedSub] = useState<any>(null);
@@ -225,13 +233,15 @@ export function Dashboard() {
         toast.info('لا توجد طلبات جديدة من جوجل');
       }
     } catch (e: any) {
-      toast.error(e.response?.data?.msg || 'حدث خطأ أثناء الاتصال بجوجل، تأكد من الإعدادات');
+      toast.error(e.message || 'حدث خطأ أثناء الاتصال بجوجل، تأكد من الإعدادات');
     } finally {
       setSyncing(false);
     }
   };
 
   const [syncingMs, setSyncingMs] = useState(false);
+  const [showCoverage, setShowCoverage] = useState(false);
+
   const handleSyncMicrosoft = async () => {
     setSyncingMs(true);
     try {
@@ -251,32 +261,15 @@ export function Dashboard() {
 
   // --- UNIFIED PENDING TABLE LOGIC ---
   const pendingInterns = interns.filter(i => i.status === 'قيد المراجعة');
-  
-  const unifiedPending = [
-    ...submissions.map(sub => {
-      const data = sub.submitted_data || {};
-      const nameField = Object.entries(data).find(([k]) => /اسم|name/i.test(k));
-      const emailField = Object.entries(data).find(([k]) => /بريد|email/i.test(k));
-      return {
-        type: 'submission',
-        id: sub.id,
-        name: nameField ? String(nameField[1]) : `طلب #${sub.id}`,
-        email: emailField ? String(emailField[1]) : '',
-        source: sub.form_title || 'نموذج جوجل',
-        date: sub.submitted_at,
-        raw: sub
-      };
-    }),
-    ...pendingInterns.map(intern => ({
-      type: 'intern',
-      id: intern.id,
-      name: intern.name,
-      email: intern.email || '',
-      source: 'إضافة يدوية',
-      date: intern.start_date || '', // fallback
-      raw: intern
-    }))
-  ];
+  const unifiedPending = pendingInterns.map(i => ({
+    id: i.id,
+    type: 'intern',
+    name: i.name,
+    email: i.email,
+    date: i.start_date || '',
+    source: i.source || 'إضافة يدوية',
+    raw: i
+  }));
 
   const handleApproveUnified = async (item: any) => {
     try {
@@ -420,7 +413,15 @@ export function Dashboard() {
                   {unifiedPending.length}
                 </span>
               )}
-              <div style={{ display: 'flex', gap: '8px', marginRight: '10px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginRight: '10px', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={() => setShowCoverage(true)} 
+                  className="btn btn-ghost sm" 
+                  style={{ fontSize: '0.8rem', border: '1px solid var(--line)' }}
+                >
+                  <ChartBar size={14} style={{ marginLeft: 4 }} />
+                  مخطط التغطية
+                </button>
                 <button 
                   onClick={handleSyncGoogle} 
                   disabled={syncing}
@@ -442,9 +443,9 @@ export function Dashboard() {
 
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: unifiedPending.length > 0 ? '1fr 260px' : '1fr', gap: 24 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {/* Submissions table */}
-            <div style={{ position: 'relative', overflow: 'visible' }}>
+            <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
                   <tr>
@@ -479,25 +480,29 @@ export function Dashboard() {
                           <button className="btn btn-ghost sm" onClick={() => {
                             if (item.type === 'submission') setSelectedSub(item.raw);
                             // For interns, open the edit profile modal
-                            else setEditingIntern(item.raw);
+                            navigate('/interns/' + item.id);
                           }}>
                             <Eye size={14} /> عرض
                           </button>
-                          <button className="btn btn-gold sm" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => handleApproveUnified(item)}>
-                            <CheckCircle size={14} weight="fill" /> قبول
-                          </button>
-                          <button className="btn btn-ghost sm" style={{ color: 'var(--danger)' }} onClick={() => {
-                            if (item.type === 'submission') {
-                              setSelectedSub(item.raw); // The modal will call handleRejectUnifiedSubmit
-                            } else {
-                              const reason = window.prompt('سبب الرفض (اختياري):');
-                              if (reason !== null) {
-                                handleRejectUnifiedSubmit(item, reason);
-                              }
-                            }
-                          }}>
-                            <X size={14} /> رفض
-                          </button>
+                          {isAdmin && (
+                            <>
+                              <button className="btn btn-gold sm" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => handleApproveUnified(item)}>
+                                <CheckCircle size={14} weight="fill" /> قبول
+                              </button>
+                              <button className="btn btn-ghost sm" style={{ color: 'var(--danger)' }} onClick={() => {
+                                if (item.type === 'submission') {
+                                  setSelectedSub(item.raw); // The modal will call handleRejectUnifiedSubmit
+                                } else {
+                                  const reason = window.prompt('سبب الرفض (اختياري):');
+                                  if (reason !== null) {
+                                    handleRejectUnifiedSubmit(item, reason);
+                                  }
+                                }
+                              }}>
+                                <X size={14} /> رفض
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -515,34 +520,6 @@ export function Dashboard() {
                 </tbody>
               </table>
             </div>
-
-            {/* Capacity chart */}
-            {submissions.length > 0 && (
-              <div style={{ borderRight: '1px solid var(--line)', paddingRight: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                  <ChartBar size={16} weight="fill" color="var(--gold-dark)" />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink)' }}>مخطط تغطية المتدربين</span>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--slate)', marginBottom: 10 }}>
-                  عدد المتدربين النشطين لكل قسم (يساعدك في تحديد القسم المناسب)
-                </div>
-                <CapacityChart interns={interns.filter(i => i.status === 'نشط')} />
-                <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 8, fontSize: '0.75rem', color: 'var(--slate)', lineHeight: 1.6 }}>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--success)' }} />
-                    طاقة منخفضة
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 2, background: '#F59E0B' }} />
-                    طاقة متوسطة
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--danger)' }} />
-                    مكتظ
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -717,8 +694,53 @@ export function Dashboard() {
             const item = unifiedPending.find(i => i.type === 'submission' && i.id === id);
             if (item) handleRejectUnifiedSubmit(item, reason);
           }}
+          isAdmin={isAdmin}
         />
       )}
+      {/* Coverage Modal */}
+      {showCoverage && (
+        <div className="modal-overlay" onClick={() => setShowCoverage(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ChartBar size={20} weight="fill" color="var(--gold-dark)" />
+                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>مخطط تغطية المتدربين</h3>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setShowCoverage(false)} style={{ padding: 4 }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ fontSize: '0.85rem', color: 'var(--slate)', marginBottom: 20 }}>
+              عدد المتدربين النشطين لكل قسم. يساعدك هذا المخطط في تحديد الأقسام التي تحتاج متدربين.
+            </div>
+            
+            <CapacityChart interns={interns.filter(i => i.status === 'نشط')} />
+            
+            <div style={{ marginTop: 24, padding: '12px 16px', background: 'var(--paper)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--slate)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--success)' }} />
+                طاقة منخفضة
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: '#F59E0B' }} />
+                طاقة متوسطة
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--danger)' }} />
+                مكتظ
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+              <button className="btn btn-ghost" onClick={() => setShowCoverage(false)}>
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -13,6 +13,10 @@ def get_settings():
                 data = json.load(f)
                 # Defaults
                 return {
+                    'google_sheet_link': data.get('google_sheet_link', ''),
+                    'microsoft_excel_link': data.get('microsoft_excel_link', ''),
+                    'google_client_id': data.get('google_client_id', ''),
+                    'google_client_secret': data.get('google_client_secret', ''),
                     'email_provider': data.get('email_provider', 'gmail'),
                     'gmail_address': data.get('gmail_address', ''),
                     'gmail_app_password': data.get('gmail_app_password', '')

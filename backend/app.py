@@ -84,6 +84,7 @@ class Intern(db.Model):
     department = db.Column(db.String(100), nullable=True)
     encadrant = db.Column(db.String(150), nullable=True)
     status = db.Column(db.String(50), default='قيد المراجعة')
+    source = db.Column(db.String(100), default='إضافة يدوية')
     photo_path = db.Column(db.String(255), nullable=True)
     phone = db.Column(db.String(50), nullable=True)
     start_date = db.Column(db.String(50), nullable=True)
@@ -497,8 +498,34 @@ def get_interns():
         "start_date": i.start_date,
         "end_date": i.end_date,
         "department": i.department,
+        "source": i.source,
         "has_final_report": DocumentLifecycle.query.filter_by(intern_id=i.id, doc_type='FINAL_REPORT').first() is not None
     } for i in interns])
+
+def create_user_for_intern(intern_obj):
+    if intern_obj.email:
+        existing_user = User.query.filter_by(email=intern_obj.email).first()
+        if not existing_user:
+            from werkzeug.security import generate_password_hash
+            hashed_pw = generate_password_hash('password123')
+            # Ensure unique username
+            base_username = intern_obj.email.split('@')[0]
+            username = base_username
+            counter = 1
+            while User.query.filter_by(username=username).first():
+                username = f"{base_username}{counter}"
+                counter += 1
+                
+            new_user = User(
+                username=username,
+                name=intern_obj.name or 'متدرب',
+                email=intern_obj.email,
+                password=hashed_pw,
+                role='Intern',
+                permissions=''
+            )
+            db.session.add(new_user)
+            db.session.commit()
 
 @app.route('/api/interns/<int:intern_id>', methods=['GET'])
 @jwt_required()
@@ -561,27 +588,15 @@ def add_intern():
         university=data.get('university'),
         address=data.get('address'),
         photo_path=data.get('photo_path'),
+        status=data.get('status', 'قيد المراجعة'),
+        source='إضافة يدوية',
         documents=json.dumps(data.get('documents', {}))
     )
     db.session.add(new_intern)
     db.session.commit()
     
     # Create user account automatically
-    if new_intern.email:
-        existing_user = User.query.filter_by(email=new_intern.email).first()
-        if not existing_user:
-            from werkzeug.security import generate_password_hash
-            hashed_pw = generate_password_hash('password123')
-            new_user = User(
-                username=new_intern.email.split('@')[0],
-                name=new_intern.name,
-                email=new_intern.email,
-                password=hashed_pw,
-                role='Intern',
-                permissions=''
-            )
-            db.session.add(new_user)
-            db.session.commit()
+    create_user_for_intern(new_intern)
 
     current_user = get_jwt()
     user_name = current_user.get('name') if current_user else 'Unknown'
@@ -599,6 +614,11 @@ def update_intern(intern_id):
     data = request.json
     import json
     
+    current_user = get_jwt()
+    if 'status' in data and data['status'] != intern.status:
+        if current_user.get('role') != 'Admin':
+            return jsonify({"msg": "Unauthorized: Only Admins can change intern status"}), 403
+            
     intern.name = data.get('name', intern.name)
     if 'name_fr' in data:
         intern.name_fr = data.get('name_fr')
@@ -760,7 +780,7 @@ def sync_microsoft_forms():
                 break
                 
         # Simple deduplication based on exact data match
-        existing = FormSubmission.query.filter_by(form_title=form_title).all()
+        existing = FormSubmission.query.all()
         is_duplicate = False
         for ex in existing:
             # If the JSON data is exactly the same, skip
@@ -771,12 +791,19 @@ def sync_microsoft_forms():
         if is_duplicate:
             continue
             
+        default_form = Form.query.first()
         new_sub = FormSubmission(
-            form_title=form_title,
+            form_id=default_form.id if default_form else 1,
             submitted_data=row,
-            status='pending'
+            status='pending' # Will be approved instantly
         )
         db.session.add(new_sub)
+        db.session.flush() # So it gets an ID
+        
+        # AUTO APPROVE IT
+        new_intern = _process_submission_to_intern(new_sub)
+        log_action(get_jwt_identity(), f"تم المزامنة التلقائية للطلب #{new_sub.id} كمتدرب #{new_intern.id}")
+        
         added_count += 1
         
     db.session.commit()
@@ -790,17 +817,62 @@ def generate_google_form_endpoint():
     fields = data.get("fields", [])
     
     settings = email_service.get_settings()
-    service_account_json_str = settings.get("service_account_json", "")
-    owner_email = settings.get("gmail_address", "") # Use the sending email as owner, or a new field if preferred. We'll use the gmail_address.
+    client_id = settings.get("google_client_id")
+    client_secret = settings.get("google_client_secret")
+    owner_email = settings.get("gmail_address", "")
     
-    if not service_account_json_str:
-        return jsonify({"success": False, "msg": "يرجى إضافة بيانات Service Account JSON في الإعدادات أولاً."}), 400
+    if not client_id or not client_secret:
+        return jsonify({"success": False, "msg": "يرجى إضافة Client ID و Client Secret في الإعدادات."}), 400
         
-    res = google_forms_api.generate_google_form(title, fields, service_account_json_str, owner_email)
-    if not res["success"]:
+    res = google_forms_api.generate_google_form(title, fields, owner_email)
+    if not res.get("success"):
+        if res.get("needs_auth"):
+            return jsonify(res), 401
         return jsonify(res), 400
         
     return jsonify(res)
+
+@app.route('/api/oauth/google/url', methods=['GET'])
+def get_google_auth_url():
+    settings = email_service.get_settings()
+    client_id = settings.get("google_client_id")
+    client_secret = settings.get("google_client_secret")
+    if not client_id or not client_secret:
+        return jsonify({"success": False, "msg": "إعدادات OAuth مفقودة"}), 400
+        
+    try:
+        url = google_forms_api.get_auth_url(client_id, client_secret)
+        return jsonify({"success": True, "url": url})
+    except Exception as e:
+        return jsonify({"success": False, "msg": str(e)}), 500
+
+@app.route('/oauth/callback', methods=['GET'])
+def oauth_callback():
+    from flask import redirect
+    code = request.args.get('code')
+    if not code:
+        return "خطأ: لم يتم تلقي كود التحقق", 400
+        
+    settings = email_service.get_settings()
+    client_id = settings.get("google_client_id")
+    client_secret = settings.get("google_client_secret")
+    
+    try:
+        google_forms_api.save_token_from_code(code, client_id, client_secret)
+        return """
+        <html>
+            <head><meta charset="utf-8"><title>تم تسجيل الدخول</title></head>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding-top: 50px;">
+                <h1 style="color: #4CAF50;">✅ تم تسجيل الدخول إلى حساب جوجل بنجاح!</h1>
+                <p style="font-size: 18px;">يمكنك إغلاق هذه النافذة والعودة إلى تطبيق إدارة المتدربين لإنشاء النماذج.</p>
+                <script>
+                    setTimeout(() => window.close(), 3000);
+                </script>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        return f"<html><body><h1 style='color:red'>حدث خطأ: {str(e)}</h1></body></html>", 500
 
 @app.route('/api/attendance/by-date', methods=['GET'])
 @jwt_required()
@@ -879,6 +951,10 @@ def generate_attestation(intern_id):
 @app.route('/api/interns/<int:intern_id>', methods=['DELETE'])
 @jwt_required()
 def delete_intern(intern_id):
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
@@ -2188,6 +2264,11 @@ def submit_public_form(slug):
         submitted_at=now
     )
     db.session.add(submission)
+    db.session.flush()
+    
+    # Auto convert to Intern
+    new_intern = _process_submission_to_intern(submission)
+    new_intern.source = form.title or 'نموذج محلي'
     db.session.commit()
 
     # Send confirmation email to intern if email field exists
@@ -2249,15 +2330,7 @@ def get_submissions():
         })
     return jsonify(result)
 
-@app.route('/api/submissions/<int:sub_id>/approve', methods=['POST'])
-@jwt_required()
-def approve_submission(sub_id):
-    submission = db.session.get(FormSubmission, sub_id)
-    if not submission:
-        return jsonify({"msg": "الطلب غير موجود"}), 404
-    if submission.status != 'pending':
-        return jsonify({"msg": "الطلب تمت معالجته بالفعل"}), 400
-
+def _process_submission_to_intern(submission):
     try:
         data = json.loads(submission.submitted_data)
     except Exception:
@@ -2281,15 +2354,22 @@ def approve_submission(sub_id):
         mapped_field = mapping.get(label)
         if mapped_field and mapped_field in intern_data:
             intern_data[mapped_field] = value
-        # fallback: if no mapping but name/email via type
-        if not mapped_field:
-            for f in fields:
-                if f['label'] == label and f.get('type') == 'email' and not intern_data['email']:
-                    intern_data['email'] = value
-
+            
     # Use any text field as name fallback
     if not intern_data['name']:
         intern_data['name'] = data.get(list(data.keys())[0], 'متدرب جديد') if data else 'متدرب جديد'
+
+    # Fallback for photo_path
+    if not intern_data['photo_path']:
+        for k, v in data.items():
+            if 'photo' in k.lower() or 'صورة' in k:
+                intern_data['photo_path'] = v
+                break
+                
+    # Convert Google Drive URL to direct image link
+    photo_path = intern_data.get('photo_path')
+    if photo_path and isinstance(photo_path, str) and 'drive.google.com/open?id=' in photo_path:
+        intern_data['photo_path'] = photo_path.replace('open?id=', 'uc?export=view&id=')
 
     now = datetime.now(timezone.utc).isoformat()
     new_intern = Intern(
@@ -2305,11 +2385,32 @@ def approve_submission(sub_id):
         address=intern_data['address'],
         department=intern_data['department'],
         photo_path=intern_data['photo_path'],
-        status='قيد المراجعة'
+        status='قيد المراجعة',
+        source='نماذج جوجل'
     )
     db.session.add(new_intern)
     db.session.flush()
 
+    # Automatically create user account for the new intern
+    create_user_for_intern(new_intern)
+
+    return new_intern
+
+@app.route('/api/submissions/<int:sub_id>/approve', methods=['POST'])
+@jwt_required()
+def approve_submission(sub_id):
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+
+    submission = db.session.get(FormSubmission, sub_id)
+    if not submission:
+        return jsonify({"msg": "الطلب غير موجود"}), 404
+    if submission.status != 'pending':
+        return jsonify({"msg": "الطلب ليس في حالة معلقة"}), 400
+
+    new_intern = _process_submission_to_intern(submission)
+    
     submission.status = 'approved'
     submission.intern_id = new_intern.id
     db.session.commit()
@@ -2317,14 +2418,27 @@ def approve_submission(sub_id):
     log_action(get_jwt_identity(), f"قبول طلب تسجيل #{sub_id} وإنشاء ملف متدرب #{new_intern.id}")
 
     # Send approval email
-    if intern_data['email']:
-        email_service.send_accepted_email(intern_data['email'], intern_data['name'] or 'متدرب')
+    try:
+        data = json.loads(submission.submitted_data)
+        intern_email = None
+        for key, val in data.items():
+            if 'email' in key.lower() or 'بريد' in key:
+                intern_email = val
+                break
+        if intern_email:
+            email_service.send_accepted_email(intern_email, new_intern.name or 'متدرب')
+    except Exception:
+        pass
 
     return jsonify({"success": True, "intern_id": new_intern.id})
 
 @app.route('/api/submissions/<int:sub_id>/reject', methods=['POST'])
 @jwt_required()
 def reject_submission(sub_id):
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+
     submission = db.session.get(FormSubmission, sub_id)
     if not submission:
         return jsonify({"msg": "الطلب غير موجود"}), 404
@@ -2405,25 +2519,122 @@ def sync_google_forms():
                 if 'name' in k.lower() or 'اسم' in k:
                     name = v
                     break
-                    
+            default_form = Form.query.first()
             sub = FormSubmission(
-                form_id=1, # Default Google form ID 
-                form_title='Google Form Sync',
+                form_id=default_form.id if default_form else 1,
                 submitted_data=row_json,
-                status='pending'
+                status='pending' # Will be approved instantly below
             )
             db.session.add(sub)
-            added_count += 1
+            db.session.flush() # So it gets an ID
             
-            # Send received email if possible
-            if email:
-                email_service.send_received_email(email, name or 'متدرب')
-                
+            # AUTO APPROVE IT
+            new_intern = _process_submission_to_intern(sub)
+            new_intern.status = 'قيد المراجعة'
+            new_intern.source = 'نماذج جوجل'
+            
+            # Since we just created it and it's attached to session, just flush
+            db.session.flush()
+            log_action(get_jwt_identity(), f"تم المزامنة التلقائية للطلب #{sub.id} كمتدرب #{new_intern.id}")
+            
+            added_count += 1
     db.session.commit()
     if added_count > 0:
         log_action(get_jwt_identity(), f"تم مزامنة {added_count} طلب جديد من Google Forms")
         
     return jsonify({"success": True, "added": added_count})
+
+# --- BACKGROUND AUTO-SYNC LOOP ---
+import threading
+import time
+
+def auto_sync_loop():
+    while True:
+        time.sleep(60)
+        try:
+            with app.app_context():
+                # Google Sync
+                try:
+                    settings = email_service.get_settings()
+                    sheet_link = settings.get('google_sheet_link')
+                    if sheet_link:
+                        res = google_sheets_service.fetch_google_form_responses(sheet_link)
+                        if res['success']:
+                            rows = res['data']
+                            added_count = 0
+                            for row in rows:
+                                row_json = json.dumps(row, ensure_ascii=False)
+                                existing = FormSubmission.query.filter_by(submitted_data=row_json).first()
+                                if not existing:
+                                    default_form = Form.query.first()
+                                    sub = FormSubmission(
+                                        form_id=default_form.id if default_form else 1,
+                                        submitted_data=row_json,
+                                        status='pending'
+                                    )
+                                    db.session.add(sub)
+                                    db.session.flush()
+                                    new_intern = _process_submission_to_intern(sub)
+                                    new_intern.status = 'قيد المراجعة'
+                                    new_intern.source = 'نماذج جوجل'
+                                    db.session.flush()
+                                    added_count += 1
+                            if added_count > 0:
+                                db.session.commit()
+                                log_action("النظام", f"تم مزامنة {added_count} طلب جديد من Google Forms تلقائيا")
+                except Exception as e:
+                    print(f"Auto-Sync Google Error: {e}")
+
+                # Microsoft Sync
+                try:
+                    import microsoft_excel_service
+                    settings = email_service.get_settings()
+                    excel_link = settings.get('microsoft_excel_link')
+                    if excel_link:
+                        res = microsoft_excel_service.fetch_microsoft_excel_responses(excel_link)
+                        if res['success']:
+                            rows = res['data']
+                            added_count = 0
+                            for row in rows:
+                                row_json = json.dumps(row, ensure_ascii=False)
+                                
+                                # Duplicate check
+                                existing = FormSubmission.query.all()
+                                is_duplicate = False
+                                for ex in existing:
+                                    try:
+                                        if json.loads(ex.submitted_data) == row:
+                                            is_duplicate = True
+                                            break
+                                    except:
+                                        pass
+                                
+                                if not is_duplicate:
+                                    default_form = Form.query.first()
+                                    new_sub = FormSubmission(
+                                        form_id=default_form.id if default_form else 1,
+                                        submitted_data=row_json,
+                                        status='pending'
+                                    )
+                                    db.session.add(new_sub)
+                                    db.session.flush()
+                                    new_intern = _process_submission_to_intern(new_sub)
+                                    new_intern.status = 'قيد المراجعة'
+                                    new_intern.source = 'نماذج مايكروسوفت'
+                                    db.session.flush()
+                                    added_count += 1
+                            
+                            if added_count > 0:
+                                db.session.commit()
+                                log_action("النظام", f"تم مزامنة {added_count} طلب جديد من Microsoft Forms تلقائيا")
+                except Exception as e:
+                    print(f"Auto-Sync Microsoft Error: {e}")
+
+        except Exception as e:
+            print(f"Fatal Auto-Sync Error: {e}")
+
+# Start background sync thread
+threading.Thread(target=auto_sync_loop, daemon=True).start()
 
 if __name__ == '__main__':
     init_db()

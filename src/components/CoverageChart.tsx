@@ -153,7 +153,7 @@ export default function CoverageChart({ internId }: CoverageChartProps) {
   }, [colored]);
 
   const monthsToShow = useMemo(() => {
-    let min: Date | null = null, max: Date | null = null;
+    let min: any = null, max: any = null;
     colored.forEach((c: any) => {
       const s = parseDate(c.start_date), e = parseDate(c.end_date);
       if (!s || !e) return;

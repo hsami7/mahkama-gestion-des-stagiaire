@@ -43,9 +43,20 @@ export function Attendance() {
       // Show only active interns whose start and end dates encapsulate the selected date
       const activeInterns = internsData.filter((i: any) => {
         if (i.status !== 'نشط') return false;
-        
-        if (i.start_date && selectedDate < i.start_date) return false;
-        if (i.end_date && selectedDate > i.end_date) return false;
+        const selDateObj = new Date(selectedDate);
+        selDateObj.setHours(0,0,0,0);
+
+        if (i.start_date) {
+          const startDateObj = new Date(i.start_date);
+          startDateObj.setHours(0,0,0,0);
+          if (!isNaN(startDateObj.getTime()) && selDateObj < startDateObj) return false;
+        }
+
+        if (i.end_date) {
+          const endDateObj = new Date(i.end_date);
+          endDateObj.setHours(0,0,0,0);
+          if (!isNaN(endDateObj.getTime()) && selDateObj > endDateObj) return false;
+        }
         
         return true;
       });

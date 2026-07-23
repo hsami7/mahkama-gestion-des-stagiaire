@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash, Check, Copy, Link, PencilSimple, ToggleLeft, ToggleRight, ArrowLeft } from '@phosphor-icons/react';
+import { Plus, Trash, Check, Copy, Link, PencilSimple, ToggleLeft, ToggleRight, ArrowLeft, FileText } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
 
@@ -77,6 +77,14 @@ export function FormBuilder() {
   const [newType, setNewType] = useState<FieldType>('text');
   const [newRequired, setNewRequired] = useState(false);
   const [newMapsTo, setNewMapsTo] = useState<MapsTo>('');
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('auth') === 'success') {
+      toast.success('تم تسجيل الدخول إلى حساب جوجل بنجاح! يمكنك الآن توليد النموذج.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
   const [userEditedLabel, setUserEditedLabel] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatedSlug, setGeneratedSlug] = useState<string | null>(null);
@@ -166,7 +174,11 @@ export function FormBuilder() {
       setGoogleFormLink(res.responderUri);
       toast.success('تم إنشاء نموذج جوجل بنجاح!');
     } catch (err: any) {
-      toast.error(err.response?.data?.msg || 'حدث خطأ أثناء إنشاء نموذج جوجل تأكد من ملف Service Account');
+      if (err.response?.status === 401) {
+        toast.error('لم تقم بتسجيل الدخول إلى جوجل. يرجى الذهاب للإعدادات لتسجيل الدخول أولاً.');
+      } else {
+        toast.error(err.response?.data?.msg || 'حدث خطأ أثناء إنشاء نموذج جوجل');
+      }
     } finally {
       setGeneratingGoogle(false);
     }
@@ -330,9 +342,14 @@ export function FormBuilder() {
           <div className="form-group">
             <label className="form-label">ربط بحقل الملف الشخصي</label>
             <select className="input" value={newMapsTo} onChange={e => { setUserEditedLabel(false); setNewMapsTo(e.target.value as MapsTo); }}>
-              {Object.entries(MAPS_TO_LABELS).map(([val, lbl]) => (
-                <option key={val} value={val}>{lbl}</option>
-              ))}
+              {Object.entries(MAPS_TO_LABELS).map(([val, lbl]) => {
+                const isUsed = val !== '' && fields.some(f => f.maps_to === val);
+                return (
+                  <option key={val} value={val} disabled={isUsed}>
+                    {lbl} {isUsed ? '(مضاف مسبقاً)' : ''}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

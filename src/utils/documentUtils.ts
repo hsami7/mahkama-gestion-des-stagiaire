@@ -36,7 +36,7 @@ export const downloadHtmlAsPdf = (html: string, filename: string, margin: number
   const opt = {
     margin,
     filename,
-    image: { type: 'jpeg', quality: 0.98 },
+    image: { type: 'jpeg' as const, quality: 0.98 },
     html2canvas: { scale: 2 },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
@@ -50,7 +50,7 @@ export const viewHtmlAsPdf = async (html: string) => {
   const opt = {
     margin: 15,
     filename: 'document.pdf',
-    image: { type: 'jpeg', quality: 0.98 },
+    image: { type: 'jpeg' as const, quality: 0.98 },
     html2canvas: { scale: 2 },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };

@@ -771,7 +771,7 @@ export function Profile() {
     const opt = {
       margin: 10,
       filename: `بطاقة_تقييم_${intern?.name || 'متدرب'}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
@@ -827,9 +827,11 @@ export function Profile() {
           <button title="تعديل" onClick={handleEdit} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fef3c7', border: '1.5px solid #f59e0b', color: '#1a1a1a', transition: 'all 0.2s' }}>
             <PencilSimple weight="bold" size={18} color="#1a1a1a" />
           </button>
-          <button title="حذف" onClick={handleDelete} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fee2e2', border: '1.5px solid #ef4444', color: '#1a1a1a', transition: 'all 0.2s' }}>
-            <Trash weight="bold" size={18} color="#1a1a1a" />
-          </button>
+          {isAdmin && (
+            <button title="حذف" onClick={handleDelete} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fee2e2', border: '1.5px solid #ef4444', color: '#1a1a1a', transition: 'all 0.2s' }}>
+              <Trash weight="bold" size={18} color="#1a1a1a" />
+            </button>
+          )}
         </div>
       </div>
 

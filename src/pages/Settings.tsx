@@ -6,9 +6,10 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   
   // Integration Settings
+  const [googleClientSecret, setGoogleClientSecret] = useState('');
+  const [googleClientId, setGoogleClientId] = useState('');
   const [sheetLink, setSheetLink] = useState('');
   const [microsoftExcelLink, setMicrosoftExcelLink] = useState('');
-  const [serviceAccountJson, setServiceAccountJson] = useState('');
   const [emailProvider, setEmailProvider] = useState('gmail');
   const [gmailAddress, setGmailAddress] = useState('');
   const [gmailAppPassword, setGmailAppPassword] = useState('');
@@ -27,7 +28,8 @@ export function Settings() {
         setLogs(logsData);
         setSheetLink(settingsData.google_sheet_link || '');
         setMicrosoftExcelLink(settingsData.microsoft_excel_link || '');
-        setServiceAccountJson(settingsData.service_account_json || '');
+        setGoogleClientId(settingsData.google_client_id || '');
+        setGoogleClientSecret(settingsData.google_client_secret || '');
         setEmailProvider(settingsData.email_provider || 'gmail');
         setGmailAddress(settingsData.gmail_address || '');
         setGmailAppPassword(settingsData.gmail_app_password || '');
@@ -72,7 +74,8 @@ export function Settings() {
       await api.post('/integration/settings', {
         google_sheet_link: sheetLink,
         microsoft_excel_link: microsoftExcelLink,
-        service_account_json: serviceAccountJson,
+        google_client_id: googleClientId,
+        google_client_secret: googleClientSecret,
         email_provider: emailProvider,
         gmail_address: gmailAddress,
         gmail_app_password: gmailAppPassword
@@ -137,7 +140,7 @@ export function Settings() {
         <div className="card" style={{ padding: '32px', marginBottom: '24px', maxWidth: '600px' }}>
           <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>ربط النماذج (Google & Microsoft) والبريد التلقائي</h3>
           <p style={{ color: 'var(--slate)', fontSize: '0.85rem', marginBottom: '24px' }}>
-            أدخل روابط النماذج لجلب الردود تلقائياً. لإنشاء نماذج جوجل برمجياً، أضف محتوى Service Account JSON. للبريد التلقائي، اختر المزود وأدخل بيانات الدخول.
+            أدخل روابط النماذج لجلب الردود تلقائياً. للبريد التلقائي، اختر المزود وأدخل بيانات الدخول.
           </p>
           <form onSubmit={handleSaveIntegration}>
             <div className="form-group">
@@ -165,16 +168,30 @@ export function Settings() {
                 style={{ textAlign: 'left' }}
               />
             </div>
-
+            
             <div className="form-group">
-              <label>محتوى ملف Service Account JSON (لجوجل)</label>
-              <textarea 
-                placeholder='{"type": "service_account", "project_id": "..."}'
-                value={serviceAccountJson}
-                onChange={e => setServiceAccountJson(e.target.value)}
+              <label>Google Client ID (لإنشاء النماذج تلقائياً)</label>
+              <input 
+                type="text"
+                placeholder="...apps.googleusercontent.com"
+                value={googleClientId}
+                onChange={e => setGoogleClientId(e.target.value)}
                 className="input"
                 dir="ltr"
-                style={{ textAlign: 'left', minHeight: '80px', fontFamily: 'monospace', fontSize: '12px' }}
+                style={{ textAlign: 'left' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Google Client Secret</label>
+              <input 
+                type="text"
+                placeholder="GOCSPX-..."
+                value={googleClientSecret}
+                onChange={e => setGoogleClientSecret(e.target.value)}
+                className="input"
+                dir="ltr"
+                style={{ textAlign: 'left' }}
               />
             </div>
             
@@ -205,10 +222,9 @@ export function Settings() {
               </div>
               
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>كلمة المرور (أو App Password)</label>
+                <label>كلمة مرور التطبيقات (App Password)</label>
                 <input 
-                  type="password" 
-                  placeholder="كلمة المرور" 
+                  type="password"
                   value={gmailAppPassword}
                   onChange={e => setGmailAppPassword(e.target.value)}
                   className="input"
@@ -216,6 +232,37 @@ export function Settings() {
                   style={{ textAlign: 'left' }}
                 />
               </div>
+            
+              <div className="form-group" style={{ marginTop: 20 }}>
+                <button 
+                  type="button"
+                  className="btn btn-outline" 
+                  onClick={async () => {
+                    if (!googleClientId || !googleClientSecret) {
+                      setIntegrationMsg('خطأ: الرجاء حفظ Client ID و Client Secret أولاً');
+                      return;
+                    }
+                    try {
+                      setIntegrationMsg('جاري فتح صفحة تسجيل الدخول لجوجل...');
+                      const res = await api.get('/oauth/google/url');
+                      try {
+                        const electron = window.require ? window.require('electron') : require('electron');
+                        electron.shell.openExternal(res.url);
+                      } catch (e: any) {
+                        setIntegrationMsg('محاولة بديلة... ' + e.message);
+                        window.open(res.url, '_blank');
+                      }
+                      setIntegrationMsg('تم فتح نافذة الدخول بنجاح.');
+                    } catch (err: any) {
+                      setIntegrationMsg('خطأ: ' + (err.response?.data?.msg || err.message || String(err)));
+                    }
+                  }}
+                  disabled={!googleClientId || !googleClientSecret}
+                >
+                  تسجيل الدخول إلى Google (لإنشاء النماذج)
+                </button>
+              </div>
+
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
