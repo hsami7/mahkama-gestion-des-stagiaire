@@ -11,6 +11,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta, timezone
+import base64
+import email_service
+import google_sheets_service
 
 app = Flask(__name__)
 CORS(app)
@@ -180,43 +183,9 @@ def log_action(user, action):
         db.session.rollback()
         print(f"Failed to log action: {e}")
 
-SMTP_SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'smtp_settings.json')
-
-def load_smtp_settings():
-    if os.path.exists(SMTP_SETTINGS_FILE):
-        try:
-            with open(SMTP_SETTINGS_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return None
-
+# Old smtp logic removed. We now use email_service.py for Gmail integration.
 def send_email(to_email: str, subject: str, body_html: str):
-    """Send an HTML email. Silently skips if SMTP is not configured."""
-    settings = load_smtp_settings()
-    if not settings or not settings.get('smtp_host') or not settings.get('from_email'):
-        print(f"[EMAIL SKIPPED] No SMTP config. Would send to {to_email}: {subject}")
-        return
-    try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = settings['from_email']
-        msg['To'] = to_email
-        msg.attach(MIMEText(body_html, 'html', 'utf-8'))
-        port = int(settings.get('smtp_port', 587))
-        use_ssl = settings.get('use_ssl', False)
-        if use_ssl:
-            server = smtplib.SMTP_SSL(settings['smtp_host'], port)
-        else:
-            server = smtplib.SMTP(settings['smtp_host'], port)
-            server.starttls()
-        if settings.get('smtp_user') and settings.get('smtp_password'):
-            server.login(settings['smtp_user'], settings['smtp_password'])
-        server.sendmail(settings['from_email'], [to_email], msg.as_string())
-        server.quit()
-        print(f"[EMAIL SENT] To {to_email}: {subject}")
-    except Exception as e:
-        print(f"[EMAIL ERROR] {e}")
+    email_service.send_email(to_email, subject, body_html)
 
 
 def init_db():
@@ -1260,7 +1229,7 @@ def upload_requested_document(request_id):
             ).update({'status': 'fulfilled'})
             doc_request.status = 'fulfilled'
             db.session.commit()
-            log_action(current_user.get('name'), f"قام برفع مستند ({doc_request.custom_title or doc_request.document_type}) استجابة لطلب")
+            log_action(user.name, f"قام برفع مستند ({doc_request.custom_title or doc_request.document_type}) استجابة لطلب")
         except Exception as e:
             db.session.rollback()
             print(f"Upload metadata update failed but file saved: {e}")
@@ -2166,20 +2135,7 @@ def submit_public_form(slug):
         pass
 
     if intern_email:
-        send_email(
-            intern_email,
-            "تم استلام طلب التدريب الخاص بك",
-            f"""
-            <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                <h2 style="color: #B8960C;">تم استلام طلبك بنجاح</h2>
-                <p>شكراً لتقديمك على التدريب في المديرية الإقليمية بفاس.</p>
-                <p>لقد تم استلام طلبك وهو الآن <strong>قيد المراجعة</strong>.</p>
-                <p>سيتم التواصل معك في أقرب وقت ممكن عبر هذا البريد الإلكتروني بمجرد اتخاذ القرار بشأن طلبك.</p>
-                <br>
-                <p style="color: #888;">محكمة الاستئناف الإدارية بفاس — وزارة العدل</p>
-            </div>
-            """
-        )
+        email_service.send_received_email(intern_email, data.get('الاسم', 'متدرب'))
 
     return jsonify({"success": True, "msg": "تم إرسال طلبك بنجاح"})
 
@@ -2289,19 +2245,7 @@ def approve_submission(sub_id):
 
     # Send approval email
     if intern_data['email']:
-        send_email(
-            intern_data['email'],
-            "تمت الموافقة على طلب التدريب الخاص بك",
-            f"""
-            <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                <h2 style="color: #22C55E;">تهانينا! تمت الموافقة على طلبك</h2>
-                <p>يسعدنا إبلاغك بأن طلبك للتدريب في المديرية الإقليمية بفاس قد <strong>تمت الموافقة عليه</strong>.</p>
-                <p>سيتم التواصل معك قريباً لإتمام إجراءات الالتحاق.</p>
-                <br>
-                <p style="color: #888;">محكمة الاستئناف الإدارية بفاس — وزارة العدل</p>
-            </div>
-            """
-        )
+        email_service.send_accepted_email(intern_data['email'], intern_data['name'] or 'متدرب')
 
     return jsonify({"success": True, "intern_id": new_intern.id})
 
@@ -2334,27 +2278,80 @@ def reject_submission(sub_id):
             if field.get('type') == 'email' and data.get(field['label']) and not intern_email:
                 intern_email = data[field['label']]
         if intern_email:
-            reason_html = f"<p><strong>السبب:</strong> {reason}</p>" if reason else ""
-            send_email(
-                intern_email,
-                "بشأن طلب التدريب الخاص بك",
-                f"""
-                <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                    <h2 style="color: #EF4444;">نتيجة طلب التدريب</h2>
-                    <p>نأسف لإبلاغك بأن طلبك للتدريب لم يتم قبوله في الوقت الحالي.</p>
-                    {reason_html}
-                    <p>نتمنى لك التوفيق.</p>
-                    <br>
-                    <p style="color: #888;">محكمة الاستئناف الإدارية بفاس — وزارة العدل</p>
-                </div>
-                """
-            )
+            email_service.send_rejected_email(intern_email, data.get('name', 'متدرب'), reason)
     except Exception as e:
         print(f"[REJECT EMAIL ERROR] {e}")
 
     return jsonify({"success": True})
 
 
+# --- INTEGRATION API ---
+@app.route('/api/integration/settings', methods=['GET'])
+@jwt_required()
+def get_integration_settings():
+    return jsonify(email_service.get_settings())
+
+@app.route('/api/integration/settings', methods=['POST'])
+@jwt_required()
+def save_integration_settings():
+    data = request.json
+    email_service.save_settings(data)
+    log_action(get_jwt_identity(), "قام بتحديث إعدادات الربط مع Google Forms & Gmail")
+    return jsonify({"success": True})
+
+@app.route('/api/forms/sync-google', methods=['POST'])
+@jwt_required()
+def sync_google_forms():
+    settings = email_service.get_settings()
+    sheet_link = settings.get('google_sheet_link')
+    if not sheet_link:
+        return jsonify({"success": False, "msg": "يرجى إضافة رابط Google Sheet في الإعدادات أولاً"})
+        
+    res = google_sheets_service.fetch_google_form_responses(sheet_link)
+    if not res['success']:
+        return jsonify(res), 400
+        
+    rows = res['data']
+    added_count = 0
+    # To avoid duplicates, we check if we already have this data based on email or timestamp.
+    # Simple deduplication: Hash the row JSON and check if it exists
+    for row in rows:
+        row_json = json.dumps(row, ensure_ascii=False)
+        existing = FormSubmission.query.filter_by(submitted_data=row_json).first()
+        if not existing:
+            # Try to find email
+            email = row.get('Email', '') or row.get('بريد', '') or row.get('البريد الإلكتروني', '')
+            for k, v in row.items():
+                if 'email' in k.lower() or 'بريد' in k:
+                    email = v
+                    break
+            
+            # Try to find name
+            name = row.get('Name', '') or row.get('الاسم', '') or row.get('الاسم الكامل', '')
+            for k, v in row.items():
+                if 'name' in k.lower() or 'اسم' in k:
+                    name = v
+                    break
+                    
+            sub = FormSubmission(
+                form_id=1, # Default Google form ID 
+                form_title='Google Form Sync',
+                submitted_data=row_json,
+                status='pending'
+            )
+            db.session.add(sub)
+            added_count += 1
+            
+            # Send received email if possible
+            if email:
+                email_service.send_received_email(email, name or 'متدرب')
+                
+    db.session.commit()
+    if added_count > 0:
+        log_action(get_jwt_identity(), f"تم مزامنة {added_count} طلب جديد من Google Forms")
+        
+    return jsonify({"success": True, "added": added_count})
+
 if __name__ == '__main__':
     init_db()
-    app.run(port=5055, debug=True)
+    app.run(host='0.0.0.0', port=5055, debug=True)

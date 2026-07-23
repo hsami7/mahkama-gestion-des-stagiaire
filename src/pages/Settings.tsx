@@ -4,6 +4,12 @@ import { api } from '../services/api';
 export function Settings() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Integration Settings
+  const [sheetLink, setSheetLink] = useState('');
+  const [gmailAddress, setGmailAddress] = useState('');
+  const [gmailAppPassword, setGmailAppPassword] = useState('');
+  const [integrationMsg, setIntegrationMsg] = useState('');
 
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
@@ -11,15 +17,19 @@ export function Settings() {
 
   useEffect(() => {
     if (isAdmin) {
-      api.get('/logs')
-        .then(data => {
-          setLogs(data);
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error("Failed to fetch logs", err);
-          setLoading(false);
-        });
+      Promise.all([
+        api.get('/logs'),
+        api.get('/integration/settings')
+      ]).then(([logsData, settingsData]) => {
+        setLogs(logsData);
+        setSheetLink(settingsData.google_sheet_link || '');
+        setGmailAddress(settingsData.gmail_address || '');
+        setGmailAppPassword(settingsData.gmail_app_password || '');
+        setLoading(false);
+      }).catch(err => {
+        console.error("Failed to fetch data", err);
+        setLoading(false);
+      });
     } else {
       setLoading(false);
     }
@@ -48,6 +58,19 @@ export function Settings() {
       setConfirmPassword('');
     } catch (err: any) {
       setMsg(err.response?.data?.msg || 'فشل في تغيير كلمة المرور');
+    }
+  const handleSaveIntegration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/integration/settings', {
+        google_sheet_link: sheetLink,
+        gmail_address: gmailAddress,
+        gmail_app_password: gmailAppPassword
+      });
+      setIntegrationMsg('تم حفظ الإعدادات بنجاح');
+      setTimeout(() => setIntegrationMsg(''), 3000);
+    } catch (err: any) {
+      setIntegrationMsg('فشل في حفظ الإعدادات');
     }
   };
 
@@ -94,11 +117,68 @@ export function Settings() {
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button type="submit" className="btn btn-gold" style={{ padding: '12px 32px' }}>حفظ التغييرات</button>
+            <button type="submit" className="btn btn-gold" style={{ padding: '12px 32px' }}>تغيير كلمة المرور</button>
             {msg && <span style={{ fontWeight: 'bold', color: msg.includes('نجاح') ? 'var(--success)' : 'var(--danger)' }}>{msg}</span>}
           </div>
         </form>
       </div>
+
+      {isAdmin && (
+        <div className="card" style={{ padding: '32px', marginBottom: '24px', maxWidth: '600px' }}>
+          <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>ربط نماذج جوجل والبريد التلقائي</h3>
+          <p style={{ color: 'var(--slate)', fontSize: '0.85rem', marginBottom: '24px' }}>
+            لربط نموذج جوجل الخاص بك، قم بربط النموذج بجدول بيانات Google Sheet، واجعله متاحاً لـ "أي شخص لديه الرابط". ثم أدخل الرابط هنا.
+            لإرسال الرسائل التلقائية، أدخل بريدك الإلكتروني (Gmail) و "كلمة مرور التطبيق" (App Password).
+          </p>
+          <form onSubmit={handleSaveIntegration}>
+            <div className="form-group">
+              <label>رابط Google Sheet للردود</label>
+              <input 
+                type="text" 
+                placeholder="https://docs.google.com/spreadsheets/d/..." 
+                value={sheetLink}
+                onChange={e => setSheetLink(e.target.value)}
+                className="input"
+                dir="ltr"
+                style={{ textAlign: 'left' }}
+              />
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>بريد Gmail المرسِل</label>
+                <input 
+                  type="email" 
+                  placeholder="example@gmail.com" 
+                  value={gmailAddress}
+                  onChange={e => setGmailAddress(e.target.value)}
+                  className="input"
+                  dir="ltr"
+                  style={{ textAlign: 'left' }}
+                />
+              </div>
+              
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>كلمة مرور التطبيق (App Password)</label>
+                <input 
+                  type="password" 
+                  placeholder="16 حرفاً بدون مسافات" 
+                  value={gmailAppPassword}
+                  onChange={e => setGmailAppPassword(e.target.value)}
+                  className="input"
+                  dir="ltr"
+                  style={{ textAlign: 'left' }}
+                />
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <button type="submit" className="btn btn-gold" style={{ padding: '12px 32px' }}>حفظ إعدادات الربط</button>
+              {integrationMsg && <span style={{ fontWeight: 'bold', color: integrationMsg.includes('نجاح') ? 'var(--success)' : 'var(--danger)' }}>{integrationMsg}</span>}
+            </div>
+          </form>
+        </div>
+      )}
 
       {!isAdmin ? (
         <div className="card" style={{ padding: '22px' }}>

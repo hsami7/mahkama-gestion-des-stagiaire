@@ -165,6 +165,8 @@ export function Dashboard() {
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [attestationIntern, setAttestationIntern] = useState<any>(null);
 
+  const [syncing, setSyncing] = useState(false);
+
   const loadInterns = async () => {
     try { setInterns(await api.get('/interns')); } catch (e) { console.error(e); }
   };
@@ -199,6 +201,23 @@ export function Dashboard() {
       loadSubmissions();
     } catch (e) {
       toast.error('حدث خطأ أثناء الرفض');
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await api.post('/forms/sync-google', {});
+      if (res.added > 0) {
+        toast.success(`تم جلب ${res.added} طلب جديد من نموذج جوجل`);
+        loadSubmissions();
+      } else {
+        toast.info('لا توجد طلبات جديدة');
+      }
+    } catch (e: any) {
+      toast.error(e.response?.data?.msg || 'حدث خطأ أثناء الاتصال بجوجل، تأكد من الإعدادات');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -304,13 +323,21 @@ export function Dashboard() {
               </div>
               <div>
                 <h2 style={{ margin: 0, fontSize: '1.1rem' }}>طلبات التسجيل المعلقة</h2>
-                <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>من نموذج التسجيل العام</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>من نموذج التسجيل العام (Google Forms)</div>
               </div>
               {submissions.length > 0 && (
                 <span style={{ background: 'var(--warning)', color: '#fff', borderRadius: 12, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
                   {submissions.length}
                 </span>
               )}
+              <button 
+                onClick={handleSync} 
+                disabled={syncing}
+                className="btn btn-ghost sm" 
+                style={{ fontSize: '0.8rem', marginRight: '10px' }}
+              >
+                {syncing ? 'جاري الجلب...' : 'مزامنة مع جوجل'}
+              </button>
             </div>
 
             {/* Decision helpers row */}
