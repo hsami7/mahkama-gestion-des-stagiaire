@@ -31,89 +31,63 @@ export function AttestationModal({ isOpen, onClose, intern }: AttestationModalPr
     const yyyy = today.getFullYear();
     const current_date = `${dd}/${mm}/${yyyy}`;
 
-    return `<!DOCTYPE html>
-<html dir="ltr">
-<head>
-  <meta charset="utf-8">
-  <title>Attestation de stage</title>
-  <style>
-    @font-face {
-      font-family: 'Tifinagh';
-      src: local('Segoe UI Historic'), local('Noto Sans Tifinagh');
-    }
-    @page { margin: 15mm; }
-    body {
-      font-family: 'Arial', sans-serif;
-      font-size: 16px;
-      line-height: 1.6;
-      color: #000;
-      margin: 0;
-      padding: 0;
-      background: #fff;
-    }
-    .header-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 40px;
-    }
-    .header-text {
-      text-align: center;
-      font-weight: bold;
-      font-size: 14px;
-    }
-    .header-logo {
-      width: 90px;
-      height: 90px;
-      object-fit: contain;
-    }
-  </style>
-</head>
-<body>
-  <div class="header-container">
-    <div class="header-text">
-      Royaume du Maroc<br>
-      Ministère de la Justice<br>
-      Cour d'Appel Administrative<br>de Fès
+    return `
+<div style="font-family: 'Arial', sans-serif; font-size: 16px; line-height: 1.8; color: #000; padding: 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px;">
+    <div style="text-align: center; font-weight: bold; font-size: 13px; font-family: 'Tifinagh', sans-serif; line-height: 1.5;">
+      ⵜⴰⴳⵍⴷⵉⵜ ⵏ ⵍⵎⵖⵔⵉⴱ<br>
+      ⵜⴰⵎⴰⵡⵙⵜ ⵏ ⵜⵥⵔⴼⵜ<br>
+      ⵜⴰⵎⵀⵍⴰ ⵜⴰⵙⴳⴰⵡⴰⵏⵜ<br>ⴷⵉ ⴼⴰⵙ
     </div>
-    <img src="${LOGO_BASE64}" class="header-logo" alt="Logo" />
-    <div class="header-text" dir="rtl">
+    <img src="${LOGO_BASE64}" style="width: 80px; height: auto; object-fit: contain;" alt="Logo" />
+    <div dir="rtl" style="text-align: center; font-weight: bold; font-size: 15px; line-height: 1.5;">
       المملكة المغربية<br>
       وزارة العدل<br>
-      محكمة الإستئناف الإدارية<br>بفاس
+      المديرية الإقليمية<br>بفاس
     </div>
   </div>
 
-  <h1 style="text-align: center; font-size: 28px; font-weight: bold; margin: 60px 0 40px 0; text-decoration: underline; text-transform: uppercase;">
-    Attestation de Stage
-  </h1>
+  <div style="text-align: center; margin: 60px 0 40px 0;">
+    <h1 style="font-size: 26px; font-weight: bold; text-decoration: underline; text-transform: uppercase; margin: 0 0 10px 0;">
+      Attestation de Stage
+    </h1>
+    <div style="font-size: 14px; font-style: italic;">
+      (Il ne sera délivré qu'un seul exemplaire de cette attestation)
+    </div>
+  </div>
 
-  <p style="font-size: 18px; line-height: 2; margin-bottom: 30px; text-align: justify;">
-    Le Secrétaire Général de la Cour d'Appel Administrative de Fès soussigné, atteste par la présente que :
+  <p style="font-size: 18px; margin-bottom: 25px; text-align: justify;">
+    Le Chef de Service des Stages atteste que Mlle/Mr. <strong>${intern?.name_fr || '......................'}</strong>
   </p>
 
-  <p style="font-size: 22px; font-weight: bold; text-align: center; margin: 40px 0;">
-    Monsieur / Madame : ${intern?.name_fr || '......................'}
+  <p style="font-size: 18px; margin-bottom: 25px; text-align: justify;">
+    titulaire de la C.N.I.N° : <strong>${intern?.national_id || '............'}</strong> a effectué un stage pratique au sein de la
   </p>
 
-  <p style="font-size: 18px; line-height: 2; text-align: justify;">
-    Titulaire de la Carte Nationale d'Identité N° : <strong>${intern?.national_id || '............'}</strong>,<br><br>
-    A effectué un stage pratique au sein des services de la Cour d'Appel Administrative de Fès,<br>
-    durant la période allant du <strong>${intern?.start_date ? formatDate(intern.start_date) : '............'}</strong> au <strong>${intern?.end_date ? formatDate(intern.end_date) : '............'}</strong>.
+  <p style="font-size: 18px; font-weight: bold; margin-bottom: 25px; text-align: justify;">
+    Cour Administrative d'Appel de Fès (Ministère de la Justice) <span style="font-weight: normal;">et ce</span>
   </p>
 
-  <p style="font-size: 18px; line-height: 2; margin-top: 40px; text-align: justify;">
-    Cette attestation est délivrée à l'intéressé(e) pour servir et valoir ce que de droit.
+  <p style="font-size: 18px; margin-bottom: 10px; text-align: justify;">
+    du :
   </p>
 
-  <div style="margin-top: 80px; text-align: right; font-size: 18px; font-weight: bold;">
+  <p style="font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0 35px 0;">
+    ${intern?.start_date ? formatDate(intern.start_date) : '............'} Au ${intern?.end_date ? formatDate(intern.end_date) : '............'}
+  </p>
+
+  <p style="font-size: 18px; margin-bottom: 25px; text-align: justify;">
+    Pendant toute la période du stage, l'intéressé(e) a montré un grand intérêt pour son travail qu'il/elle a mené avec sérieux et assiduité.
+  </p>
+
+  <p style="font-size: 18px; margin-bottom: 60px; text-align: justify;">
+    Cette attestation est délivrée à l'intéressé(e), sur sa demande, pour servir et valoir ce que de droit.
+  </p>
+
+  <div style="text-align: center; font-size: 18px; margin-bottom: 20px;">
     Fait à Fès, le ${current_date}
   </div>
-  <div style="margin-top: 30px; text-align: right; font-size: 18px; font-weight: bold; padding-right: 40px;">
-    Signature et Cachet :
-  </div>
-</body>
-</html>`;
+</div>`;
   };
 
   const handleDownloadPdf = () => {

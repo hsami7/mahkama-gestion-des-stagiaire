@@ -31,6 +31,7 @@ export const printHTML = (html: string) => {
 
 export const downloadHtmlAsPdf = (html: string, filename: string, margin: number = 15) => {
   const container = document.createElement('div');
+  container.dir = 'ltr'; // Prevent global RTL from breaking French layout
   container.innerHTML = html;
   const opt = {
     margin,
@@ -44,6 +45,7 @@ export const downloadHtmlAsPdf = (html: string, filename: string, margin: number
 
 export const viewHtmlAsPdf = async (html: string) => {
   const container = document.createElement('div');
+  container.dir = 'ltr'; // Prevent global RTL from breaking French layout
   container.innerHTML = html;
   const opt = {
     margin: 15,
