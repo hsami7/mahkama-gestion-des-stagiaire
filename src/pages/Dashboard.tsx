@@ -270,6 +270,7 @@ export function Dashboard() {
       
       {attestationIntern && (
         <AttestationModal
+          isOpen={true}
           intern={attestationIntern}
           onClose={() => setAttestationIntern(null)}
         />
