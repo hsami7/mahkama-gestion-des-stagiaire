@@ -445,6 +445,8 @@ def get_interns():
         "name": i.name, 
         "email": i.email, 
         "encadrant": i.encadrant, 
+        "name_fr": i.name_fr,
+        "national_id": i.national_id,
         "status": i.status,
         "photo_path": i.photo_path,
         "start_date": i.start_date,
@@ -954,6 +956,22 @@ def upload_vault_document():
 @app.route('/api/vault/<filename>', methods=['GET'])
 def download_vault_document(filename):
     return send_from_directory(VAULT_FOLDER, filename)
+
+@app.route('/api/vault/open/<filename>', methods=['GET'])
+def open_vault_document(filename):
+    safe_name = filename.replace('/', '_').replace('\\', '_')
+    filepath = os.path.join(VAULT_FOLDER, safe_name)
+    if os.path.exists(filepath):
+        import os as _os
+        if _os.name == 'nt':
+            try:
+                _os.startfile(filepath)
+                return jsonify({"success": True})
+            except OSError:
+                return jsonify({"msg": "لم يتم العثور على برنامج لفتح ملفات Word (مثل Microsoft Word) على جهازك."}), 400
+        # If not Windows, we just return the file as a fallback, 
+        # or we could try xdg-open/open, but Windows is what matters here.
+    return jsonify({"msg": "File not found"}), 404
 
 @app.route('/api/vault/<filename>', methods=['DELETE'])
 @jwt_required()

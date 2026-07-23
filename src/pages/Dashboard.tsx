@@ -3,6 +3,7 @@ import { Users, FileText, CheckCircle, WarningCircle, Archive, Plus, Eye, Certif
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
+import { AttestationModal } from '../components/AttestationModal';
 
 function formatDate(d: string | undefined | null): string {
   if (!d) return '—';
@@ -20,6 +21,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const toast = useToast();
   const [interns, setInterns] = useState<any[]>([]);
+  const [attestationIntern, setAttestationIntern] = useState<any>(null);
 
   useEffect(() => {
     const fetchInterns = async () => {
@@ -238,7 +240,7 @@ export function Dashboard() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button className="btn btn-ghost sm" style={{ fontSize: 11 }} onClick={() => window.open(`/api/interns/${intern.id}/attestation?token=${sessionStorage.getItem('token')}`, '_blank')}>
+                        <button className="btn btn-ghost sm" style={{ fontSize: 11 }} onClick={() => setAttestationIntern(intern)}>
                           <Certificate size={14} /> شهادة
                         </button>
                         {!intern.has_final_report && (
@@ -265,6 +267,14 @@ export function Dashboard() {
           </table>
         </div>
       </div>
+      </div>
+      
+      {attestationIntern && (
+        <AttestationModal
+          intern={attestationIntern}
+          onClose={() => setAttestationIntern(null)}
+        />
+      )}
     </div>
   );
 }
