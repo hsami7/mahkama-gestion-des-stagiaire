@@ -40,7 +40,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login setAuthToken={setToken} />} />
-      <Route path="/apply" element={<PublicForm />} />
+      <Route path="/apply/:slug" element={<PublicForm />} />
       
 
       {isIntern ? (
