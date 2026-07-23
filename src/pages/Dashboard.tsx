@@ -175,9 +175,28 @@ export function Dashboard() {
     try { setSubmissions(await api.get('/submissions?status=pending')); } catch (e) { console.error(e); }
   };
 
+  const syncGoogleFormsQuietly = async () => {
+    try {
+      const res = await api.post('/forms/sync-google', {});
+      if (res.added > 0) {
+        toast.success(`تم جلب ${res.added} طلب جديد من نموذج جوجل تلقائياً`);
+        loadSubmissions();
+      }
+    } catch (e) {
+      // Quietly fail for automatic background syncs
+    }
+  };
+
   useEffect(() => {
     loadInterns();
     loadSubmissions();
+
+    // Auto-sync Google Forms every 2 minutes
+    const intervalId = setInterval(() => {
+      syncGoogleFormsQuietly();
+    }, 120000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   const handleApprove = async (id: number) => {
