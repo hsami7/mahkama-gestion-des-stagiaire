@@ -86,17 +86,36 @@ export const downloadDocx = async (templateUrl: string, data: any, filename: str
   saveAs(blob, filename);
 };
 
-export const viewDocx = async (templateUrl: string, data: any) => {
-  const blob = await generateDocxBlob(templateUrl, data);
-  const res = await fetch('https://docx-viewer.mahkamaplus.com/upload', {
-    method: 'POST',
-    body: blob
+export const viewDocx = async (templateUrl: string, data: any, filename: string = 'Document.docx') => {
+  const res = await fetch(templateUrl);
+  if (!res.ok) throw new Error('Template not found');
+  const blobData = await res.blob();
+  const content = await blobData.arrayBuffer();
+  
+  const zip = new PizZip(content);
+  const doc = new Docxtemplater(zip, {
+    paragraphLoop: true,
+    linebreaks: true,
   });
-  if (!res.ok) throw new Error('Failed to upload docx');
-  const url = await res.text();
-  if (url) {
-    window.open(url, '_blank');
+
+  doc.render(data);
+
+  const outBuffer = doc.getZip().generate({
+    type: 'nodebuffer',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+  
+  // This requires the app to be running in Electron
+  if (window.require) {
+    const fs = window.require('fs');
+    const os = window.require('os');
+    const path = window.require('path');
+    const { shell } = window.require('electron');
+    
+    const tempPath = path.join(os.tmpdir(), filename);
+    fs.writeFileSync(tempPath, outBuffer);
+    shell.openPath(tempPath);
   } else {
-    throw new Error('Viewer URL not returned');
+    throw new Error('Not running in Electron, cannot open file locally.');
   }
 };

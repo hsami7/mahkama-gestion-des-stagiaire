@@ -160,10 +160,10 @@ export function AttestationModal({ isOpen, onClose, intern }: AttestationModalPr
   const handleViewDocx = async () => {
     try {
       toast.info('جاري إعداد المستند للعرض...');
-      await viewDocx('/attestation_template.docx', getDocxData());
+      await viewDocx('/attestation_template.docx', getDocxData(), `Attestation_de_stage_de_${intern?.name_fr || intern?.name || 'Intern'}.docx`);
     } catch (err) {
       console.error(err);
-      toast.error('حدث خطأ أثناء عرض الشهادة أو خدمة عرض الملفات غير متوفرة حالياً');
+      toast.error('حدث خطأ أثناء عرض الشهادة');
     }
   };
 
