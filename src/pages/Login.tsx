@@ -57,7 +57,7 @@ export function Login({ setAuthToken }: { setAuthToken: (token: string) => void 
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@mahkama.ma"
+                  placeholder="اسم المستخدم أو البريد الإلكتروني"
                   style={{ paddingRight: '38px' }}
                 />
               </div>

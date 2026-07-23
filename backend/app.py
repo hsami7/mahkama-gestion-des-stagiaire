@@ -917,8 +917,8 @@ def upload_vault_document():
         return jsonify({"msg": "No selected file"}), 400
         
     if file:
-        if not file.filename.lower().endswith('.pdf'):
-            return jsonify({"msg": "عذراً، يُسمح فقط برفع ملفات PDF"}), 400
+        if not (file.filename.lower().endswith('.pdf') or file.filename.lower().endswith('.docx') or file.filename.lower().endswith('.doc')):
+            return jsonify({"msg": "عذراً، يُسمح فقط برفع ملفات PDF و Word"}), 400
             
         file.seek(0, os.SEEK_END)
         size = file.tell()
@@ -929,8 +929,16 @@ def upload_vault_document():
         custom_name = request.form.get('custom_name')
         if custom_name:
             filename = custom_name.replace('/', '_').replace('\\', '_')
-            if not filename.lower().endswith('.pdf'):
-                filename += '.pdf'
+            
+            # Determine correct extension based on original file
+            ext = '.pdf'
+            if file.filename.lower().endswith('.docx'):
+                ext = '.docx'
+            elif file.filename.lower().endswith('.doc'):
+                ext = '.doc'
+                
+            if not (filename.lower().endswith('.pdf') or filename.lower().endswith('.docx') or filename.lower().endswith('.doc')):
+                filename += ext
         else:
             filename = secure_filename(file.filename)
             if not filename:

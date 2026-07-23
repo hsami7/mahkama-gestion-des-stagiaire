@@ -138,4 +138,6 @@ export const api = {
     `${API_BASE}/interns/${internId}/profile-md?token=${sessionStorage.getItem('token')}`,
   exportInterns: (format: 'pdf' | 'excel', ids?: number[]) =>
     `${API_BASE}/interns/export?format=${format}${ids && ids.length ? `&ids=${ids.join(',')}` : ''}&token=${sessionStorage.getItem('token')}`,
+  exportInternZip: (internId: number) =>
+    `${API_BASE}/interns/${internId}/export-zip?token=${sessionStorage.getItem('token')}`,
 };

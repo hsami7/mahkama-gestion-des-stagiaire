@@ -13,7 +13,6 @@ import { LOGO_BASE64 } from '../utils/logoBase64';
 
 const EVAL_CRITERIA = [
   { key: 'punctuality', label: 'المواظبة واحترام الوقت' },
-  { key: 'skills', label: 'المهارات السلوكية والعملية' },
   { key: 'conduct', label: 'حسن التعامل' },
   { key: 'seriousness', label: 'الجدية في العمل' },
 ];
@@ -477,7 +476,7 @@ export function Profile() {
 <html dir="rtl">
 <head>
   <meta charset="utf-8">
-  <title>بطاقة تقييم التدريب</title>
+  <title>بطاقة تقييم المتدرب</title>
   <style>
     @font-face {
       font-family: 'Tifinagh';
@@ -592,7 +591,7 @@ export function Profile() {
     </div>
   </div>
 
-  <h1>بطاقة تقييم التدريب</h1>
+  <h1>بطاقة تقييم المتدرب</h1>
 
   <table>
     <tr class="bg-yellow">
@@ -740,12 +739,10 @@ export function Profile() {
         
         c1_no: crit['punctuality']?.no ? '☑' : '☐',
         c1_yes: crit['punctuality']?.yes ? '☑' : '☐',
-        c2_no: crit['skills']?.no ? '☑' : '☐',
-        c2_yes: crit['skills']?.yes ? '☑' : '☐',
-        c3_no: crit['conduct']?.no ? '☑' : '☐',
-        c3_yes: crit['conduct']?.yes ? '☑' : '☐',
-        c4_no: crit['seriousness']?.no ? '☑' : '☐',
-        c4_yes: crit['seriousness']?.yes ? '☑' : '☐',
+        c2_no: crit['conduct']?.no ? '☑' : '☐',
+        c2_yes: crit['conduct']?.yes ? '☑' : '☐',
+        c3_no: crit['seriousness']?.no ? '☑' : '☐',
+        c3_yes: crit['seriousness']?.yes ? '☑' : '☐',
         
         notes: comments,
       });
@@ -758,6 +755,43 @@ export function Profile() {
     } catch (err) {
       console.error(err);
       toast.error('حدث خطأ أثناء إنشاء ملف Word');
+    }
+  };
+
+  const handleDownloadAttestationWord = async () => {
+    try {
+      const res = await fetch('/attestation_template.docx');
+      if (!res.ok) throw new Error('Template not found');
+      const blob = await res.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+
+      const zip = new PizZip(arrayBuffer);
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+      
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+
+      doc.render({
+        name_fr: intern?.name_fr || '—',
+        cni: intern?.national_id || '—',
+        start_date: intern?.start_date ? formatDate(intern.start_date) : '—',
+        end_date: intern?.end_date ? formatDate(intern.end_date) : '—',
+        current_date: `${dd}/${mm}/${yyyy}`,
+      });
+
+      const out = doc.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+      saveAs(out, `شهادة_تدريب_${intern?.name || 'متدرب'}.docx`);
+    } catch (err) {
+      console.error(err);
+      toast.error('حدث خطأ أثناء إنشاء الشهادة');
     }
   };
 
@@ -1189,7 +1223,7 @@ export function Profile() {
         <div id="evaluation-section" className="card" style={{ padding: '28px', marginTop: '24px', borderTop: '4px solid var(--success)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>بطاقة تقييم التدريب</h3>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>بطاقة تقييم المتدرب</h3>
               <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>تقييم أداء المتدرب وطباعة البطاقة للتوقيع.</p>
             </div>
             {canEvaluateInterns && (
@@ -1218,18 +1252,20 @@ export function Profile() {
               )}
               <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5, marginBottom:12}}>
                 <thead><tr style={{borderBottom:'1px solid var(--line)'}}>
-                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
+                  <th style={{textAlign:'right', padding:'6px 4px', width: 200}}>المعيار</th>
                   <th style={{textAlign:'center', padding:'6px 4px', width:60}}>نعم</th>
-                  <th style={{textAlign:'right', padding:'6px 4px'}}>المعيار</th>
+                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
+                  <th style={{width: 'auto'}}></th>
                 </tr></thead>
                 <tbody>
                   {EVAL_CRITERIA.map(c => {
                     const val = intern.evaluation.criteria?.[c.key] || {yes:false, no:false};
                     return (
                       <tr key={c.key} style={{borderBottom:'1px solid var(--line)'}}>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
                         <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
+                        <td></td>
                       </tr>
                     );
                   })}
@@ -1261,9 +1297,6 @@ export function Profile() {
                     </a>
                   )}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button className="btn btn-ghost sm" onClick={handlePrintEval} style={{fontSize:12}}>
-                      <DownloadSimple size={14} /> طباعة البطاقة
-                    </button>
                     <button className="btn btn-ghost sm" onClick={handleDownloadWord} title="تحميل DOCX" style={{fontSize:12, color:'#2b579a'}}>
                       <FileDoc size={14} /> DOCX
                     </button>
@@ -1290,7 +1323,7 @@ export function Profile() {
               <a href={api.exportInternZip(intern.id)} download className="btn btn-ghost" style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px', border: '1px solid var(--line)' }}>
                 <Package size={18} weight="fill" /> تحميل أرشيف الملفات ZIP
               </a>
-              <button className="btn btn-primary" onClick={() => toast.info('جاري إعداد قالب الشهادة')} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px', background: 'var(--danger)', color: '#fff', border: 'none' }}>
+              <button className="btn btn-primary" onClick={handleDownloadAttestationWord} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px', background: 'var(--danger)', color: '#fff', border: 'none' }}>
                 <Certificate size={18} weight="fill" /> إصدار شهادة التدريب
               </button>
             </div>
@@ -1347,7 +1380,7 @@ export function Profile() {
         <div className="overlay on" style={{ display: 'flex' }}>
           <div className="modal" style={{maxWidth:700}}>
             <div className="modal-head">
-              <h3>بطاقة تقييم التدريب</h3>
+              <h3>بطاقة تقييم المتدرب</h3>
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowEvalForm(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
@@ -1407,22 +1440,24 @@ export function Profile() {
                 <label style={{fontWeight:700, fontSize:13, display:'block', marginBottom:8}}>تقييم المتدرب</label>
                 <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
                   <thead><tr style={{borderBottom:'1px solid var(--line)'}}>
-                    <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
+                    <th style={{textAlign:'right', padding:'6px 4px', width: 200}}>المعيار</th>
                     <th style={{textAlign:'center', padding:'6px 4px', width:60}}>نعم</th>
-                    <th style={{textAlign:'right', padding:'6px 4px'}}>المعيار</th>
+                    <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
+                    <th style={{width: 'auto'}}></th>
                   </tr></thead>
                   <tbody>
                     {EVAL_CRITERIA.map(c => {
                       const val = evalCriteria[c.key] || {yes:false, no:false};
                       return (
                         <tr key={c.key} style={{borderBottom:'1px solid var(--line)'}}>
-                          <td style={{textAlign:'center', padding:'8px 4px'}}>
-                            <input type="checkbox" checked={val.no} onChange={e => setEvalCriteria({...evalCriteria, [c.key]:{...val, no: e.target.checked}})} style={{width:18,height:18,cursor:'pointer'}} />
-                          </td>
+                          <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
                           <td style={{textAlign:'center', padding:'8px 4px'}}>
                             <input type="checkbox" checked={val.yes} onChange={e => setEvalCriteria({...evalCriteria, [c.key]:{...val, yes: e.target.checked}})} style={{width:18,height:18,cursor:'pointer'}} />
                           </td>
-                          <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
+                          <td style={{textAlign:'center', padding:'8px 4px'}}>
+                            <input type="checkbox" checked={val.no} onChange={e => setEvalCriteria({...evalCriteria, [c.key]:{...val, no: e.target.checked}})} style={{width:18,height:18,cursor:'pointer'}} />
+                          </td>
+                          <td></td>
                         </tr>
                       );
                     })}

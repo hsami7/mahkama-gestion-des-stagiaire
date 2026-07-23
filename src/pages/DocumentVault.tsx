@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UploadSimple, FilePdf, DownloadSimple, Trash, FolderOpen, Eye } from '@phosphor-icons/react';
+import { UploadSimple, FilePdf, DownloadSimple, Trash, FolderOpen, Eye, FileDoc } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
 
@@ -27,8 +27,8 @@ export function DocumentVault() {
     e.preventDefault();
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      toast.warning('عذراً، يُسمح فقط برفع ملفات PDF');
+    if (!file.name.toLowerCase().endsWith('.pdf') && !file.name.toLowerCase().endsWith('.docx') && !file.name.toLowerCase().endsWith('.doc')) {
+      toast.warning('عذراً، يُسمح فقط برفع ملفات PDF و Word');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -106,26 +106,33 @@ export function DocumentVault() {
               onBlur={e => e.target.style.borderColor = 'var(--line)'}
             />
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <input 
-              id="vault-file-input"
-              type="file" 
-              accept=".pdf"
-              required
-              onChange={(e) => {
-                const selectedFile = e.target.files?.[0] || null;
-                setFile(selectedFile);
-                if (selectedFile && !docName) {
-                  setDocName(selectedFile.name.replace(/\.pdf$/i, ''));
-                }
-              }}
-              style={{ flex: 1 }}
-            />
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label 
+              className="btn btn-ghost" 
+              style={{ flex: 1, border: '1px dashed var(--line)', background: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', padding: '10px' }}
+            >
+              {file?.name?.toLowerCase().endsWith('.docx') || file?.name?.toLowerCase().endsWith('.doc') ? <FileDoc size={18} /> : <FilePdf size={18} />}
+              {file ? file.name : 'اختر ملف PDF أو Word'}
+              <input 
+                id="vault-file-input"
+                type="file" 
+                accept=".pdf,.docx,.doc"
+                required
+                onChange={(e) => {
+                  const selectedFile = e.target.files?.[0] || null;
+                  setFile(selectedFile);
+                  if (selectedFile && !docName) {
+                    setDocName(selectedFile.name.replace(/\.(pdf|docx|doc)$/i, ''));
+                  }
+                }}
+                style={{ display: 'none' }}
+              />
+            </label>
             <button 
               type="submit" 
               disabled={!file}
               className="btn btn-ink"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', whiteSpace: 'nowrap' }}
             >
               <UploadSimple size={18} />
               رفع الملف
@@ -150,10 +157,10 @@ export function DocumentVault() {
             >
               <Trash size={16} weight="regular" />
             </button>
-            <div style={{ width: '70px', height: '70px', backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
-              <FilePdf size={36} weight="regular" />
+            <div style={{ width: '70px', height: '70px', backgroundColor: doc.name.toLowerCase().endsWith('.pdf') ? 'var(--danger-bg)' : '#e0f0ff', color: doc.name.toLowerCase().endsWith('.pdf') ? 'var(--danger)' : '#0056b3', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+              {doc.name.toLowerCase().endsWith('.pdf') ? <FilePdf size={36} weight="regular" /> : <FileDoc size={36} weight="regular" />}
             </div>
-            <h3 style={{ fontWeight: 'bold', marginBottom: '8px', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} dir="ltr">{doc.name}</h3>
+            <h3 style={{ fontWeight: 'bold', marginBottom: '8px', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} dir="ltr">{doc.name.replace(/\.(pdf|docx|doc)$/i, '')}</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--slate)', marginBottom: '24px' }}>KB {(doc.size / 1024).toFixed(1)}</p>
             <div style={{ width: '100%', marginTop: 'auto', display: 'flex', gap: '10px' }}>
               <a 

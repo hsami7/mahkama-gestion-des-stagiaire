@@ -574,7 +574,7 @@ export function InternPortal() {
 
             {internData?.evaluation?.criteria && (
             <div className="card" style={{ padding: '20px 24px', marginTop: 16, borderTop: '3px solid var(--success)' }}>
-              <div className="section-title"><h3>بطاقة تقييم التدريب</h3></div>
+              <div className="section-title"><h3>بطاقة تقييم المتدرب</h3></div>
               <div style={{marginBottom:14, fontSize:13}}>
                 <b>الفترة:</b> من {formatDate(internData.evaluation.period_from || internData.start_date)} إلى {formatDate(internData.evaluation.period_to || internData.end_date)}
               </div>
@@ -590,26 +590,29 @@ export function InternPortal() {
               )}
               <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5, marginBottom:12}}>
                 <thead><tr style={{borderBottom:'1px solid var(--line)'}}>
-                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
+                  <th style={{textAlign:'right', padding:'6px 4px', width: 200}}>المعيار</th>
                   <th style={{textAlign:'center', padding:'6px 4px', width:60}}>نعم</th>
-                  <th style={{textAlign:'right', padding:'6px 4px'}}>المعيار</th>
+                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
+                  <th style={{width: 'auto'}}></th>
                 </tr></thead>
                 <tbody>
                   {(window as any).EVAL_CRITERIA ? (window as any).EVAL_CRITERIA.map((c: any) => {
                     const val = internData.evaluation.criteria?.[c.key] || {yes:false, no:false};
                     return (
                       <tr key={c.key} style={{borderBottom:'1px solid var(--line)'}}>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
                         <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
+                        <td></td>
                       </tr>
                     );
                   }) : Object.keys(internData.evaluation.criteria || {}).length > 0 && (
                     Object.entries(internData.evaluation.criteria).map(([key, val]: [string, any]) => (
                       <tr key={key} style={{borderBottom:'1px solid var(--line)'}}>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
                         <td style={{padding:'8px 4px', fontWeight:600}}>{key}</td>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
+                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
+                        <td></td>
                       </tr>
                     ))
                   )}
