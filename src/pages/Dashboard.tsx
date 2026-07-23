@@ -267,7 +267,6 @@ export function Dashboard() {
           </table>
         </div>
       </div>
-      </div>
       
       {attestationIntern && (
         <AttestationModal
