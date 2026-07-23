@@ -7,6 +7,9 @@ export function Settings() {
   
   // Integration Settings
   const [sheetLink, setSheetLink] = useState('');
+  const [microsoftExcelLink, setMicrosoftExcelLink] = useState('');
+  const [serviceAccountJson, setServiceAccountJson] = useState('');
+  const [emailProvider, setEmailProvider] = useState('gmail');
   const [gmailAddress, setGmailAddress] = useState('');
   const [gmailAppPassword, setGmailAppPassword] = useState('');
   const [integrationMsg, setIntegrationMsg] = useState('');
@@ -23,6 +26,9 @@ export function Settings() {
       ]).then(([logsData, settingsData]) => {
         setLogs(logsData);
         setSheetLink(settingsData.google_sheet_link || '');
+        setMicrosoftExcelLink(settingsData.microsoft_excel_link || '');
+        setServiceAccountJson(settingsData.service_account_json || '');
+        setEmailProvider(settingsData.email_provider || 'gmail');
         setGmailAddress(settingsData.gmail_address || '');
         setGmailAppPassword(settingsData.gmail_app_password || '');
         setLoading(false);
@@ -59,11 +65,15 @@ export function Settings() {
     } catch (err: any) {
       setMsg(err.response?.data?.msg || 'فشل في تغيير كلمة المرور');
     }
+  };
   const handleSaveIntegration = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await api.post('/integration/settings', {
         google_sheet_link: sheetLink,
+        microsoft_excel_link: microsoftExcelLink,
+        service_account_json: serviceAccountJson,
+        email_provider: emailProvider,
         gmail_address: gmailAddress,
         gmail_app_password: gmailAppPassword
       });
@@ -125,14 +135,13 @@ export function Settings() {
 
       {isAdmin && (
         <div className="card" style={{ padding: '32px', marginBottom: '24px', maxWidth: '600px' }}>
-          <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>ربط نماذج جوجل والبريد التلقائي</h3>
+          <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>ربط النماذج (Google & Microsoft) والبريد التلقائي</h3>
           <p style={{ color: 'var(--slate)', fontSize: '0.85rem', marginBottom: '24px' }}>
-            لربط نموذج جوجل الخاص بك، قم بربط النموذج بجدول بيانات Google Sheet، واجعله متاحاً لـ "أي شخص لديه الرابط". ثم أدخل الرابط هنا.
-            لإرسال الرسائل التلقائية، أدخل بريدك الإلكتروني (Gmail) و "كلمة مرور التطبيق" (App Password).
+            أدخل روابط النماذج لجلب الردود تلقائياً. لإنشاء نماذج جوجل برمجياً، أضف محتوى Service Account JSON. للبريد التلقائي، اختر المزود وأدخل بيانات الدخول.
           </p>
           <form onSubmit={handleSaveIntegration}>
             <div className="form-group">
-              <label>رابط Google Sheet للردود</label>
+              <label>رابط Google Sheet (للردود اليدوية)</label>
               <input 
                 type="text" 
                 placeholder="https://docs.google.com/spreadsheets/d/..." 
@@ -143,10 +152,47 @@ export function Settings() {
                 style={{ textAlign: 'left' }}
               />
             </div>
+
+            <div className="form-group">
+              <label>رابط Microsoft Excel (من OneDrive)</label>
+              <input 
+                type="text" 
+                placeholder="https://1drv.ms/x/c/..." 
+                value={microsoftExcelLink}
+                onChange={e => setMicrosoftExcelLink(e.target.value)}
+                className="input"
+                dir="ltr"
+                style={{ textAlign: 'left' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>محتوى ملف Service Account JSON (لجوجل)</label>
+              <textarea 
+                placeholder='{"type": "service_account", "project_id": "..."}'
+                value={serviceAccountJson}
+                onChange={e => setServiceAccountJson(e.target.value)}
+                className="input"
+                dir="ltr"
+                style={{ textAlign: 'left', minHeight: '80px', fontFamily: 'monospace', fontSize: '12px' }}
+              />
+            </div>
             
+            <div className="form-group">
+              <label>مزود البريد الإلكتروني</label>
+              <select 
+                value={emailProvider} 
+                onChange={e => setEmailProvider(e.target.value)}
+                className="input"
+              >
+                <option value="gmail">Gmail</option>
+                <option value="outlook">Outlook / Office 365</option>
+              </select>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>بريد Gmail المرسِل</label>
+                <label>البريد الإلكتروني المرسِل</label>
                 <input 
                   type="email" 
                   placeholder="example@gmail.com" 
@@ -159,10 +205,10 @@ export function Settings() {
               </div>
               
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>كلمة مرور التطبيق (App Password)</label>
+                <label>كلمة المرور (أو App Password)</label>
                 <input 
                   type="password" 
-                  placeholder="16 حرفاً بدون مسافات" 
+                  placeholder="كلمة المرور" 
                   value={gmailAppPassword}
                   onChange={e => setGmailAppPassword(e.target.value)}
                   className="input"

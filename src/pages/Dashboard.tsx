@@ -214,7 +214,7 @@ export function Dashboard() {
 
   // Old handleReject removed, handled below
 
-  const handleSync = async () => {
+  const handleSyncGoogle = async () => {
     setSyncing(true);
     try {
       const res = await api.post('/forms/sync-google', {});
@@ -222,12 +222,30 @@ export function Dashboard() {
         toast.success(`تم جلب ${res.added} طلب جديد من نموذج جوجل`);
         loadSubmissions();
       } else {
-        toast.info('لا توجد طلبات جديدة');
+        toast.info('لا توجد طلبات جديدة من جوجل');
       }
     } catch (e: any) {
       toast.error(e.response?.data?.msg || 'حدث خطأ أثناء الاتصال بجوجل، تأكد من الإعدادات');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const [syncingMs, setSyncingMs] = useState(false);
+  const handleSyncMicrosoft = async () => {
+    setSyncingMs(true);
+    try {
+      const res = await api.post('/forms/sync-microsoft', {});
+      if (res.added > 0) {
+        toast.success(`تم جلب ${res.added} طلب جديد من مايكروسوفت`);
+        loadSubmissions();
+      } else {
+        toast.info('لا توجد طلبات جديدة من مايكروسوفت');
+      }
+    } catch (e: any) {
+      toast.error(e.response?.data?.msg || 'حدث خطأ أثناء الاتصال بمايكروسوفت، تأكد من الرابط في الإعدادات');
+    } finally {
+      setSyncingMs(false);
     }
   };
 
@@ -402,14 +420,24 @@ export function Dashboard() {
                   {unifiedPending.length}
                 </span>
               )}
-              <button 
-                onClick={handleSync} 
-                disabled={syncing}
-                className="btn btn-ghost sm" 
-                style={{ fontSize: '0.8rem', marginRight: '10px' }}
-              >
-                {syncing ? 'جاري الجلب...' : 'مزامنة مع جوجل'}
-              </button>
+              <div style={{ display: 'flex', gap: '8px', marginRight: '10px' }}>
+                <button 
+                  onClick={handleSyncGoogle} 
+                  disabled={syncing}
+                  className="btn btn-ghost sm" 
+                  style={{ fontSize: '0.8rem' }}
+                >
+                  {syncing ? 'جاري الجلب...' : 'مزامنة جوجل'}
+                </button>
+                <button 
+                  onClick={handleSyncMicrosoft} 
+                  disabled={syncingMs}
+                  className="btn btn-ghost sm" 
+                  style={{ fontSize: '0.8rem' }}
+                >
+                  {syncingMs ? 'جاري الجلب...' : 'مزامنة مايكروسوفت'}
+                </button>
+              </div>
             </div>
 
             {/* Decision helpers row */}

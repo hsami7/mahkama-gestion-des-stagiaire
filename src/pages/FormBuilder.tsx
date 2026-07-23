@@ -134,6 +134,9 @@ export function FormBuilder() {
 
   const removeField = (id: string) => setFields(prev => prev.filter(f => f.id !== id));
 
+  const [googleFormLink, setGoogleFormLink] = useState<string | null>(null);
+  const [generatingGoogle, setGeneratingGoogle] = useState(false);
+
   const saveForm = async () => {
     if (!fields.length) { toast.info('أضف حقلاً واحداً على الأقل'); return; }
     setSaving(true);
@@ -151,6 +154,21 @@ export function FormBuilder() {
       toast.error('فشل حفظ النموذج');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const generateGoogleForm = async () => {
+    if (!fields.length) { toast.info('أضف حقلاً واحداً على الأقل'); return; }
+    setGeneratingGoogle(true);
+    try {
+      const payload = { title: formTitle, fields: fields };
+      const res = await api.post('/forms/generate', payload);
+      setGoogleFormLink(res.responderUri);
+      toast.success('تم إنشاء نموذج جوجل بنجاح!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.msg || 'حدث خطأ أثناء إنشاء نموذج جوجل تأكد من ملف Service Account');
+    } finally {
+      setGeneratingGoogle(false);
     }
   };
 
@@ -254,9 +272,14 @@ export function FormBuilder() {
           </button>
           <h2 style={{ margin: 0 }}>{editingForm ? 'تعديل النموذج' : 'نموذج جديد'}</h2>
         </div>
-        <button className="btn btn-gold" onClick={saveForm} disabled={saving}>
-          <Check size={18} /> {saving ? 'جاري الحفظ...' : 'حفظ النموذج'}
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-ghost" onClick={generateGoogleForm} disabled={generatingGoogle || fields.length === 0} style={{ border: '1px solid var(--line)' }}>
+            <FileText size={18} /> {generatingGoogle ? 'جاري التوليد...' : 'توليد Google Form'}
+          </button>
+          <button className="btn btn-gold" onClick={saveForm} disabled={saving}>
+            <Check size={18} /> {saving ? 'جاري الحفظ...' : 'حفظ النموذج'}
+          </button>
+        </div>
       </div>
 
       {/* Form title */}
@@ -280,6 +303,19 @@ export function FormBuilder() {
             <code style={{ fontSize: '0.88rem', color: 'var(--ink)' }}>{publicUrl(generatedSlug)}</code>
           </div>
           <button className="btn btn-ghost sm" onClick={() => copyLink(generatedSlug)}>
+            <Copy size={15} /> نسخ الرابط
+          </button>
+        </div>
+      )}
+
+      {/* Generated Google Form link */}
+      {googleFormLink && (
+        <div className="card" style={{ padding: '14px 22px', marginBottom: 20, background: '#EFF6FF', borderRight: '4px solid #1E40AF', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontWeight: 'bold', color: '#1E40AF', marginBottom: 4 }}>رابط Google Form</div>
+            <code style={{ fontSize: '0.88rem', color: 'var(--ink)' }}>{googleFormLink}</code>
+          </div>
+          <button className="btn btn-ghost sm" onClick={() => { navigator.clipboard.writeText(googleFormLink); toast.success('تم النسخ'); }}>
             <Copy size={15} /> نسخ الرابط
           </button>
         </div>

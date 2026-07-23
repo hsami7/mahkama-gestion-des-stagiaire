@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, timezone
 import base64
 import email_service
 import google_sheets_service
+import microsoft_excel_service
+import google_forms_api
 
 app = Flask(__name__)
 CORS(app)
@@ -728,6 +730,77 @@ def mark_attendance(intern_id):
         
     db.session.commit()
     return jsonify({"success": True, "id": record.id})
+
+@app.route('/api/forms/sync-microsoft', methods=['POST'])
+@jwt_required()
+def sync_microsoft_forms():
+    import microsoft_excel_service
+    settings = email_service.get_settings()
+    excel_link = settings.get('microsoft_excel_link')
+    if not excel_link:
+        return jsonify({"success": False, "msg": "يرجى تعيين رابط Microsoft Excel في الإعدادات أولاً"})
+        
+    res = microsoft_excel_service.fetch_microsoft_excel_responses(excel_link)
+    if not res['success']:
+        return jsonify(res), 400
+        
+    rows = res['data']
+    added_count = 0
+    
+    # We use 'Microsoft Excel' as the form title to distinguish
+    form_title = "Microsoft Excel"
+    
+    for row in rows:
+        # Generate a stable hash or identifier if possible, but Excel rows usually lack timestamps unless the user added them.
+        # Try to find an email or name to deduplicate
+        email = None
+        for k, v in row.items():
+            if 'email' in k.lower() or 'بريد' in k:
+                email = str(v)
+                break
+                
+        # Simple deduplication based on exact data match
+        existing = FormSubmission.query.filter_by(form_title=form_title).all()
+        is_duplicate = False
+        for ex in existing:
+            # If the JSON data is exactly the same, skip
+            if ex.submitted_data == row:
+                is_duplicate = True
+                break
+                
+        if is_duplicate:
+            continue
+            
+        new_sub = FormSubmission(
+            form_title=form_title,
+            submitted_data=row,
+            status='pending'
+        )
+        db.session.add(new_sub)
+        added_count += 1
+        
+    db.session.commit()
+    return jsonify({"success": True, "added": added_count})
+
+@app.route('/api/forms/generate', methods=['POST'])
+@jwt_required()
+def generate_google_form_endpoint():
+    data = request.json
+    title = data.get("title", "نموذج جديد")
+    fields = data.get("fields", [])
+    
+    settings = email_service.get_settings()
+    service_account_json_str = settings.get("service_account_json", "")
+    owner_email = settings.get("gmail_address", "") # Use the sending email as owner, or a new field if preferred. We'll use the gmail_address.
+    
+    if not service_account_json_str:
+        return jsonify({"success": False, "msg": "يرجى إضافة بيانات Service Account JSON في الإعدادات أولاً."}), 400
+        
+    res = google_forms_api.generate_google_form(title, fields, service_account_json_str, owner_email)
+    if not res["success"]:
+        return jsonify(res), 400
+        
+    return jsonify(res)
 
 @app.route('/api/attendance/by-date', methods=['GET'])
 @jwt_required()

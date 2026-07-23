@@ -8,35 +8,52 @@ SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'integration_settings.js
 
 def get_settings():
     if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
+        try:
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                # Defaults
+                return {
+                    'email_provider': data.get('email_provider', 'gmail'),
+                    'gmail_address': data.get('gmail_address', ''),
+                    'gmail_app_password': data.get('gmail_app_password', '')
+                }
+        except:
+            pass
+    return {'email_provider': 'gmail', 'gmail_address': '', 'gmail_app_password': ''}
 
 def save_settings(data):
     with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
+def get_smtp_config(provider):
+    if provider == 'outlook':
+        return 'smtp.office365.com', 587
+    return 'smtp.gmail.com', 587
+
 def send_email(to_email, subject, body_html):
     settings = get_settings()
-    gmail_user = settings.get('gmail_address')
-    gmail_app_password = settings.get('gmail_app_password')
-    
-    if not gmail_user or not gmail_app_password:
-        print("Email settings not configured. Cannot send email.")
+    sender_email = settings.get('gmail_address')
+    password = settings.get('gmail_app_password')
+    provider = settings.get('email_provider', 'gmail')
+
+    if not sender_email or not password:
+        print("Email settings not configured. Skipping email.")
         return False
-        
+
+    smtp_host, smtp_port = get_smtp_config(provider)
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = sender_email
+    msg['To'] = to_email
+
+    msg.attach(MIMEText(body_html, 'html'))
+
     try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = f"إدارة المتدربين <{gmail_user}>"
-        msg['To'] = to_email
-        
-        part = MIMEText(body_html, 'html', 'utf-8')
-        msg.attach(part)
-        
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(gmail_user, gmail_app_password)
-        server.sendmail(gmail_user, [to_email], msg.as_string())
+        server = smtplib.SMTP(smtp_host, smtp_port)
+        server.starttls()
+        server.login(sender_email, password)
+        server.send_message(msg)
         server.quit()
         return True
     except Exception as e:
