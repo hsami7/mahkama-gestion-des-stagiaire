@@ -10,6 +10,7 @@ import { useToast } from '../components/Toast';
 import TextArea from '../components/TextArea';
 import CoverageChart from '../components/CoverageChart';
 import { LOGO_BASE64 } from '../utils/logoBase64';
+import { AttestationModal } from '../components/AttestationModal';
 
 const EVAL_CRITERIA = [
   { key: 'punctuality', label: 'المواظبة واحترام الوقت' },
@@ -126,6 +127,7 @@ export function Profile() {
 
   // PDF Export Modal State
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showAttestationModal, setShowAttestationModal] = useState(false);
   const [exportMode, setExportMode] = useState<'summary' | 'full'>('summary');
 
   const handleExportAction = async (disposition: 'attachment' | 'inline') => {
@@ -758,42 +760,7 @@ export function Profile() {
     }
   };
 
-  const handleDownloadAttestationWord = async () => {
-    try {
-      const res = await fetch('/attestation_template.docx');
-      if (!res.ok) throw new Error('Template not found');
-      const blob = await res.blob();
-      const arrayBuffer = await blob.arrayBuffer();
 
-      const zip = new PizZip(arrayBuffer);
-      const doc = new Docxtemplater(zip, {
-        paragraphLoop: true,
-        linebreaks: true,
-      });
-      
-      const today = new Date();
-      const dd = String(today.getDate()).padStart(2, '0');
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const yyyy = today.getFullYear();
-
-      doc.render({
-        name_fr: intern?.name_fr || '—',
-        cni: intern?.national_id || '—',
-        start_date: intern?.start_date ? formatDate(intern.start_date) : '—',
-        end_date: intern?.end_date ? formatDate(intern.end_date) : '—',
-        current_date: `${dd}/${mm}/${yyyy}`,
-      });
-
-      const out = doc.getZip().generate({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      });
-      saveAs(out, `شهادة_تدريب_${intern?.name || 'متدرب'}.docx`);
-    } catch (err) {
-      console.error(err);
-      toast.error('حدث خطأ أثناء إنشاء الشهادة');
-    }
-  };
 
   const handleDownloadPdf = () => {
     const html = generateEvalHtml();
@@ -847,7 +814,7 @@ export function Profile() {
         </div>
         <div className="profile-actions" style={{ display: 'flex', gap: '8px' }}>
           {intern.status !== 'مرفوض' && (
-          <button title="تحميل شهادة التدريب" onClick={() => window.open(`${API_BASE}/interns/${intern.id}/attestation?token=${sessionStorage.getItem('token')}`, '_blank')} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#e0e7ff', border: '1.5px solid #6366f1', color: '#1a1a1a', transition: 'all 0.2s' }}>
+          <button title="تحميل شهادة التدريب" onClick={() => setShowAttestationModal(true)} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#e0e7ff', border: '1.5px solid #6366f1', color: '#1a1a1a', transition: 'all 0.2s' }}>
             <Certificate weight="bold" size={18} color="#1a1a1a" />
           </button>
           )}
@@ -1323,13 +1290,18 @@ export function Profile() {
               <a href={api.exportInternZip(intern.id)} download className="btn btn-ghost" style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px', border: '1px solid var(--line)' }}>
                 <Package size={18} weight="fill" /> تحميل أرشيف الملفات ZIP
               </a>
-              <button className="btn btn-primary" onClick={handleDownloadAttestationWord} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px', background: 'var(--danger)', color: '#fff', border: 'none' }}>
+              <button className="btn btn-primary" onClick={() => setShowAttestationModal(true)} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px', background: 'var(--danger)', color: '#fff', border: 'none' }}>
                 <Certificate size={18} weight="fill" /> إصدار شهادة التدريب
               </button>
             </div>
           </div>
         </div>
       )}
+      <AttestationModal 
+        isOpen={showAttestationModal} 
+        onClose={() => setShowAttestationModal(false)} 
+        intern={intern} 
+      />
 
       {showExportModal && (
         <div className="overlay on" style={{ display: 'flex' }}>

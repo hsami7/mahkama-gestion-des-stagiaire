@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { TestModeAutofill } from '../components/TestModeAutofill';
 import { useToast } from '../components/Toast';
+import { AttestationModal } from '../components/AttestationModal';
 
 function parseDate(v?: string): Date | null {
   if (!v) return null;
@@ -42,6 +43,9 @@ export function Interns() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [appliedFilters, setAppliedFilters] = useState({ query: '', status: '' });
+  
+  const [showAttestationModal, setShowAttestationModal] = useState(false);
+  const [selectedIntern, setSelectedIntern] = useState<any>(null);
 
 const filteredInterns = useMemo(() => {
     const arr = interns.filter(intern => {
@@ -664,7 +668,11 @@ const filteredInterns = useMemo(() => {
                         <button
                           className="btn btn-ghost sm"
                           style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                          onClick={(e) => { e.stopPropagation(); window.open(`${API_BASE}/interns/${intern.id}/attestation?token=${sessionStorage.getItem('token')}`, '_blank'); }}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setSelectedIntern(intern);
+                            setShowAttestationModal(true);
+                          }}
                           title="شهادة التدريب"
                         >
                           <Certificate size={14} weight="bold" /> شهادة
@@ -707,7 +715,11 @@ const filteredInterns = useMemo(() => {
         </div>
       )}
 
-
+      <AttestationModal 
+        isOpen={showAttestationModal} 
+        onClose={() => setShowAttestationModal(false)} 
+        intern={selectedIntern} 
+      />
 
     </div>
   );
