@@ -26,16 +26,31 @@ interface SavedForm {
   pending_count: number;
 }
 
+const MAPS_TO_TYPE: Record<string, FieldType> = {
+  'name': 'text',
+  'name_fr': 'text',
+  'email': 'email',
+  'national_id': 'text',
+  'phone': 'text',
+  'university': 'text',
+  'start_date': 'date',
+  'end_date': 'date',
+  'date_of_birth': 'date',
+  'address': 'text',
+  'department': 'text',
+  'photo_path': 'photo',
+};
+
 const MAPS_TO_LABELS: Record<string, string> = {
   '': 'لا يوجد ربط',
-  'name': 'اسم المتدرب (عربي)',
-  'name_fr': 'اسم المتدرب (فرنسي)',
+  'name': 'الإسم الكامل (بالعربية)',
+  'name_fr': 'الإسم الكامل (بالفرنسة)',
   'email': 'البريد الإلكتروني',
   'national_id': 'رقم البطاقة الوطنية',
   'phone': 'رقم الهاتف',
   'university': 'الجامعة / المؤسسة',
-  'start_date': 'تاريخ البدء',
-  'end_date': 'تاريخ الانتهاء',
+  'start_date': 'تاريخ بدء التدريب',
+  'end_date': 'تاريخ إنتهاء التدريب',
   'date_of_birth': 'تاريخ الميلاد',
   'address': 'العنوان',
   'department': 'القسم / الدائرة',
@@ -62,6 +77,7 @@ export function FormBuilder() {
   const [newType, setNewType] = useState<FieldType>('text');
   const [newRequired, setNewRequired] = useState(false);
   const [newMapsTo, setNewMapsTo] = useState<MapsTo>('');
+  const [userEditedLabel, setUserEditedLabel] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatedSlug, setGeneratedSlug] = useState<string | null>(null);
 
@@ -75,6 +91,15 @@ export function FormBuilder() {
   };
 
   useEffect(() => { loadForms(); }, []);
+
+  useEffect(() => {
+    if (newMapsTo) {
+      if (!userEditedLabel) setNewLabel(MAPS_TO_LABELS[newMapsTo]);
+      if (MAPS_TO_TYPE[newMapsTo]) setNewType(MAPS_TO_TYPE[newMapsTo]);
+    } else {
+      setNewLabel('');
+    }
+  }, [newMapsTo]);
 
   const openNewBuilder = () => {
     setEditingForm(null);
@@ -104,6 +129,7 @@ export function FormBuilder() {
     setNewLabel('');
     setNewRequired(false);
     setNewMapsTo('');
+    setUserEditedLabel(false);
   };
 
   const removeField = (id: string) => setFields(prev => prev.filter(f => f.id !== id));
@@ -242,7 +268,6 @@ export function FormBuilder() {
           value={formTitle}
           onChange={e => setFormTitle(e.target.value)}
           placeholder="مثال: نموذج تسجيل دفعة 2026"
-          style={{ maxWidth: 450 }}
         />
       </div>
 
@@ -266,14 +291,24 @@ export function FormBuilder() {
           <h3 style={{ marginTop: 0, marginBottom: 20, fontSize: '1rem' }}>إضافة حقل جديد</h3>
 
           <div className="form-group">
+            <label className="form-label">ربط بحقل الملف الشخصي</label>
+            <select className="input" value={newMapsTo} onChange={e => { setUserEditedLabel(false); setNewMapsTo(e.target.value as MapsTo); }}>
+              {Object.entries(MAPS_TO_LABELS).map(([val, lbl]) => (
+                <option key={val} value={val}>{lbl}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
             <label className="form-label">اسم الحقل / السؤال</label>
             <input
               type="text"
               className="input"
               value={newLabel}
-              onChange={e => setNewLabel(e.target.value)}
+              onChange={e => { setNewLabel(e.target.value); setUserEditedLabel(true); }}
+              onFocus={() => setUserEditedLabel(true)}
               onKeyDown={e => e.key === 'Enter' && addField()}
-              placeholder="مثال: الاسم الكامل"
+              placeholder={newMapsTo ? MAPS_TO_LABELS[newMapsTo] : 'مثال: الاسم الكامل'}
             />
           </div>
 
@@ -286,15 +321,6 @@ export function FormBuilder() {
               <option value="date">تاريخ (Date)</option>
               <option value="photo">صورة (Photo)</option>
               <option value="pdf">مستند PDF</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">ربط بحقل الملف الشخصي</label>
-            <select className="input" value={newMapsTo} onChange={e => setNewMapsTo(e.target.value as MapsTo)}>
-              {Object.entries(MAPS_TO_LABELS).map(([val, lbl]) => (
-                <option key={val} value={val}>{lbl}</option>
-              ))}
             </select>
           </div>
 

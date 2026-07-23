@@ -137,70 +137,92 @@ export default function PublicForm() {
     );
   }
 
-  return (
-    <div style={{ minHeight: '100vh', background: '#F8F9FA', padding: '40px 20px', fontFamily: "'Cairo', 'Arial', sans-serif" }} dir="rtl">
-      <div style={{ maxWidth: '620px', margin: '0 auto', background: 'white', borderRadius: '16px', boxShadow: '0 4px 32px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-        {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', padding: '32px 32px 28px', textAlign: 'center' }}>
-          <h1 style={{ color: '#B8960C', fontSize: '1.5rem', margin: '0 0 8px', fontWeight: 700 }}>{formTitle}</h1>
-          <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '0.9rem' }}>يرجى ملء جميع الحقول المطلوبة بدقة</p>
+return (
+    <div style={{ minHeight: '100vh', background: '#F0EBF8', padding: '40px 20px', fontFamily: "'Cairo', 'Arial', sans-serif" }} dir="rtl">
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        {/* Top color bar */}
+        <div style={{ background: '#673AB7', height: 12, borderRadius: '12px 12px 0 0' }} />
+
+        <div style={{ background: 'white', borderRadius: '0 0 12px 12px', boxShadow: '0 1px 6px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+          {/* Header */}
+          <div style={{ padding: '28px 32px 20px', borderBottom: '1px solid #E0E0E0' }}>
+            <h1 style={{ color: '#202124', fontSize: '1.4rem', margin: '0 0 6px', fontWeight: 400 }}>{formTitle}</h1>
+            <p style={{ color: '#70757A', margin: 0, fontSize: '0.82rem' }}>يرجى ملء جميع الحقول المطلوبة *</p>
+          </div>
+
+          {/* Form body */}
+          <div style={{ padding: '24px 32px 32px' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              {fields.map(field => (
+                <div key={field.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.8rem', color: '#70757A', fontWeight: 500 }}>
+                    {field.label}
+                    {field.required && <span style={{ color: '#D93025' }}> *</span>}
+                  </label>
+
+                  {field.type === 'text' && (
+                    <input type="text" style={inputStyle} value={formData[field.label] || ''} onChange={e => handleChange(field.label, e.target.value)} required={field.required} />
+                  )}
+                  {field.type === 'email' && (
+                    <input type="email" style={inputStyle} value={formData[field.label] || ''} onChange={e => handleChange(field.label, e.target.value)} required={field.required} />
+                  )}
+                  {field.type === 'number' && (
+                    <input type="number" style={inputStyle} value={formData[field.label] || ''} onChange={e => handleChange(field.label, e.target.value)} required={field.required} />
+                  )}
+                  {field.type === 'date' && (
+                    <input type="date" style={inputStyle} value={formData[field.label] || ''} onChange={e => handleChange(field.label, e.target.value)} required={field.required} />
+                  )}
+                  {(field.type === 'photo' || field.type === 'pdf') && (
+                    <div>
+                      <input
+                        type="file"
+                        style={{ ...inputStyle, cursor: 'pointer', padding: '10px', background: '#F6F8FC', border: '1px solid #DADCE0', borderRadius: 4 }}
+                        accept={field.type === 'photo' ? 'image/*' : '.pdf'}
+                        onChange={e => { if (e.target.files?.[0]) handleFileUpload(field.label, e.target.files[0]); }}
+                        required={field.required && !formData[field.label]}
+                      />
+                      {formData[field.label] && (
+                        <div style={{ marginTop: 4, fontSize: '0.78rem', color: '#188038', fontWeight: 500 }}>
+                          ✓ تم الرفع بنجاح
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <div style={{ borderTop: '1px solid #E0E0E0', paddingTop: 20, display: 'flex', justifyContent: 'flex-start' }}>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{
+                    padding: '10px 24px',
+                    background: submitting ? '#9CA3AF' : '#673AB7',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 4,
+                    fontSize: '0.88rem',
+                    fontWeight: 500,
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    transition: 'background 0.2s',
+                    fontFamily: 'inherit',
+                    letterSpacing: '0.3px',
+                  }}
+                >
+                  {submitting ? 'جاري الإرسال...' : (<><span>إرسال</span><PaperPlaneRight size={18} /></>)}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
 
-        {/* Form body */}
-        <div style={{ padding: '32px' }}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-            {fields.map(field => (
-              <div key={field.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a1a2e' }}>
-                  {field.label}
-                  {field.required && <span style={{ color: '#EF4444', marginRight: 4 }}>*</span>}
-                </label>
-
-                {field.type === 'text' && (
-                  <input type="text" style={inputStyle} value={formData[field.label] || ''} onChange={e => handleChange(field.label, e.target.value)} required={field.required} />
-                )}
-                {field.type === 'email' && (
-                  <input type="email" style={inputStyle} value={formData[field.label] || ''} onChange={e => handleChange(field.label, e.target.value)} required={field.required} />
-                )}
-                {field.type === 'number' && (
-                  <input type="number" style={inputStyle} value={formData[field.label] || ''} onChange={e => handleChange(field.label, e.target.value)} required={field.required} />
-                )}
-                {field.type === 'date' && (
-                  <input type="date" style={inputStyle} value={formData[field.label] || ''} onChange={e => handleChange(field.label, e.target.value)} required={field.required} />
-                )}
-                {(field.type === 'photo' || field.type === 'pdf') && (
-                  <div>
-                    <input
-                      type="file"
-                      style={{ ...inputStyle, cursor: 'pointer', padding: '10px', background: '#F9FAFB', border: '2px dashed #D1D5DB' }}
-                      accept={field.type === 'photo' ? 'image/*' : '.pdf'}
-                      onChange={e => { if (e.target.files?.[0]) handleFileUpload(field.label, e.target.files[0]); }}
-                      required={field.required && !formData[field.label]}
-                    />
-                    {formData[field.label] && (
-                      <div style={{ marginTop: 6, fontSize: '0.82rem', color: '#22C55E', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <CheckCircle size={14} weight="fill" /> تم الرفع بنجاح
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            <button
-              type="submit"
-              disabled={submitting}
-              style={{
-                marginTop: 8, padding: '14px 24px', background: submitting ? '#9CA3AF' : '#B8960C',
-                color: '#fff', border: 'none', borderRadius: '10px', fontSize: '1rem',
-                fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'background 0.2s', fontFamily: 'inherit'
-              }}
-            >
-              {submitting ? 'جاري الإرسال...' : (<><span>إرسال الطلب</span><PaperPlaneRight size={20} /></>)}
-            </button>
-          </form>
+        {/* Footer */}
+        <div style={{ textAlign: 'center', marginTop: 16, fontSize: '0.75rem', color: '#9AA0A6' }}>
+          <span> powered by MYP</span>
         </div>
       </div>
     </div>
@@ -209,13 +231,14 @@ export default function PublicForm() {
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  padding: '11px 14px',
-  border: '1.5px solid #E5E7EB',
-  borderRadius: '8px',
+  padding: '10px 12px',
+  border: 'none',
+  borderBottom: '1px solid #DADCE0',
+  borderRadius: 0,
   fontSize: '0.95rem',
   fontFamily: "'Cairo', 'Arial', sans-serif",
   outline: 'none',
-  background: '#FAFAFA',
+  background: 'transparent',
   boxSizing: 'border-box',
   transition: 'border-color 0.2s',
 };
