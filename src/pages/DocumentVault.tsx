@@ -170,7 +170,7 @@ export function DocumentVault() {
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                textAlign: /[\u0600-\u06FF]/.test(doc.name) ? 'right' : 'left',
+                textAlign: 'center',
                 cursor: 'default',
               }}
             >
