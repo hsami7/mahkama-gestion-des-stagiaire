@@ -1,4 +1,9 @@
 import os
+import json
+import uuid
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -106,6 +111,20 @@ class Form(db.Model):
     __tablename__ = 'forms'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     form_data = db.Column(db.Text, nullable=False)
+    title = db.Column(db.String(200), nullable=True)
+    slug = db.Column(db.String(50), unique=True, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.String(50), nullable=True)
+
+class FormSubmission(db.Model):
+    __tablename__ = 'form_submissions'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    form_id = db.Column(db.Integer, db.ForeignKey('forms.id'), nullable=False)
+    submitted_data = db.Column(db.Text, nullable=False)  # JSON string
+    status = db.Column(db.String(20), default='pending')  # pending | approved | rejected
+    submitted_at = db.Column(db.String(50), nullable=True)
+    rejection_reason = db.Column(db.Text, nullable=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=True)
 
 class Message(db.Model):
     __tablename__ = 'messages'
@@ -160,6 +179,44 @@ def log_action(user, action):
     except Exception as e:
         db.session.rollback()
         print(f"Failed to log action: {e}")
+
+SMTP_SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'smtp_settings.json')
+
+def load_smtp_settings():
+    if os.path.exists(SMTP_SETTINGS_FILE):
+        try:
+            with open(SMTP_SETTINGS_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+def send_email(to_email: str, subject: str, body_html: str):
+    """Send an HTML email. Silently skips if SMTP is not configured."""
+    settings = load_smtp_settings()
+    if not settings or not settings.get('smtp_host') or not settings.get('from_email'):
+        print(f"[EMAIL SKIPPED] No SMTP config. Would send to {to_email}: {subject}")
+        return
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = settings['from_email']
+        msg['To'] = to_email
+        msg.attach(MIMEText(body_html, 'html', 'utf-8'))
+        port = int(settings.get('smtp_port', 587))
+        use_ssl = settings.get('use_ssl', False)
+        if use_ssl:
+            server = smtplib.SMTP_SSL(settings['smtp_host'], port)
+        else:
+            server = smtplib.SMTP(settings['smtp_host'], port)
+            server.starttls()
+        if settings.get('smtp_user') and settings.get('smtp_password'):
+            server.login(settings['smtp_user'], settings['smtp_password'])
+        server.sendmail(settings['from_email'], [to_email], msg.as_string())
+        server.quit()
+        print(f"[EMAIL SENT] To {to_email}: {subject}")
+    except Exception as e:
+        print(f"[EMAIL ERROR] {e}")
 
 
 def init_db():
@@ -221,6 +278,23 @@ def init_db():
                 conn.commit()
         except Exception:
             db.session.rollback()
+        # Migrate Form table — add new columns if missing
+        try:
+            form_cols = [c['name'] for c in db.inspect(db.engine).get_columns('forms')]
+            with db.engine.connect() as conn:
+                from sqlalchemy import text as sql_text
+                if 'title' not in form_cols:
+                    conn.execute(sql_text('ALTER TABLE forms ADD COLUMN title VARCHAR(200)'))
+                if 'slug' not in form_cols:
+                    conn.execute(sql_text('ALTER TABLE forms ADD COLUMN slug VARCHAR(50)'))
+                if 'is_active' not in form_cols:
+                    conn.execute(sql_text('ALTER TABLE forms ADD COLUMN is_active BOOLEAN DEFAULT 1'))
+                if 'created_at' not in form_cols:
+                    conn.execute(sql_text('ALTER TABLE forms ADD COLUMN created_at VARCHAR(50)'))
+                conn.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Form migration: {e}")
         # Create default Admin user if none exists
         admin = User.query.filter_by(username='admin').first()
         if not admin:
@@ -777,119 +851,6 @@ def delete_intern(intern_id):
     
     return jsonify({"success": True})
 
-# --- FORM BUILDER ROUTES ---
-@app.route('/api/forms', methods=['GET'])
-@jwt_required()
-def get_form():
-    form = Form.query.first()
-    if form:
-        return jsonify({"success": True, "form_data": form.form_data})
-    return jsonify({"success": True, "form_data": "[]"})
-
-@app.route('/api/forms', methods=['POST'])
-@jwt_required()
-def save_form():
-    data = request.json
-    import json
-    form_data = json.dumps(data.get('form_data', []))
-    
-    form = Form.query.first()
-    if not form:
-        form = Form(form_data=form_data)
-        db.session.add(form)
-    else:
-        form.form_data = form_data
-        
-    db.session.commit()
-    
-    current_user = get_jwt()
-    user_name = current_user.get('name') if current_user else 'Unknown'
-    log_action(user_name, "قام بتحديث نموذج التسجيل")
-    
-    return jsonify({"success": True})
-
-# --- PUBLIC FORM ROUTES ---
-@app.route('/api/public-form', methods=['GET'])
-def get_public_form():
-    form = Form.query.first()
-    if form:
-        return jsonify({"success": True, "form_data": form.form_data})
-    return jsonify({"success": True, "form_data": "[]"})
-
-@app.route('/api/public-upload', methods=['POST'])
-def public_upload():
-    if 'file' not in request.files:
-        return jsonify({"msg": "No file part"}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"msg": "No selected file"}), 400
-        
-    if file:
-        file.seek(0, os.SEEK_END)
-        size = file.tell()
-        file.seek(0)
-        if size > 15 * 1024 * 1024:
-            return jsonify({"msg": "عذراً، حجم الملف يجب أن لا يتجاوز 15 ميجابايت"}), 400
-            
-        import uuid
-        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'bin'
-        filename = f"public_{uuid.uuid4().hex[:8]}.{ext}"
-        
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        return jsonify({"msg": "تم الرفع بنجاح", "filename": filename, "path": f"/api/uploads/{filename}"}), 201
-
-@app.route('/api/public-submit', methods=['POST'])
-def public_submit():
-    data = request.json
-    import json
-    
-    # Try to find name and email in the dynamic fields
-    name = "متدرب جديد (من الاستمارة)"
-    email = ""
-    phone = ""
-    photo_path = None
-    
-    for key, val in data.items():
-        key_lower = key.lower()
-        if "اسم" in key_lower or "name" in key_lower:
-            name = val
-        elif "بريد" in key_lower or "email" in key_lower:
-            email = val
-        elif "هاتف" in key_lower or "phone" in key_lower:
-            phone = val
-        elif isinstance(val, str) and val.startswith('/api/uploads/') and not photo_path:
-            # First uploaded image goes to photo_path
-            photo_path = val
-
-    new_intern = Intern(
-        name=name,
-        email=email,
-        phone=phone,
-        photo_path=photo_path,
-        status='قيد المراجعة',
-        documents=json.dumps(data)
-    )
-    db.session.add(new_intern)
-    db.session.commit()
-
-    # Create user account automatically
-    if email:
-        existing_user = User.query.filter_by(email=email).first()
-        if not existing_user:
-            from werkzeug.security import generate_password_hash
-            hashed_pw = generate_password_hash('password123')
-            new_user = User(
-                username=email.split('@')[0],
-                name=name,
-                email=email,
-                password=hashed_pw,
-                role='Intern',
-                permissions=''
-            )
-            db.session.add(new_user)
-            db.session.commit()
-
-    return jsonify({"success": True, "id": new_intern.id})
 
 # --- DOCUMENT VAULT ROUTES (separate from intern profile documents) ---
 VAULT_FOLDER = os.path.join(os.path.dirname(__file__), 'vault')
@@ -2095,6 +2056,303 @@ def export_intern_zip(intern_id):
                         
     tmp.close()
     return send_file(tmp.name, as_attachment=True, download_name=f"Intern_{intern_id}_Archive.zip", mimetype='application/zip')
+
+
+# --- FORM BUILDER ROUTES ---
+
+@app.route('/api/forms', methods=['GET'])
+@jwt_required()
+def get_forms():
+    forms = Form.query.order_by(Form.id.desc()).all()
+    return jsonify([{
+        "id": f.id, "title": f.title or "نموذج بدون عنوان",
+        "slug": f.slug, "is_active": f.is_active,
+        "created_at": f.created_at,
+        "form_data": f.form_data,
+        "pending_count": FormSubmission.query.filter_by(form_id=f.id, status='pending').count()
+    } for f in forms])
+
+@app.route('/api/forms', methods=['POST'])
+@jwt_required()
+def save_form():
+    data = request.json
+    fields = data.get('form_data', [])
+    title = data.get('title', 'نموذج تسجيل')
+    form_id = data.get('id')  # if editing existing form
+    now = datetime.now(timezone.utc).isoformat()
+
+    if form_id:
+        form = db.session.get(Form, form_id)
+        if not form:
+            return jsonify({"msg": "النموذج غير موجود"}), 404
+        form.form_data = json.dumps(fields, ensure_ascii=False)
+        form.title = title
+    else:
+        slug = uuid.uuid4().hex[:8]
+        form = Form(form_data=json.dumps(fields, ensure_ascii=False), title=title, slug=slug, is_active=True, created_at=now)
+        db.session.add(form)
+
+    db.session.commit()
+    return jsonify({"success": True, "id": form.id, "slug": form.slug, "title": form.title})
+
+@app.route('/api/forms/<int:form_id>', methods=['DELETE'])
+@jwt_required()
+def delete_form(form_id):
+    form = db.session.get(Form, form_id)
+    if not form:
+        return jsonify({"msg": "النموذج غير موجود"}), 404
+    db.session.delete(form)
+    db.session.commit()
+    return jsonify({"success": True})
+
+@app.route('/api/forms/<int:form_id>/toggle', methods=['POST'])
+@jwt_required()
+def toggle_form(form_id):
+    form = db.session.get(Form, form_id)
+    if not form:
+        return jsonify({"msg": "النموذج غير موجود"}), 404
+    form.is_active = not form.is_active
+    db.session.commit()
+    return jsonify({"success": True, "is_active": form.is_active})
+
+# --- PUBLIC FORM ROUTES (no JWT) ---
+
+@app.route('/api/public-form/<slug>', methods=['GET'])
+def get_public_form(slug):
+    form = Form.query.filter_by(slug=slug).first()
+    if not form:
+        return jsonify({"success": False, "msg": "النموذج غير موجود"}), 404
+    if not form.is_active:
+        return jsonify({"success": False, "msg": "النموذج غير متاح حالياً"}), 403
+    try:
+        fields = json.loads(form.form_data)
+    except Exception:
+        fields = []
+    return jsonify({"success": True, "form_data": fields, "title": form.title or "استمارة التقديم للتدريب"})
+
+@app.route('/api/public-form/<slug>/submit', methods=['POST'])
+def submit_public_form(slug):
+    form = Form.query.filter_by(slug=slug).first()
+    if not form or not form.is_active:
+        return jsonify({"success": False, "msg": "النموذج غير متاح"}), 403
+
+    data = request.json or {}
+    now = datetime.now(timezone.utc).isoformat()
+
+    submission = FormSubmission(
+        form_id=form.id,
+        submitted_data=json.dumps(data, ensure_ascii=False),
+        status='pending',
+        submitted_at=now
+    )
+    db.session.add(submission)
+    db.session.commit()
+
+    # Send confirmation email to intern if email field exists
+    intern_email = None
+    try:
+        fields = json.loads(form.form_data)
+        for field in fields:
+            if field.get('maps_to') == 'email' and data.get(field['label']):
+                intern_email = data[field['label']]
+                break
+        # fallback: look for any email-type field
+        if not intern_email:
+            for field in fields:
+                if field.get('type') == 'email' and data.get(field['label']):
+                    intern_email = data[field['label']]
+                    break
+    except Exception:
+        pass
+
+    if intern_email:
+        send_email(
+            intern_email,
+            "تم استلام طلب التدريب الخاص بك",
+            f"""
+            <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                <h2 style="color: #B8960C;">تم استلام طلبك بنجاح</h2>
+                <p>شكراً لتقديمك على التدريب في المديرية الإقليمية بفاس.</p>
+                <p>لقد تم استلام طلبك وهو الآن <strong>قيد المراجعة</strong>.</p>
+                <p>سيتم التواصل معك في أقرب وقت ممكن عبر هذا البريد الإلكتروني بمجرد اتخاذ القرار بشأن طلبك.</p>
+                <br>
+                <p style="color: #888;">محكمة الاستئناف الإدارية بفاس — وزارة العدل</p>
+            </div>
+            """
+        )
+
+    return jsonify({"success": True, "msg": "تم إرسال طلبك بنجاح"})
+
+@app.route('/api/public-upload', methods=['POST'])
+def public_upload():
+    if 'file' not in request.files:
+        return jsonify({"msg": "لا يوجد ملف"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"msg": "لا يوجد ملف محدد"}), 400
+    filename = safe_filename('pub', file.filename)
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    return jsonify({"success": True, "filename": filename, "path": f"/api/uploads/{filename}"})
+
+# --- ADMIN: SUBMISSIONS ROUTES ---
+
+@app.route('/api/submissions', methods=['GET'])
+@jwt_required()
+def get_submissions():
+    status_filter = request.args.get('status', 'pending')
+    submissions = FormSubmission.query.filter_by(status=status_filter).order_by(FormSubmission.id.desc()).all()
+    result = []
+    for s in submissions:
+        try:
+            data = json.loads(s.submitted_data)
+        except Exception:
+            data = {}
+        form = db.session.get(Form, s.form_id)
+        result.append({
+            "id": s.id,
+            "form_id": s.form_id,
+            "form_title": form.title if form else "—",
+            "submitted_data": data,
+            "status": s.status,
+            "submitted_at": s.submitted_at,
+            "rejection_reason": s.rejection_reason,
+            "intern_id": s.intern_id
+        })
+    return jsonify(result)
+
+@app.route('/api/submissions/<int:sub_id>/approve', methods=['POST'])
+@jwt_required()
+def approve_submission(sub_id):
+    submission = db.session.get(FormSubmission, sub_id)
+    if not submission:
+        return jsonify({"msg": "الطلب غير موجود"}), 404
+    if submission.status != 'pending':
+        return jsonify({"msg": "الطلب تمت معالجته بالفعل"}), 400
+
+    try:
+        data = json.loads(submission.submitted_data)
+    except Exception:
+        data = {}
+
+    form = db.session.get(Form, submission.form_id)
+    fields = []
+    if form:
+        try:
+            fields = json.loads(form.form_data)
+        except Exception:
+            pass
+
+    # Map form fields to intern model
+    mapping = {f['label']: f.get('maps_to') for f in fields if f.get('maps_to')}
+    intern_data = {'name': None, 'name_fr': None, 'email': None, 'national_id': None,
+                   'phone': None, 'university': None, 'start_date': None, 'end_date': None,
+                   'date_of_birth': None, 'address': None, 'department': None, 'photo_path': None}
+
+    for label, value in data.items():
+        mapped_field = mapping.get(label)
+        if mapped_field and mapped_field in intern_data:
+            intern_data[mapped_field] = value
+        # fallback: if no mapping but name/email via type
+        if not mapped_field:
+            for f in fields:
+                if f['label'] == label and f.get('type') == 'email' and not intern_data['email']:
+                    intern_data['email'] = value
+
+    # Use any text field as name fallback
+    if not intern_data['name']:
+        intern_data['name'] = data.get(list(data.keys())[0], 'متدرب جديد') if data else 'متدرب جديد'
+
+    now = datetime.now(timezone.utc).isoformat()
+    new_intern = Intern(
+        name=intern_data['name'] or 'متدرب جديد',
+        name_fr=intern_data['name_fr'],
+        email=intern_data['email'],
+        national_id=intern_data['national_id'],
+        phone=intern_data['phone'],
+        university=intern_data['university'],
+        start_date=intern_data['start_date'],
+        end_date=intern_data['end_date'],
+        date_of_birth=intern_data['date_of_birth'],
+        address=intern_data['address'],
+        department=intern_data['department'],
+        photo_path=intern_data['photo_path'],
+        status='قيد المراجعة'
+    )
+    db.session.add(new_intern)
+    db.session.flush()
+
+    submission.status = 'approved'
+    submission.intern_id = new_intern.id
+    db.session.commit()
+
+    log_action(get_jwt_identity(), f"قبول طلب تسجيل #{sub_id} وإنشاء ملف متدرب #{new_intern.id}")
+
+    # Send approval email
+    if intern_data['email']:
+        send_email(
+            intern_data['email'],
+            "تمت الموافقة على طلب التدريب الخاص بك",
+            f"""
+            <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                <h2 style="color: #22C55E;">تهانينا! تمت الموافقة على طلبك</h2>
+                <p>يسعدنا إبلاغك بأن طلبك للتدريب في المديرية الإقليمية بفاس قد <strong>تمت الموافقة عليه</strong>.</p>
+                <p>سيتم التواصل معك قريباً لإتمام إجراءات الالتحاق.</p>
+                <br>
+                <p style="color: #888;">محكمة الاستئناف الإدارية بفاس — وزارة العدل</p>
+            </div>
+            """
+        )
+
+    return jsonify({"success": True, "intern_id": new_intern.id})
+
+@app.route('/api/submissions/<int:sub_id>/reject', methods=['POST'])
+@jwt_required()
+def reject_submission(sub_id):
+    submission = db.session.get(FormSubmission, sub_id)
+    if not submission:
+        return jsonify({"msg": "الطلب غير موجود"}), 404
+    if submission.status != 'pending':
+        return jsonify({"msg": "الطلب تمت معالجته بالفعل"}), 400
+
+    reason = request.json.get('reason', '') if request.json else ''
+    submission.status = 'rejected'
+    submission.rejection_reason = reason
+    db.session.commit()
+
+    log_action(get_jwt_identity(), f"رفض طلب تسجيل #{sub_id}")
+
+    # Send rejection email
+    try:
+        data = json.loads(submission.submitted_data)
+        form = db.session.get(Form, submission.form_id)
+        fields = json.loads(form.form_data) if form else []
+        intern_email = None
+        for field in fields:
+            if field.get('maps_to') == 'email' and data.get(field['label']):
+                intern_email = data[field['label']]
+                break
+            if field.get('type') == 'email' and data.get(field['label']) and not intern_email:
+                intern_email = data[field['label']]
+        if intern_email:
+            reason_html = f"<p><strong>السبب:</strong> {reason}</p>" if reason else ""
+            send_email(
+                intern_email,
+                "بشأن طلب التدريب الخاص بك",
+                f"""
+                <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                    <h2 style="color: #EF4444;">نتيجة طلب التدريب</h2>
+                    <p>نأسف لإبلاغك بأن طلبك للتدريب لم يتم قبوله في الوقت الحالي.</p>
+                    {reason_html}
+                    <p>نتمنى لك التوفيق.</p>
+                    <br>
+                    <p style="color: #888;">محكمة الاستئناف الإدارية بفاس — وزارة العدل</p>
+                </div>
+                """
+            )
+    except Exception as e:
+        print(f"[REJECT EMAIL ERROR] {e}")
+
+    return jsonify({"success": True})
 
 
 if __name__ == '__main__':
