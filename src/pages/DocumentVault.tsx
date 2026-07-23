@@ -48,7 +48,7 @@ export function DocumentVault() {
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      
+
       if (res.ok) {
         setFile(null);
         setDocName('');
@@ -95,7 +95,7 @@ export function DocumentVault() {
         <h2 style={{ marginTop: 0, fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '16px' }}>رفع مستند جديد للخزنة</h2>
         <form onSubmit={handleUpload} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <input 
+            <input
               type="text"
               placeholder="اسم المستند"
               required
@@ -107,15 +107,15 @@ export function DocumentVault() {
             />
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <label 
-              className="btn btn-ghost" 
+            <label
+              className="btn btn-ghost"
               style={{ flex: 1, border: '1px dashed var(--line)', background: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', padding: '10px' }}
             >
               {file?.name?.toLowerCase().endsWith('.docx') || file?.name?.toLowerCase().endsWith('.doc') ? <FileDoc size={18} /> : <FilePdf size={18} />}
               {file ? file.name : 'اختر ملف PDF أو Word'}
-              <input 
+              <input
                 id="vault-file-input"
-                type="file" 
+                type="file"
                 accept=".pdf,.docx,.doc"
                 required
                 onChange={(e) => {
@@ -128,8 +128,8 @@ export function DocumentVault() {
                 style={{ display: 'none' }}
               />
             </label>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={!file}
               className="btn btn-ink"
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', whiteSpace: 'nowrap' }}
@@ -144,11 +144,11 @@ export function DocumentVault() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '24px' }}>
         {documents.map((doc, i) => (
           <div key={i} className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative', padding: '24px' }}>
-            <button 
+            <button
               onClick={() => handleDelete(doc.name)}
-              style={{ 
-                position: 'absolute', top: '12px', left: '12px', 
-                background: 'var(--paper)', color: 'var(--danger)', 
+              style={{
+                position: 'absolute', top: '12px', left: '12px',
+                background: 'var(--paper)', color: 'var(--danger)',
                 border: '1px solid var(--danger)', borderRadius: '8px',
                 width: '32px', height: '32px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -160,21 +160,59 @@ export function DocumentVault() {
             <div style={{ width: '70px', height: '70px', backgroundColor: doc.name.toLowerCase().endsWith('.pdf') ? 'var(--danger-bg)' : '#e0f0ff', color: doc.name.toLowerCase().endsWith('.pdf') ? 'var(--danger)' : '#0056b3', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
               {doc.name.toLowerCase().endsWith('.pdf') ? <FilePdf size={36} weight="regular" /> : <FileDoc size={36} weight="regular" />}
             </div>
-            <h3 style={{ fontWeight: 'bold', marginBottom: '8px', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} dir="ltr">{doc.name.replace(/\.(pdf|docx|doc)$/i, '')}</h3>
+            <h3
+              dir={/[\u0600-\u06FF]/.test(doc.name) ? 'rtl' : 'ltr'}
+              title={doc.name.replace(/\.(pdf|docx|doc)$/i, '')}
+              style={{
+                fontWeight: 'bold',
+                marginBottom: '8px',
+                width: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                textAlign: /[\u0600-\u06FF]/.test(doc.name) ? 'right' : 'left',
+                cursor: 'default',
+              }}
+            >
+              {doc.name.replace(/\.(pdf|docx|doc)$/i, '')}
+            </h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--slate)', marginBottom: '24px' }}>KB {(doc.size / 1024).toFixed(1)}</p>
             <div style={{ width: '100%', marginTop: 'auto', display: 'flex', gap: '10px' }}>
-              <a 
-                href={`/api/vault/${doc.name}`} 
-                target="_blank" 
-                rel="noreferrer"
-                className="btn btn-ghost"
-                style={{ flex: 1, display: 'flex', justifyContent: 'center', textDecoration: 'none', gap: '6px', padding: '10px 0', fontSize: '0.9rem', borderRadius: '10px' }}
-              >
-                <Eye size={18} />
-                عرض
-              </a>
-              <a 
-                href={`/api/vault/${doc.name}`} 
+              {doc.name.toLowerCase().endsWith('.pdf') ? (
+                <a
+                  href={`/api/vault/${doc.name}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => toast.info('جاري فتح المستند في قارئ PDF...')}
+                  className="btn btn-ghost"
+                  style={{ flex: 1, display: 'flex', justifyContent: 'center', textDecoration: 'none', gap: '6px', padding: '10px 0', fontSize: '0.9rem', borderRadius: '10px' }}
+                >
+                  <Eye size={18} />
+                  عرض
+                </a>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toast.info('جاري فتح المستند في برنامج Word...');
+                    fetch(`/api/vault/open/${encodeURIComponent(doc.name)}`)
+                      .then(async res => {
+                         if (!res.ok) {
+                            const err = await res.json();
+                            alert(err.msg || "حدث خطأ أثناء فتح الملف");
+                         }
+                      })
+                      .catch(err => console.error("Error opening document:", err));
+                  }}
+                  className="btn btn-ghost"
+                  style={{ flex: 1, display: 'flex', justifyContent: 'center', textDecoration: 'none', gap: '6px', padding: '10px 0', fontSize: '0.9rem', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  <Eye size={18} />
+                  عرض
+                </button>
+              )}
+              <a
+                href={`/api/vault/${doc.name}`}
                 download={doc.name}
                 className="btn btn-ink"
                 style={{ flex: 1, display: 'flex', justifyContent: 'center', textDecoration: 'none', gap: '6px', padding: '10px 0', fontSize: '0.9rem', borderRadius: '10px' }}
