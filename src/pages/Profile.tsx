@@ -773,7 +773,7 @@ export function Profile() {
       filename: `بطاقة_تقييم_${intern?.name || 'متدرب'}.pdf`,
       image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { scale: 2 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
     };
 
     html2pdf().set(opt).from(container).save();
@@ -787,6 +787,17 @@ export function Profile() {
       } catch (err) {
         toast.error('فشل الرفض');
       }
+    }
+  };
+
+  const handleCompleteStage = async () => {
+    if (!window.confirm('هل أنت متأكد من إنهاء التدريب؟ سيتم مراجعة الوثائق وإصدار شهادة التدريب.')) return;
+    try {
+      const res = await api.post(`/interns/${id}/complete-stage`, {});
+      toast.success(res.msg || 'تم إنهاء التدريب بنجاح');
+      fetchInternAndAttendance();
+    } catch (err: any) {
+      toast.error(err.response?.data?.msg || 'فشل في إنهاء التدريب');
     }
   };
 
@@ -827,6 +838,11 @@ export function Profile() {
           <button title="تعديل" onClick={handleEdit} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fef3c7', border: '1.5px solid #f59e0b', color: '#1a1a1a', transition: 'all 0.2s' }}>
             <PencilSimple weight="bold" size={18} color="#1a1a1a" />
           </button>
+          {(isAdmin || user?.role === 'Manager') && (
+            <button title="إنهاء التدريب" onClick={handleCompleteStage} style={{ width: 'auto', padding: '0 12px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'var(--gold)', border: '1.5px solid #d4af37', color: '#fff', transition: 'all 0.2s', fontWeight: 'bold' }}>
+              إنهاء التدريب
+            </button>
+          )}
           {isAdmin && (
             <button title="حذف" onClick={handleDelete} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fee2e2', border: '1.5px solid #ef4444', color: '#1a1a1a', transition: 'all 0.2s' }}>
               <Trash weight="bold" size={18} color="#1a1a1a" />
@@ -1214,7 +1230,7 @@ export function Profile() {
                   <div style={{fontWeight:700, marginBottom:6}}>فترات التدريب:</div>
                   {intern.evaluation.rotations.map((r: any, i: number) => (
                     <div key={i} style={{background:'var(--paper)', padding:'6px 10px', borderRadius:6, marginBottom:4, border:'1px solid var(--line)'}}>
-                      <b>{r.label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {formatDate(r.from)} إلى {formatDate(r.to)}
+                      <b>{(r as any).label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {formatDate(r.from)} إلى {formatDate(r.to)}
                     </div>
                   ))}
                 </div>
@@ -1365,7 +1381,7 @@ export function Profile() {
                   return (
                   <div key={i} style={{background:'var(--paper)', padding:12, borderRadius:8, border:'1px solid var(--line)', marginBottom:8}}>
                     <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
-                      <b style={{fontSize:12}}>{r.label || ('الفترة '+(i+1))}</b>
+                      <b style={{fontSize:12}}>{(r as any).label || ('الفترة '+(i+1))}</b>
                       {evalRotations.length > 1 && <button className="btn btn-ghost sm" onClick={() => removeRotation(i)} style={{fontSize:10, color:'var(--danger)', padding:'2px 6px'}}><X size={12} /> حذف</button>}
                     </div>
                     <div style={{display:'grid', gridTemplateColumns:'1fr', gap:8}}>
@@ -1469,12 +1485,12 @@ export function Profile() {
               <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12}}>
                 <div className="form-group" style={{margin:0}}>
                   <label style={{fontSize:12}}>تاريخ البدء</label>
-                  <input type="text" inputMode="numeric" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveStartDisplay} onChange={e => handleStartDateChange(e.target.value)} placeholder="dd/mm/yyyy" />
+                  <input type="text" inputMode="numeric" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveStartDisplay} onChange={e => setApproveStartDisplay(e.target.value)} placeholder="dd/mm/yyyy" />
                   <input type="date" ref={startDateRef} style={{display:'none'}} onChange={e => { setApproveStartDate(e.target.value); setApproveStartDisplay(formatDate(e.target.value)); }} />
                 </div>
                 <div className="form-group" style={{margin:0}}>
                   <label style={{fontSize:12}}>تاريخ الانتهاء</label>
-                  <input type="text" inputMode="numeric" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveEndDisplay} onChange={e => handleEndDateChange(e.target.value)} placeholder="dd/mm/yyyy" />
+                  <input type="text" inputMode="numeric" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveEndDisplay} onChange={e => setApproveEndDisplay(e.target.value)} placeholder="dd/mm/yyyy" />
                   <input type="date" ref={endDateRef} style={{display:'none'}} onChange={e => { setApproveEndDate(e.target.value); setApproveEndDisplay(formatDate(e.target.value)); }} />
                 </div>
               </div>

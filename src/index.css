@@ -328,8 +328,22 @@ tr:last-child td{border-bottom:none;}
 
 .responsive-note{font-size:11px; color:var(--slate-light); text-align:center; margin-top:30px;}
 @media (max-width:1000px){
+  .app-container{grid-template-columns:1fr;}
+  .sidebar{display:none;} /* Will implement a toggle menu in future if needed */
+  .topbar{padding:0 16px;}
+  .view{padding:20px 16px 60px;}
   .stat-grid{grid-template-columns:repeat(2,1fr);}
   .fb-layout, .grid-2{grid-template-columns:1fr;}
   .login-card{grid-template-columns:1fr;}
   .login-side{display:none;}
+}
+
+@media (max-width:600px){
+  .stat-grid{grid-template-columns:1fr;}
+  .tb-title{font-size: 16px;}
+  .tb-search{width:100%; max-width:160px;}
+  .profile-photo-wrap{width:80px;height:80px;}
+  .profile-head{gap:12px; flex-direction:column; align-items:flex-start;}
+  .profile-actions{margin-right:0; width:100%;}
+  .profile-actions .btn{flex:1; justify-content:center;}
 }

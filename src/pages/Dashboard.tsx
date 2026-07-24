@@ -170,6 +170,7 @@ export function Dashboard() {
 
   const [interns, setInterns] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [documentQueue, setDocumentQueue] = useState<any[]>([]);
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [attestationIntern, setAttestationIntern] = useState<any>(null);
 
@@ -181,6 +182,10 @@ export function Dashboard() {
 
   const loadSubmissions = async () => {
     try { setSubmissions(await api.get('/submissions?status=pending')); } catch (e) { console.error(e); }
+  };
+
+  const loadDocumentQueue = async () => {
+    try { setDocumentQueue(await api.getDocumentQueue()); } catch (e) { console.error(e); }
   };
 
   const syncGoogleFormsQuietly = async () => {
@@ -198,6 +203,7 @@ export function Dashboard() {
   useEffect(() => {
     loadInterns();
     loadSubmissions();
+    loadDocumentQueue();
 
     // Auto-sync Google Forms every 2 minutes
     const intervalId = setInterval(() => {
@@ -256,6 +262,31 @@ export function Dashboard() {
       toast.error(e.response?.data?.msg || 'حدث خطأ أثناء الاتصال بمايكروسوفت، تأكد من الرابط في الإعدادات');
     } finally {
       setSyncingMs(false);
+    }
+  };
+
+  const handleApproveDoc = async (internId: number, docId: number) => {
+    try {
+      await api.approveDocument(internId, docId);
+      toast.success('تم قبول المستند بنجاح');
+      loadDocumentQueue();
+    } catch (e: any) {
+      toast.error(e.message || 'حدث خطأ أثناء القبول');
+    }
+  };
+
+  const handleRejectDoc = async (internId: number, docId: number) => {
+    const reason = window.prompt('سبب الرفض (إلزامي لإشعار المتدرب):');
+    if (reason !== null && reason.trim() !== '') {
+      try {
+        await api.rejectDocument(internId, docId, reason);
+        toast.success('تم رفض المستند وإرسال إشعار للمتدرب');
+        loadDocumentQueue();
+      } catch (e: any) {
+        toast.error(e.message || 'حدث خطأ أثناء الرفض');
+      }
+    } else if (reason !== null) {
+      toast.warning('يجب كتابة سبب الرفض');
     }
   };
 
@@ -520,6 +551,79 @@ export function Dashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── DOCUMENT QUEUE (Admin View) ─── */}
+      {isAdmin && documentQueue.length > 0 && (
+        <div className="card" style={{ padding: '24px', marginBottom: 20, borderTop: '3px solid #3B82F6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ background: '#EFF6FF', color: '#3B82F6', borderRadius: 10, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileText size={20} weight="fill" />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.1rem' }}>طابور المستندات</h2>
+                <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>مستندات بانتظار المراجعة أو معادة للتصحيح</div>
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>المتدرب</th>
+                  <th>المستند</th>
+                  <th>الحالة</th>
+                  <th>التاريخ</th>
+                  <th>الإجراء</th>
+                </tr>
+              </thead>
+              <tbody>
+                {documentQueue.map((doc: any) => (
+                  <tr key={doc.id}>
+                    <td>
+                      <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{doc.intern_name}</div>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '0.9rem' }}>
+                        {doc.custom_title || doc.document_type}
+                      </div>
+                    </td>
+                    <td>
+                      {doc.status === 'PENDING_REVIEW' && <span className="badge warn"><div className="dot"></div>بانتظار المراجعة</span>}
+                      {doc.status === 'REVISION_REQUESTED' && <span className="badge bad"><div className="dot"></div>مرفوض — يتطلب تصحيحًا</span>}
+                      {doc.status === 'APPROVED_AND_SIGNED' && <span className="badge ok"><div className="dot"></div>مكتمل</span>}
+                      {doc.status === 'MISSING' && <span className="badge" style={{background: 'var(--paper)', color: 'var(--slate)'}}><div className="dot"></div>مفقود</span>}
+                    </td>
+                    <td style={{ fontSize: '0.85rem', color: 'var(--slate)' }}>
+                      {formatSubmittedAt(doc.uploaded_at)}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {doc.file_path && (
+                          <a href={doc.file_path} target="_blank" rel="noreferrer" className="btn btn-ghost sm">
+                            <Eye size={14} /> عرض
+                          </a>
+                        )}
+                        {doc.status === 'PENDING_REVIEW' && (
+                          <>
+                            <button className="btn btn-gold sm" onClick={() => handleApproveDoc(doc.intern_id, doc.id)}>
+                              <CheckCircle size={14} /> قبول
+                            </button>
+                            <button className="btn btn-ghost sm" style={{ color: 'var(--danger)' }} onClick={() => handleRejectDoc(doc.intern_id, doc.id)}>
+                              <X size={14} /> رفض
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

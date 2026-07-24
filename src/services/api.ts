@@ -108,6 +108,8 @@ export const api = {
   },
 
   // --- Document Lifecycle ---
+  getDocumentQueue: () => api.get('/documents/queue'),
+
   getInternDocuments: (internId: number) =>
     api.get(`/interns/${internId}/documents`),
 

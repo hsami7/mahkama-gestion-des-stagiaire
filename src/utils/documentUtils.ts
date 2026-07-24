@@ -38,7 +38,7 @@ export const downloadHtmlAsPdf = (html: string, filename: string, margin: number
     filename,
     image: { type: 'jpeg' as const, quality: 0.98 },
     html2canvas: { scale: 2 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
   };
   html2pdf().set(opt).from(container).save();
 };
@@ -52,7 +52,7 @@ export const viewHtmlAsPdf = async (html: string) => {
     filename: 'document.pdf',
     image: { type: 'jpeg' as const, quality: 0.98 },
     html2canvas: { scale: 2 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
   };
   
   // Generate blob and open in new tab

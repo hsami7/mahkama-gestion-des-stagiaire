@@ -7,16 +7,21 @@ const GLOBAL_SEARCH_ITEMS = [
   { id: 'attendance', title: 'الحضور والانصراف', keywords: ['حضور', 'انصراف', 'غياب', 'attendance', 'time'], path: '/attendance', icon: <CalendarCheck size={16} /> },
 ];
 
-export function Header({ title, missingCount }: { title: string, missingCount?: number }) {
+export function Header({ title, missingCount, notifications = [], onReadNotification }: { title: string, missingCount?: number, notifications?: any[], onReadNotification?: (id: number) => void }) {
   const [query, setQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLDivElement>(null);
+  const [showBellDropdown, setShowBellDropdown] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowDropdown(false);
+      }
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+        setShowBellDropdown(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -27,6 +32,9 @@ export function Header({ title, missingCount }: { title: string, missingCount?: 
     item.title.toLowerCase().includes(query.toLowerCase()) || 
     item.keywords.some(k => k.includes(query.toLowerCase()))
   );
+  
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const totalBadgeCount = (missingCount || 0) + unreadCount;
 
   return (
     <div className="topbar no-print">
@@ -69,9 +77,26 @@ export function Header({ title, missingCount }: { title: string, missingCount?: 
           )}
         </div>
         
-        <div className="bell">
+        <div className="bell" ref={bellRef} style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setShowBellDropdown(!showBellDropdown)}>
           <Bell weight="bold" className="icon" />
-          {missingCount ? <span style={{position: 'absolute', top: '2px', right: '4px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', border: '1.5px solid var(--ink)'}}></span> : null}
+          {totalBadgeCount > 0 ? <span style={{position: 'absolute', top: '2px', right: '4px', width: '16px', height: '16px', borderRadius: '50%', background: 'var(--danger)', border: '1.5px solid var(--ink)', color: '#fff', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'}}>{totalBadgeCount > 9 ? '9+' : totalBadgeCount}</span> : null}
+          
+          {showBellDropdown && (
+            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 100, width: '300px', maxHeight: '400px', overflowY: 'auto' }}>
+              <div style={{ padding: '12px', borderBottom: '1px solid var(--line)', fontWeight: 'bold', fontSize: '14px' }}>الإشعارات</div>
+              {notifications.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--slate)', fontSize: '13px' }}>لا توجد إشعارات</div>
+              ) : (
+                notifications.map(n => (
+                  <div key={n.id} style={{ padding: '12px', borderBottom: '1px solid var(--line-soft)', background: n.is_read ? 'transparent' : '#FFF6E5', cursor: 'pointer' }} onClick={() => { if (!n.is_read && onReadNotification) onReadNotification(n.id); }}>
+                    <div style={{ fontWeight: 'bold', fontSize: '13px', color: n.is_read ? 'var(--ink)' : 'var(--gold-dark)' }}>{n.title}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--slate)', marginTop: '4px', lineHeight: '1.4' }}>{n.body}</div>
+                    {n.created_at && <div style={{ fontSize: '10px', color: 'var(--slate-light)', marginTop: '6px' }}>{new Date(n.created_at).toLocaleString('ar-MA')}</div>}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

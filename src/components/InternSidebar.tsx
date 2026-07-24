@@ -14,7 +14,7 @@ interface InternSidebarProps {
 
 export function InternSidebar({ activeTab, setActiveTab, internData, user, missingCount, pendingCount = 0, reqDotColor = '#F4B400', onLogout }: InternSidebarProps) {
   const isRejected = internData?.status === 'مرفوض';
-  const navItems = [
+  const navItems: { id: string; name: string; icon: React.ReactNode; badge?: boolean }[] = [
     { id: 'status', name: 'حالة الطلب', icon: <House size={24} /> },
     { id: 'profile', name: 'ملفي الشخصي', icon: <User size={24} /> },
   ];
