@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 import base64
 import email_service
 import google_sheets_service
@@ -267,6 +267,23 @@ class DocumentLifecycle(db.Model):
     intern = db.relationship('Intern', foreign_keys=[intern_id], backref='documents_lifecycle')
     assigned_to = db.relationship('Intern', foreign_keys=[assigned_to_intern_id])
     parent = db.relationship('DocumentLifecycle', remote_side=[id])
+
+def _parse_date(val):
+    """Safely convert a date string to a Python date object for SQLite."""
+    if not val:
+        return None
+    if isinstance(val, date):
+        return val
+    if not isinstance(val, str):
+        return None
+    val = val.strip()
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y/%m/%d'):
+        try:
+            return datetime.strptime(val, fmt).date()
+        except ValueError:
+            continue
+    return None
+
 
 def log_action(user, action):
     try:
@@ -736,9 +753,9 @@ def add_intern():
         department=data.get('department'),
         encadrant=data.get('encadrant'),
         phone=data.get('phone'),
-        start_date=data.get('start_date'),
-        end_date=data.get('end_date'),
-        date_of_birth=data.get('date_of_birth'),
+        start_date=_parse_date(data.get('start_date')),
+        end_date=_parse_date(data.get('end_date')),
+        date_of_birth=_parse_date(data.get('date_of_birth')),
         university=data.get('university'),
         address=data.get('address'),
         photo_path=data.get('photo_path'),
@@ -782,9 +799,9 @@ def update_intern(intern_id):
     if 'encadrant' in data:
         intern.encadrant = data.get('encadrant')
     intern.phone = data.get('phone', intern.phone)
-    intern.start_date = data.get('start_date', intern.start_date)
-    intern.end_date = data.get('end_date', intern.end_date)
-    intern.date_of_birth = data.get('date_of_birth', intern.date_of_birth)
+    intern.start_date = _parse_date(data.get('start_date')) if 'start_date' in data else intern.start_date
+    intern.end_date = _parse_date(data.get('end_date')) if 'end_date' in data else intern.end_date
+    intern.date_of_birth = _parse_date(data.get('date_of_birth')) if 'date_of_birth' in data else intern.date_of_birth
     intern.university = data.get('university', intern.university)
     intern.address = data.get('address', intern.address)
     if 'status' in data:
