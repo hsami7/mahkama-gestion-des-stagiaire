@@ -130,6 +130,7 @@ export function Dashboard() {
   const [interns, setInterns] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectedSub, setSelectedSub] = useState<any>(null);
+  const [photoError, setPhotoError] = useState<Record<number, boolean>>({});
 
   const loadInterns = async () => {
     try { setInterns(await api.get('/interns')); } catch (e) { console.error(e); }
@@ -316,13 +317,24 @@ export function Dashboard() {
                       </td>
                     </tr>
                   ))}
-                  {pendingInterns.map(intern => (
+                  {pendingInterns.map(intern => {
+                    const showImg = intern.photo_path && !photoError[intern.id];
+                    return (
                     <tr key={`intern-${intern.id}`}>
                       <td>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gold)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}>
-                            {intern.name.charAt(0)}
-                          </div>
+                          {showImg ? (
+                            <img
+                              src={intern.photo_path}
+                              alt=""
+                              style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                              onError={() => setPhotoError(p => ({...p, [intern.id]: true}))}
+                            />
+                          ) : (
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gold)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}>
+                              {intern.name.charAt(0)}
+                            </div>
+                          )}
                           <div>
                             <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: '0.9rem' }}>{intern.name}</div>
                             {intern.email && <div style={{ fontSize: '0.75rem', color: 'var(--slate)' }}>{intern.email}</div>}
@@ -353,7 +365,7 @@ export function Dashboard() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );})}
                 </tbody>
               </table>
             </div>
