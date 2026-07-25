@@ -2124,17 +2124,14 @@ DOC_TYPE_LABELS = {
 }
 
 def _seed_doc_records(intern_id):
-    """Ensure one DocumentLifecycle row exists per standard doc_type for this intern."""
-    now = datetime.now(timezone.utc).isoformat()
-    for dt in ['CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED', 'FINAL_REPORT', 'ATTESTATION_SIGNED']:
-        existing = DocumentLifecycle.query.filter_by(intern_id=intern_id, doc_type=dt).filter(
-            DocumentLifecycle.custom_title.is_(None)
-        ).first()
-        if not existing:
-            dl = DocumentLifecycle(intern_id=intern_id, doc_type=dt, status='MISSING',
-                                   created_at=now, updated_at=now)
-            db.session.add(dl)
-    db.session.commit()
+    """No-op: documents are now created dynamically by admins/interns.
+
+    Previously this seeded one MISSING row per standard doc_type so every intern
+    always saw the 7 hardcoded rows. Those defaults are intentionally removed —
+    the documents table now starts empty for every intern and only real, named
+    rows (requirements/uploads) appear in it. Kept for backward-compat callers.
+    """
+    return None
 
 
 def _get_doc_type_intern():
@@ -2175,6 +2172,9 @@ def list_intern_documents(intern_id):
             "returned_file_path": d.returned_file_path,
             "created_at": d.created_at,
             "updated_at": d.updated_at,
+            "file_type": d.file_type or 'pdf',
+            "action_type": d.action_type or 'view',
+            "requested_by": d.requested_by or ('INTERN' if (d.uploaded_by or '') == 'INTERN' else 'ADMIN'),
         })
     return jsonify(result), 200
 
@@ -2459,6 +2459,9 @@ def list_my_documents():
     docs = DocumentLifecycle.query.filter_by(intern_id=intern.id).order_by(DocumentLifecycle.doc_type).all()
     result = []
     for d in docs:
+        # The intern only sees rows shared with them or that they uploaded.
+        if not (d.is_visible_to_intern or (d.uploaded_by or '') == 'INTERN'):
+            continue
         entry = {
             "id": d.id,
             "doc_type": d.doc_type,
@@ -2473,6 +2476,9 @@ def list_my_documents():
             "returned_file_path": d.returned_file_path,
             "created_at": d.created_at,
             "updated_at": d.updated_at,
+            "file_type": d.file_type or 'pdf',
+            "action_type": d.action_type or 'view',
+            "requested_by": d.requested_by or ('INTERN' if (d.uploaded_by or '') == 'INTERN' else 'ADMIN'),
         }
         result.append(entry)
     return jsonify(result), 200
