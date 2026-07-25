@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { useToast } from '../components/Toast';
 
 export function Settings() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
   
   // Integration Settings
   const [googleClientSecret, setGoogleClientSecret] = useState('');
@@ -14,6 +16,8 @@ export function Settings() {
   const [gmailAddress, setGmailAddress] = useState('');
   const [gmailAppPassword, setGmailAppPassword] = useState('');
   const [integrationMsg, setIntegrationMsg] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncingMs, setSyncingMs] = useState(false);
 
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
@@ -268,6 +272,31 @@ export function Settings() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <button type="submit" className="btn btn-gold" style={{ padding: '12px 32px' }}>حفظ إعدادات الربط</button>
               {integrationMsg && <span style={{ fontWeight: 'bold', color: integrationMsg.includes('نجاح') ? 'var(--success)' : 'var(--danger)' }}>{integrationMsg}</span>}
+            </div>
+
+            <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--line)', display: 'flex', gap: 12 }}>
+              <button type="button" className="btn btn-ghost" onClick={async () => {
+                setSyncing(true);
+                try {
+                  const res = await api.post('/forms/sync-google', {});
+                  toast.success(res.added > 0 ? `تم جلب ${res.added} طلب جديد من نموذج جوجل` : 'لا توجد طلبات جديدة من جوجل');
+                } catch (e: any) {
+                  toast.error(e.message || 'حدث خطأ أثناء الاتصال بجوجل، تأكد من الإعدادات');
+                } finally { setSyncing(false); }
+              }} disabled={syncing}>
+                {syncing ? 'جاري الجلب...' : 'مزامنة جوجل الآن'}
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={async () => {
+                setSyncingMs(true);
+                try {
+                  const res = await api.post('/forms/sync-microsoft', {});
+                  toast.success(res.added > 0 ? `تم جلب ${res.added} طلب جديد من مايكروسوفت` : 'لا توجد طلبات جديدة من مايكروسوفت');
+                } catch (e: any) {
+                  toast.error(e.message || 'حدث خطأ أثناء الاتصال بمايكروسوفت، تأكد من الرابط في الإعدادات');
+                } finally { setSyncingMs(false); }
+              }} disabled={syncingMs}>
+                {syncingMs ? 'جاري الجلب...' : 'مزامنة مايكروسوفت الآن'}
+              </button>
             </div>
           </form>
         </div>
