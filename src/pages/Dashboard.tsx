@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, CheckCircle, WarningCircle, Plus, Eye, X, UserCirclePlus } from '@phosphor-icons/react';
+import { FileText, CheckCircle, WarningCircle, Plus, Eye, X, UserCirclePlus, ChartBar } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -119,6 +119,44 @@ function SubmissionDrawer({ sub, onClose, onApprove, onReject, isAdmin }: {
   );
 }
 
+function CapacityChart({ interns }: { interns: any[] }) {
+  const byDept: Record<string, number> = {};
+  for (const i of interns) {
+    const dept = i.department || 'غير محدد';
+    byDept[dept] = (byDept[dept] || 0) + 1;
+  }
+  const entries = Object.entries(byDept).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const max = Math.max(...entries.map(e => e[1]), 1);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+      {entries.length === 0 ? (
+        <div style={{ color: 'var(--slate)', fontSize: '0.85rem', textAlign: 'center', padding: 16 }}>
+          لا توجد بيانات كافية للعرض
+        </div>
+      ) : (
+        entries.map(([dept, count]) => (
+          <div key={dept} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 120, fontSize: '0.78rem', color: 'var(--slate)', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={dept}>
+              {dept}
+            </div>
+            <div style={{ flex: 1, background: 'var(--line)', borderRadius: 4, height: 10, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${(count / max) * 100}%`,
+                background: count / max > 0.7 ? 'var(--danger)' : count / max > 0.4 ? '#F59E0B' : 'var(--success)',
+                borderRadius: 4,
+                transition: 'width 0.6s ease'
+              }} />
+            </div>
+            <div style={{ width: 24, fontSize: '0.78rem', fontWeight: 700, color: 'var(--ink)', textAlign: 'center' }}>{count}</div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 export function Dashboard() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -131,6 +169,7 @@ export function Dashboard() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [photoError, setPhotoError] = useState<Record<number, boolean>>({});
+  const [showCoverage, setShowCoverage] = useState(false);
 
   const loadInterns = async () => {
     try { setInterns(await api.get('/interns')); } catch (e) { console.error(e); }
@@ -303,6 +342,9 @@ export function Dashboard() {
                           <button className="btn btn-ghost sm" onClick={() => setSelectedSub(sub)}>
                             <Eye size={14} /> عرض
                           </button>
+                          <button className="btn btn-ghost sm" onClick={() => setShowCoverage(true)} title="مخطط تغطية المتدربين" style={{ fontSize: '0.7rem', padding: '4px 6px', color: 'var(--gold-dark)' }}>
+                            <ChartBar size={14} /> تغطية
+                          </button>
                           {isAdmin && (
                             <>
                               <button className="btn btn-gold sm" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => handleApproveUnified({ id: sub.id, type: 'submission' })}>
@@ -351,6 +393,9 @@ export function Dashboard() {
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button className="btn btn-ghost sm" onClick={() => navigate(`/interns/${intern.id}`)}>
                             <Eye size={14} /> عرض
+                          </button>
+                          <button className="btn btn-ghost sm" onClick={() => setShowCoverage(true)} title="مخطط تغطية المتدربين" style={{ fontSize: '0.7rem', padding: '4px 6px', color: 'var(--gold-dark)' }}>
+                            <ChartBar size={14} /> تغطية
                           </button>
                           {isAdmin && (
                             <>
@@ -454,6 +499,45 @@ export function Dashboard() {
           }}
           isAdmin={isAdmin}
         />
+      )}
+
+      {showCoverage && (
+        <div className="modal-overlay" onClick={() => setShowCoverage(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ChartBar size={20} weight="fill" color="var(--gold-dark)" />
+                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>مخطط تغطية المتدربين</h3>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setShowCoverage(false)} style={{ padding: 4 }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--slate)', marginBottom: 20 }}>
+              عدد المتدربين النشطين لكل قسم. يساعدك هذا المخطط في تحديد الأقسام التي تحتاج متدربين.
+            </div>
+            <CapacityChart interns={interns.filter(i => i.status === 'نشط')} />
+            <div style={{ marginTop: 24, padding: '12px 16px', background: 'var(--paper)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--slate)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--success)' }} />
+                طاقة منخفضة
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: '#F59E0B' }} />
+                طاقة متوسطة
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--danger)' }} />
+                مكتظ
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+              <button className="btn btn-ghost" onClick={() => setShowCoverage(false)}>
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
