@@ -176,11 +176,26 @@ class AuditEvent(db.Model):
     note = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# Legacy known doc_types — kept for backward compatibility only. New documents
+# can use an arbitrary doc_type ('OTHER' by default) so that admins/interns can
+# request any document by name. Labels are derived from DocumentLifecycle.custom_title.
 DOC_TYPES = [
     'CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED',
     'FINAL_REPORT', 'ATTESTATION_SIGNED', 'OTHER'
 ]
 DOC_STATUSES = ['MISSING', 'PENDING_REVIEW', 'REVISION_REQUESTED', 'APPROVED_AND_SIGNED']
+
+# Allowed file types for a requested/uploaded document. Maps the value stored on
+# DocumentLifecycle.file_type to the set of extensions the server will accept.
+FILE_TYPE_EXTENSIONS = {
+    'pdf':   ['.pdf'],
+    'word':  ['.doc', '.docx'],
+    'excel': ['.xls', '.xlsx'],
+    'image': ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'],
+    'any':   ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'],
+}
+# What the document should be used for — drives lifecycle behaviour.
+ACTION_TYPES = {'sign', 'fill', 'view', 'view_or_return'}
 
 class DocumentLifecycle(db.Model):
     __tablename__ = 'document_lifecycle'
@@ -204,6 +219,9 @@ class DocumentLifecycle(db.Model):
     signed_by = db.Column(db.String(150), nullable=True)
     correction_round = db.Column(db.Integer, default=0)
     parent_id = db.Column(db.Integer, db.ForeignKey('document_lifecycle.id'), nullable=True)
+    file_type = db.Column(db.String(20), default='pdf')
+    action_type = db.Column(db.String(20), default='view')
+    requested_by = db.Column(db.String(20), default='ADMIN')
 
     intern = db.relationship('Intern', foreign_keys=[intern_id], backref='documents_lifecycle')
     assigned_to = db.relationship('Intern', foreign_keys=[assigned_to_intern_id])
@@ -282,6 +300,20 @@ def init_db():
                 conn.commit()
         except Exception:
             db.session.rollback()
+        # Add file_type / action_type / requested_by columns (dynamic document requests)
+        try:
+            dl_cols = [c['name'] for c in db.inspect(db.engine).get_columns('document_lifecycle')]
+            with db.engine.connect() as conn:
+                from sqlalchemy import text as sql_text
+                if 'file_type' not in dl_cols:
+                    conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN file_type VARCHAR(20) DEFAULT 'pdf'"))
+                if 'action_type' not in dl_cols:
+                    conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN action_type VARCHAR(20) DEFAULT 'view'"))
+                if 'requested_by' not in dl_cols:
+                    conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN requested_by VARCHAR(20) DEFAULT 'ADMIN'"))
+                conn.commit()
+        except Exception as e:
+            print(f"document_lifecycle migration: {e}")
         # Migrate Form table — add new columns if missing
         try:
             form_cols = [c['name'] for c in db.inspect(db.engine).get_columns('forms')]
