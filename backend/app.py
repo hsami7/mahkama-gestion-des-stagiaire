@@ -2194,9 +2194,11 @@ def upload_intern_document(intern_id):
     elif intern.status == 'مرفوض' and claims.get('role') == 'Intern':
         return jsonify({"msg": "Account not yet activated"}), 403
 
-    doc_type = request.form.get('doc_type')
-    if not doc_type or doc_type not in DOC_TYPES:
+    doc_type = (request.form.get('doc_type') or 'OTHER').strip() or 'OTHER'
+    # DOC_TYPES is now only a legacy reference set; arbitrary types are allowed.
+    if not doc_type or len(doc_type) > 50:
         return jsonify({"msg": "Invalid doc_type"}), 400
+    target_doc_id = request.form.get('doc_id')
 
     if 'file' not in request.files:
         return jsonify({"msg": "No file part"}), 400
@@ -2204,35 +2206,44 @@ def upload_intern_document(intern_id):
     if file.filename == '':
         return jsonify({"msg": "No selected file"}), 400
 
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"msg": "PDF files only"}), 400
+    custom_title = request.form.get('custom_title')
+    now = datetime.now(timezone.utc).isoformat()
+
+    if target_doc_id:
+        record = DocumentLifecycle.query.filter_by(
+            id=target_doc_id, intern_id=intern.id
+        ).first()
+        if not record:
+            return jsonify({"msg": "Document slot not found"}), 404
+    else:
+        existing = DocumentLifecycle.query.filter_by(
+            intern_id=intern.id, doc_type=doc_type
+        ).filter(
+            DocumentLifecycle.custom_title.is_(None) if not custom_title else DocumentLifecycle.custom_title == custom_title
+        ).first()
+        record = existing
+
+    file_type = (record.file_type if record else request.form.get('file_type')) or 'pdf'
+    if not _allowed_file(file.filename, file_type):
+        return jsonify({"msg": f"File type not allowed (expected: {file_type})"}), 400
     file.seek(0, os.SEEK_END)
     size = file.tell()
     file.seek(0)
     if size > 15 * 1024 * 1024:
         return jsonify({"msg": "File too large (max 15MB)"}), 400
 
-    filename = safe_filename('doc', file.filename)
-    if not filename.lower().endswith('.pdf'):
-        filename += '.pdf'
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    file_url = f"/api/uploads/{filename}"
-
-    custom_title = request.form.get('custom_title')
-    now = datetime.now(timezone.utc).isoformat()
-
-    record = DocumentLifecycle.query.filter_by(
-        intern_id=intern.id, doc_type=doc_type
-    ).filter(
-        DocumentLifecycle.custom_title.is_(None) if not custom_title else DocumentLifecycle.custom_title == custom_title
-    ).first()
+    label_for_name = (record.custom_title if record else custom_title) or doc_type
+    suffix = safe_filename('doc', file.filename)
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], suffix))
+    file_url = f"/api/uploads/{suffix}"
 
     if not record:
         record = DocumentLifecycle(
             intern_id=intern.id, doc_type=doc_type,
             status='PENDING_REVIEW', file_path=file_url,
             uploaded_by='INTERN', is_visible_to_intern=False,
-            custom_title=custom_title, created_at=now, updated_at=now
+            custom_title=custom_title, file_type=file_type,
+            created_at=now, updated_at=now
         )
         db.session.add(record)
     else:
@@ -2242,6 +2253,8 @@ def upload_intern_document(intern_id):
         record.is_visible_to_intern = False
         record.rejection_reason = None
         record.updated_at = now
+        if file_type:
+            record.file_type = file_type
 
     if not record.id:
         db.session.flush()
@@ -2294,11 +2307,13 @@ def upload_signed_document(intern_id):
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
 
-    doc_type = request.form.get('doc_type')
-    if not doc_type or doc_type not in DOC_TYPES:
+    doc_type = (request.form.get('doc_type') or 'OTHER').strip() or 'OTHER'
+    if len(doc_type) > 50:
         return jsonify({"msg": "Invalid doc_type"}), 400
 
     custom_title = request.form.get('custom_title', '').strip() or None
+    target_doc_id = request.form.get('doc_id')
+    file_type = (request.form.get('file_type') or '').strip().lower() or None
 
     if 'file' not in request.files:
         return jsonify({"msg": "No file part"}), 400
@@ -2306,23 +2321,11 @@ def upload_signed_document(intern_id):
     if file.filename == '':
         return jsonify({"msg": "No selected file"}), 400
 
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"msg": "PDF files only"}), 400
-    file.seek(0, os.SEEK_END)
-    size = file.tell()
-    file.seek(0)
-    if size > 15 * 1024 * 1024:
-        return jsonify({"msg": "File too large (max 15MB)"}), 400
-
-    filename = safe_filename('signed', file.filename)
-    if not filename.lower().endswith('.pdf'):
-        filename += '.pdf'
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    file_url = f"/api/uploads/{filename}"
-
-    now = datetime.now(timezone.utc).isoformat()
-
-    if custom_title:
+    if target_doc_id:
+        existing = DocumentLifecycle.query.filter_by(id=target_doc_id, intern_id=intern.id).first()
+        if not existing:
+            return jsonify({"msg": "Document slot not found"}), 404
+    elif custom_title:
         existing = DocumentLifecycle.query.filter_by(
             intern_id=intern.id, doc_type=doc_type, custom_title=custom_title
         ).first()
@@ -2331,6 +2334,21 @@ def upload_signed_document(intern_id):
             DocumentLifecycle.custom_title.is_(None)
         ).first()
 
+    record_ft = (existing.file_type if existing else file_type) or 'pdf'
+    if not _allowed_file(file.filename, record_ft):
+        return jsonify({"msg": f"File type not allowed (expected: {record_ft})"}), 400
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    if size > 15 * 1024 * 1024:
+        return jsonify({"msg": "File too large (max 15MB)"}), 400
+
+    filename = safe_filename('signed', file.filename)
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    file_url = f"/api/uploads/{filename}"
+
+    now = datetime.now(timezone.utc).isoformat()
+
     if existing:
         existing.file_path = file_url
         existing.status = 'APPROVED_AND_SIGNED'
@@ -2338,6 +2356,8 @@ def upload_signed_document(intern_id):
         existing.is_visible_to_intern = True
         if custom_title:
             existing.custom_title = custom_title
+        if file_type:
+            existing.file_type = file_type
         existing.updated_at = now
         db.session.commit()
         log_action(current_user.get('name'), f"رفع نسخة موقعة من {doc_type} للمتدرب {intern.name}")
@@ -2347,6 +2367,7 @@ def upload_signed_document(intern_id):
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
         uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
         is_visible_to_intern=True, custom_title=custom_title,
+        file_type=file_type or 'pdf',
         created_at=now, updated_at=now
     )
     db.session.add(record)
