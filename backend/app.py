@@ -39,6 +39,47 @@ app.config['JWT_QUERY_STRING_NAME'] = 'token'
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+def _ext_for_file_type(file_type: str) -> list:
+    """Return the list of allowed extensions for the given logical file_type."""
+    return FILE_TYPE_EXTENSIONS.get((file_type or '').strip().lower(), FILE_TYPE_EXTENSIONS['any'])
+
+
+def _allowed_file(file_name: str, file_type: str) -> bool:
+    ft = (file_type or '').strip().lower() or 'any'
+    return any(file_name.lower().endswith(ext) for ext in _ext_for_file_type(ft))
+
+
+def _file_extension(file_name: str, file_type: str) -> str:
+    """Pick the canonical extension (incl. leading '.') for an upload."""
+    ft = (file_type or '').strip().lower() or 'any'
+    low = (file_name or '').lower()
+    for ext in _ext_for_file_type(ft):
+        if low.endswith(ext):
+            return ext
+    if '.' in low:
+        cand = '.' + low.rsplit('.', 1)[1]
+        return cand if 1 < len(cand) <= 10 else '.pdf'
+    return '.pdf'
+
+
+def friendly_doc_filename(intern_id: int, doc_id, label: str, file_type: str) -> str:
+    """Build an IT-friendly filename: intern-{id}-{doc_id}-{safe-label}.<ext>"""
+    import re
+    base = re.sub(r'[^a-zA-Z0-9_-]+', '_', (label or '').strip()) or 'document'
+    base = base[:40]
+    ext = ''
+    ft = (file_type or '').strip().lower()
+    if ft == 'pdf':
+        ext = '.pdf'
+    elif ft == 'word':
+        ext = '.docx'
+    elif ft == 'excel':
+        ext = '.xlsx'
+    elif ft == 'image':
+        ext = '.png'
+    return f"intern-{intern_id}-{doc_id or 'tmp'}-{base}{ext}"
+
+
 def safe_filename(prefix: str, original: str) -> str:
     """Generate a safe, unique upload filename while preserving the original extension."""
     import uuid
