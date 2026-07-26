@@ -500,12 +500,15 @@ export function InternPortal() {
                                 if (!grouped.has(base)) grouped.set(base, []);
                                 grouped.get(base)!.push(d);
                               });
-                              for (const [base, docs] of grouped) {
+for (const [base, docs] of grouped) {
                                 const sign = docs.find(d => d.action_type === 'sign');
                                 const fill = docs.find(d => d.action_type === 'fill');
                                 const both = docs.find(d => d.action_type === 'sign_fill');
                                 if (sign && fill) {
                                   rows.push({ id: `combined-${base}`, isCombined: true, sign, fill, base });
+                                } else if (both) {
+                                  // sign_fill is a single combined action - treat as combined row
+                                  rows.push({ id: `combined-${base}`, isCombined: true, sign: both, fill: both, base, isSignFill: true });
                                 } else {
                                   docs.forEach(d => rows.push(d));
                                 }
@@ -516,37 +519,37 @@ export function InternPortal() {
                                   const fillDoc = row.fill;
                                   const bothReturned = d.returned_file_path && fillDoc.returned_file_path;
                                   const anyReturned = d.returned_file_path || fillDoc.returned_file_path;
-                                  const combinedStatus = bothReturned ? 'completed' : anyReturned ? 'partial' : 'pending';
                                   const inputId = `return-upload-${d.id}`;
                                   // Use whichever doc has a file_path for view/download
                                   const fileDoc = d.file_path ? d : fillDoc.file_path ? fillDoc : null;
                                   const fileLabel = (d.custom_title || d.doc_type || row.base);
+                                  const statusLabel = bothReturned ? 'مكتمل' : anyReturned ? 'قيد الإجراء' : 
+                                    (row.isSignFill ? 'بانتظار التوقيع والتعبئة' : 'بانتظار الرفع');
+                                  const statusClass = bothReturned ? 'badge-success' : anyReturned ? 'badge-warning' : 'badge-warning';
                                   return (
                                     <tr key={row.id} style={{ borderBottom: '1px solid var(--line)' }}>
                                       <td style={{ padding: '10px 8px' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--ink)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.base}>
                                           {row.base}
-                                          <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>(توقيع) و (تعبئة وإرجاع)</span>
+                                          {row.isSignFill ? <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>({d.action_type === 'sign_fill' ? 'توقيع وتعبئة' : 'توقيع وتعبئة'})</span> : <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>(توقيع) و (تعبئة وإرجاع)</span>}
                                         </div>
                                       </td>
                                       <td style={{ textAlign: 'center', padding: '10px 8px' }}>
-                                        {bothReturned ? <span className="badge badge-success" style={{ fontSize: 11 }}>مكتمل</span> :
-                                          anyReturned ? <span className="badge badge-warning" style={{ fontSize: 11 }}>قيد الإجراء</span> :
-                                            <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>بانتظار الرفع</span>}
+                                        <span className={`badge ${statusClass}`} style={{ fontSize: 11 }}>{statusLabel}</span>
                                       </td>
                                       <td style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--slate)', fontSize: 11 }}>
                                         {fileDoc ? formatDate(fileDoc.updated_at || fileDoc.created_at) : '—'}
                                       </td>
                                       <td style={{ textAlign: 'left', padding: '10px 8px' }}>
                                         <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-{/* View original file */}
-                                           <button className="btn btn-ghost sm" title={fileDoc ? "معاينة الأصل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleViewFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
-                                             <Eye size={14} />
-                                           </button>
-                                           {/* Download original file */}
-                                           <button className="btn btn-ghost sm" title={fileDoc ? "تحميل الأصل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleDownloadFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
-                                             <DownloadSimple size={14} />
-                                           </button>
+                                          {/* View original file */}
+                                          <button className="btn btn-ghost sm" title={fileDoc ? "معاينة الأصل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleViewFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
+                                            <Eye size={14} />
+                                          </button>
+                                          {/* Download original file */}
+                                          <button className="btn btn-ghost sm" title={fileDoc ? "تحميل الأصل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleDownloadFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
+                                            <DownloadSimple size={14} />
+                                          </button>
                                           {/* View returned file if exists */}
                                           {anyReturned && (
                                             <button className="btn btn-ghost sm" title="معاينة النسخة المعادة" onClick={() => {
@@ -586,18 +589,47 @@ export function InternPortal() {
                                 const isReturned = !!d.returned_file_path;
                                 const inputId2 = `doc-upload-${d.id}`;
                                 const fileLabel = d.custom_title || d.doc_type || 'document';
-                                const statusLabel = d.status === 'AWAITING_RETURN' ? (d.action_type === 'sign' ? 'بانتظار التوقيع' : d.action_type === 'fill' ? 'بانتظار التعبئة' : 'بانتظار التوقيع والتعبئة') :
-                                  d.status === 'RETURNED' ? 'تم الإرجاع' :
-                                    d.status === 'MISSING' && !d.file_path ? 'بانتظار الرفع' :
-                                      d.status === 'PENDING_REVIEW' ? 'قيد المراجعة' :
-                                        d.status === 'APPROVED_AND_SIGNED' ? 'مقبول' :
-                                          d.status === 'REVISION_REQUESTED' ? 'مطلوب إعادة' : d.status || '—';
+                                
+                                // Status label based on action_type and status
+                                const getStatusLabel = () => {
+                                  if (d.status === 'APPROVED_AND_SIGNED') return 'مقبول';
+                                  if (d.status === 'REVISION_REQUESTED') return 'مطلوب إعادة';
+                                  if (d.status === 'RETURNED') return 'تم الإرجاع';
+                                  if (d.status === 'PENDING_REVIEW') return 'قيد المراجعة';
+                                  if (d.status === 'AWAITING_RETURN') {
+                                    if (d.action_type === 'sign') return 'بانتظار التوقيع';
+                                    if (d.action_type === 'fill') return 'بانتظار التعبئة';
+                                    return 'بانتظار التوقيع والتعبئة';
+                                  }
+                                  if (isView) {
+                                    if (d.status === 'MISSING' && !d.file_path) return 'بانتظار الرفع';
+                                    if (d.file_path) return 'مقبول';
+                                    return 'بانتظار الرفع';
+                                  }
+                                  if (d.action_type === 'sign') {
+                                    if (d.status === 'MISSING' && !d.file_path) return 'بانتظار الرفع';
+                                    return 'بانتظار التوقيع';
+                                  }
+                                  if (d.action_type === 'fill') {
+                                    if (d.status === 'MISSING' && !d.file_path) return 'بانتظار الرفع';
+                                    return 'بانتظار التعبئة';
+                                  }
+                                  if (d.action_type === 'sign_fill') {
+                                    if (d.status === 'MISSING' && !d.file_path) return 'بانتظار الرفع';
+                                    return 'بانتظار التوقيع والتعبئة';
+                                  }
+                                  return d.status || '—';
+                                };
+                                
+                                const statusLabel = getStatusLabel();
+                                
                                 const statusClass = d.status === 'APPROVED_AND_SIGNED' ? 'badge-success' :
                                   d.status === 'RETURNED' ? 'badge-success' :
                                     d.status === 'PENDING_REVIEW' ? 'badge-warning' :
-                                      d.status === 'AWAITING_RETURN' ? 'badge-warning' :
-                                        d.status === 'REVISION_REQUESTED' ? 'badge-danger' : '';
-                                // Can upload if: MISSING with no file, sign/fill not returned, or revision requested
+                                      d.status === 'REVISION_REQUESTED' ? 'badge-danger' :
+                                        d.status === 'AWAITING_RETURN' ? 'badge-warning' : '';
+                                
+                                const showViewDownload = !!d.file_path;
                                 const canUpload = (!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path);
                                 return (
                                   <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
@@ -630,13 +662,17 @@ export function InternPortal() {
                                     <td style={{ textAlign: 'left', padding: '10px 8px' }}>
                                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                                         {/* 1️⃣ View original file (admin-uploaded or intern-uploaded) */}
-                                        <button className="btn btn-ghost sm" title={d.file_path ? "معاينة" : "لا يوجد ملف مرفق من الإدارة"} disabled={!d.file_path} onClick={() => d.file_path && handleViewFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3 }}>
-                                          <Eye size={14} />
-                                        </button>
-                                        {/* 2️⃣ Download original file */}
-                                        <button className="btn btn-ghost sm" title={d.file_path ? "تحميل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!d.file_path} onClick={() => d.file_path && handleDownloadFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3 }}>
-                                          <DownloadSimple size={14} />
-                                        </button>
+                                        {showViewDownload && (
+                                          <>
+                                            <button className="btn btn-ghost sm" title="معاينة" onClick={() => handleViewFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                              <Eye size={14} />
+                                            </button>
+                                            {/* 2️⃣ Download original file */}
+                                            <button className="btn btn-ghost sm" title="تحميل" onClick={() => handleDownloadFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                              <DownloadSimple size={14} />
+                                            </button>
+                                          </>
+                                        )}
                                         {/* 3️⃣ View returned file (for sign/fill docs) */}
                                         {isReturned && (
                                           <button className="btn btn-ghost sm" title="معاينة النسخة المعادة" onClick={() => handleViewFile(api.downloadDocument(d.id) + '&returned=1', fileLabel + '_returned.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
@@ -644,6 +680,26 @@ export function InternPortal() {
                                           </button>
                                         )}
                                         {/* 4️⃣ Upload / re-upload button */}
+                                        {canUpload && (
+                                          <>
+                                            <input type="file" id={inputId2} style={{ display: 'none' }} accept=".pdf" onChange={e => {
+                                              if (!e.target.files?.[0]) return;
+                                              const file = e.target.files[0];
+                                              if (isSignFill) {
+                                                handleSignFillUpload(d.id, file);
+                                              } else {
+                                                handleProactiveUpload(d.id, d.doc_type, file);
+                                              }
+                                            }} />
+                                            <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => document.getElementById(inputId2)?.click()}>
+                                              <UploadSimple size={14} /> {d.status === 'REVISION_REQUESTED' ? 'إعادة رفع' : 'رفع'}
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
                                         {canUpload && (
                                           <>
                                             <input type="file" id={inputId2} style={{ display: 'none' }} accept=".pdf" onChange={e => {
