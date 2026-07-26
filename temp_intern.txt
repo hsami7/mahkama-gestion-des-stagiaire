@@ -1,0 +1,81 @@
+              <div className="card" style={{padding:24, marginBottom: 18, borderTop:'3px solid var(--gold)'}}>
+                <div className="section-title" style={{marginBottom:16}}>
+                  <h3 style={{fontSize:15, margin:0, color:'var(--gold-dark)'}}>قائمة المستندات</h3>
+                </div>
+                <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
+                  <thead>
+                    <tr style={{borderBottom:'1px solid var(--line)'}}>
+                      <th style={{textAlign:'right', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
+                      <th style={{textAlign:'center', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
+                      <th style={{textAlign:'left', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lifecycleDocs.length === 0 && (
+                      <tr><td colSpan={3} style={{textAlign:'center', padding:'16px', color:'var(--slate-light)'}}>لا توجد مستندات</td></tr>
+                    )}
+                    {lifecycleDocs.map(d => {
+                      const isMissing = !d.file_path && !d.returned_file_path;
+                      const isRejected = d.status === 'REVISION_REQUESTED';
+                      return (
+                        <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
+                          <td style={{padding:'10px 4px'}}>
+                            <div style={{fontWeight:600}}>{d.custom_title || DOC_TYPE_LABELS[d.doc_type] || d.doc_type}</div>
+                            {d.requires_return && !d.returned_file_path && (
+                              <div style={{marginTop:4}}><span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#FEF3C7', color:'#B45309', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>يتطلب التعبئة</span></div>
+                            )}
+                            {d.requires_return && d.returned_file_path && (
+                              <div style={{marginTop:4}}><span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}><CheckCircle size={11} weight="fill" /> تم إرجاع النسخة المعبأة</span></div>
+                            )}
+                          </td>
+                          <td style={{textAlign:'center', padding:'10px 4px', fontWeight:600, fontSize:12}}>
+                            {isMissing ? <span style={{color:'var(--slate)'}}>غير مرفوع</span> :
+                             isRejected ? <span style={{color:'var(--danger)'}}>مطلوب إعادة الرفع</span> :
+                             d.status === 'PENDING_REVIEW' ? <span style={{color:'var(--gold)'}}>قيد المراجعة</span> :
+                             <span style={{color:'var(--success)'}}>مقبول <CheckCircle size={12} weight="fill" style={{display:'inline'}} /></span>}
+                          </td>
+                          <td style={{textAlign:'left', padding:'10px 4px'}}>
+                            <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                              {(isMissing || isRejected) && !d.requires_return && (
+                                <>
+                                  <input type="file" id={`doc-upload-${d.id}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleProactiveUpload(d.doc_type, e.target.files[0]); }} />
+                                  <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`doc-upload-${d.id}`)?.click()} disabled={uploading === d.doc_type}>
+                                    <UploadSimple size={14} /> {uploading === d.doc_type ? 'جاري...' : 'رفع'}
+                                  </button>
+                                </>
+                              )}
+                              {d.requires_return && !d.returned_file_path && (
+                                <>
+                                  {d.file_path && <a href={api.downloadDocument(d.id)} download className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}><DownloadSimple size={14} /> تحميل النموذج</a>}
+                                  <input type="file" id={`return-upload-${d.id}`} style={{display:'none'}} accept=".pdf" onChange={e => {
+                                    if (!e.target.files?.[0]) return;
+                                    const formData = new FormData();
+                                    formData.append('file', e.target.files[0]);
+                                    api.post(`/interns/${internData?.id}/documents/${d.id}/return-upload`, formData).then(() => {
+                                      showToast('تم استلام النسخة المعبأة', 'success');
+                                      fetchLifecycleDocs();
+                                    }).catch(() => showToast('فشل الرفع', 'error'));
+                                  }} />
+                                  <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}} onClick={() => document.getElementById(`return-upload-${d.id}`)?.click()}>
+                                    <UploadSimple size={14} /> رفع النسخة المعبأة
+                                  </button>
+                                </>
+                              )}
+                              {!isMissing && !isRejected && !d.requires_return && d.file_path && (
+                                <a href={api.downloadDocument(d.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                  <Eye size={14} /> معاينة
+                                </a>
+                              )}
+                              {d.requires_return && d.returned_file_path && (
+                                <a href={api.downloadDocument(d.id) + '&returned=1'} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                  <Eye size={14} /> النسخة المعبأة
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>

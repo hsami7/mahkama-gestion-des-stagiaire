@@ -1,0 +1,28 @@
+68: const toast = useToast();
+74: const [formTitle, setFormTitle] = useState('نموذج تسجيل المتدربين');
+84: toast.success('تم تسجيل الدخول إلى حساب جوجل بنجاح! يمكنك الآن توليد النموذج.');
+114: setFormTitle('نموذج تسجيل المتدربين');
+129: if (!newLabel.trim()) { toast.info('أدخل اسم الحقل'); return; }
+149: if (!fields.length) { toast.info('أضف حقلاً واحداً على الأقل'); return; }
+156: toast.success('تم حفظ النموذج بنجاح!');
+162: toast.error('فشل حفظ النموذج');
+169: if (!fields.length) { toast.info('أضف حقلاً واحداً على الأقل'); return; }
+175: toast.success('تم إنشاء نموذج جوجل بنجاح!');
+178: toast.error('لم تقم بتسجيل الدخول إلى جوجل. يرجى الذهاب للإعدادات لتسجيل الدخول أولاً.');
+180: toast.error(err.response?.data?.msg || 'حدث خطأ أثناء إنشاء نموذج جوجل');
+188: if (!confirm('هل أنت متأكد من حذف هذا النموذج؟')) return;
+191: toast.success('تم حذف النموذج');
+193: } catch { toast.error('فشل الحذف'); }
+200: } catch { toast.error('فشل تغيير الحالة'); }
+206: toast.success('تم نسخ الرابط: ' + url);
+221: <Plus size={18} weight="bold" /> إنشاء نموذج جديد
+229: <Plus size={18} /> إنشاء أول نموذج
+285: <h2 style={{ margin: 0 }}>{editingForm ? 'تعديل النموذج' : 'نموذج جديد'}</h2>
+292: <Check size={18} /> {saving ? 'جاري الحفظ...' : 'حفظ النموذج'}
+300: <label>عنوان النموذج</label>
+305: placeholder="مثال: نموذج تسجيل دفعة 2026"
+314: <div style={{ fontWeight: 'bold', color: 'var(--success)', marginBottom: 4 }}>رابط النموذج العام</div>
+330: <button className="btn btn-ghost sm" onClick={() => { navigator.clipboard.writeText(googleFormLink); toast.success('تم النسخ'); }}>
+393: <Plus size={20} /> إضافة إلى النموذج
+400: <h3 style={{ margin: 0, fontSize: '1rem' }}>معاينة النموذج</h3>
+410: <div style={{ textAlign: 'center', color: 'var(--slate)', padding: 20 }}>النموذج فارغ</div>

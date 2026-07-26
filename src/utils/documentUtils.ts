@@ -121,3 +121,50 @@ export const viewDocx = async (templateUrl: string, data: any, filename: string 
     throw new Error('Not running in Electron, cannot open file locally.');
   }
 };
+
+export const openFileInDefaultApp = async (url: string, filename: string) => {
+  if (window.require) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('File not found');
+    const blobData = await res.blob();
+    const content = await blobData.arrayBuffer();
+    
+    const fs = window.require('fs');
+    const os = window.require('os');
+    const path = window.require('path');
+    const { shell } = window.require('electron');
+    
+    const tempPath = path.join(os.tmpdir(), filename);
+    fs.writeFileSync(tempPath, new Uint8Array(content));
+    shell.openPath(tempPath);
+  } else {
+    window.open(url, '_blank');
+  }
+};
+
+export const handleViewFile = async (url: string, filename: string) => {
+  const isPdf = filename.toLowerCase().endsWith('.pdf');
+  if (isPdf) {
+    window.open(url, '_blank');
+  } else {
+    await openFileInDefaultApp(url, filename);
+  }
+};
+
+export const handleDownloadFile = async (url: string, filename: string) => {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('File not found');
+    const blob = await res.blob();
+    saveAs(blob, filename);
+  } catch (error) {
+    console.error('Download error:', error);
+    // Fallback
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+};

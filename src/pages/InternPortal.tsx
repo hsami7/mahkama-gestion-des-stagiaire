@@ -92,6 +92,7 @@ export function InternPortal() {
     const interval = setInterval(() => {
       fetchRequests(true);
       fetchLifecycleDocs();
+      api.get('/notifications').then(setNotifications).catch(() => {});
     }, 10000);
     return () => clearInterval(interval);
   }, [internData?.id]);
@@ -185,10 +186,13 @@ export function InternPortal() {
   // Pending re-upload requests + sign/fill docs that need attention + revision-requested docs
   const pendingCount = useMemo(() => {
     const reqs = requests.filter((r: any) => !isRequestUploaded(r)).length;
-    const signFill = lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill') && d.file_path && !d.returned_file_path).length;
+    const signFill = lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && d.file_path && !d.returned_file_path).length;
     const revisionReqs = lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length;
     return reqs + signFill + revisionReqs;
   }, [requests, lifecycleDocs]);
+
+  // Count of sign/fill lifecycle docs that need the intern's return
+  const signFillCount = useMemo(() => lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && d.file_path && !d.returned_file_path).length, [lifecycleDocs]);
 
   // Count of revision-requested docs (for main page alert)
   const revisionCount = useMemo(() => lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length, [lifecycleDocs]);
@@ -327,6 +331,16 @@ export function InternPortal() {
                   </div>
                 </div>
 
+                {/* Pending actions alert for active interns */}
+                {signFillCount > 0 && (
+                  <div className="alert req" style={{display:'flex', alignItems:'flex-start', gap:10, padding:'16px 18px', borderRadius:'12px', marginBottom:18, fontSize:'13.5px', fontWeight:700, background: REQ_BG, color: REQ_FG, border:`1px solid ${REQ_BORDER}`}}>
+                    <Warning size={22} color={REQ_FG} weight="fill" style={{flexShrink:0, marginTop:2}} />
+                    <div>
+                      لديك {signFillCount} مستند{signFillCount > 1 ? 'ات' : ''} تتطلب التوقيع أو التعبئة من الإدارة — <span style={{textDecoration:'underline', cursor:'pointer'}} onClick={() => setActiveTab('documents')}>عرض المستندات</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="card" style={{marginBottom:18, padding:24}}>
                   <div className="intern-stepper" style={{display:'flex', alignItems:'center'}}>
                     <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}><CheckCircle weight="fill" size={18} /></div><small style={{display:'block',color:'var(--slate)'}}>الإرسال</small></div>
@@ -380,6 +394,14 @@ export function InternPortal() {
             ) : (<>
             <div className="section-title"><h2 style={{fontSize:19, margin:0}}>المستندات والوثائق</h2></div>
             <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>الوثائق الصادرة من الإدارة والمستندات المطلوب منك رفعها</p>
+
+  {/* Pending actions summary bar */}
+  {signFillCount > 0 && (
+    <div style={{marginBottom:18, padding:'14px 18px', borderRadius:12, background:REQ_BG, border:`1px solid ${REQ_BORDER}`, display:'flex', alignItems:'center', gap:10, fontSize:13, fontWeight:600, color:REQ_FG}}>
+      <Warning size={20} color={REQ_FG} weight="fill" style={{flexShrink:0}} />
+      <span>لديك <strong>{signFillCount}</strong> مستند{signFillCount > 1 ? 'ات' : ''} تتطلب توقيعك أو تعبئتك — توجه إلى قسم "وثائق من الإدارة" أدناه</span>
+    </div>
+  )}
 
   {/* Required documents list */}
   <div className="card" style={{padding:24, marginBottom:18, borderTop:'3px solid var(--brand, #9B8B6B)'}}>
@@ -435,7 +457,11 @@ export function InternPortal() {
               <div className="dn" style={{fontSize:13.5, fontWeight:700, marginBottom:4}}>{sanitizeTitle(d.label)}</div>
               <span style={{display:'inline-flex', alignItems:'center', gap:4, background: d.returned_file_path ? '#E7F8EE' : '#FEF3C7', color: d.returned_file_path ? '#15803D' : '#B45309', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
                 <ArrowsClockwise size={12} weight="bold" />
-                {d.returned_file_path ? 'تم إرجاع النسخة المعبأة' : 'يتطلب التعبئة والإرجاع'}
+                {d.returned_file_path
+                  ? 'تم إرجاع النسخة'
+                  : d.action_type === 'sign' ? 'يتطلب التوقيع'
+                  : d.action_type === 'sign_fill' ? 'يتطلب التوقيع والتعبئة والإرجاع'
+                  : 'يتطلب التعبئة والإرجاع'}
               </span>
             </div>
             <div style={{display:'flex', gap:6, alignItems:'center', flexShrink:0}}>

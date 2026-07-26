@@ -14,6 +14,10 @@ export function Layout() {
     const user = userStr ? JSON.parse(userStr) : null;
     if (user?.role === 'Admin' || user?.role === 'Manager') {
       api.get('/notifications').then(setNotifications).catch(() => {});
+      const interval = setInterval(() => {
+        api.get('/notifications').then(setNotifications).catch(() => {});
+      }, 15000);
+      return () => clearInterval(interval);
     }
   }, []);
 

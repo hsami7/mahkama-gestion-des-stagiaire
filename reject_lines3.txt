@@ -1,0 +1,3 @@
+1667: @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/reject', methods=['POST'])
+1669: def reject_document(intern_id, doc_id):
+2765: @app.route('/api/submissions/<int:sub_id>/reject', methods=['POST'])

@@ -1,0 +1,1 @@
+1669: def reject_document(intern_id, doc_id):

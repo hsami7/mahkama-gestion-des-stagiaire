@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, ClipboardText, CalendarBlank, FileDoc, Folder } from '@phosphor-icons/react';
+import { openFileInDefaultApp, handleViewFile } from '../utils/documentUtils';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
@@ -954,9 +955,74 @@ export function Profile() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(d => {
-                    const actionLabel = d.action_type === 'sign' ? 'توقيع' : d.action_type === 'fill' ? 'تعبئة وإرجاع' : 'رفع';
-                    const isSignFill = d.action_type === 'sign' || d.action_type === 'fill';
+                  {(() => {
+                    const rows: any[] = [];
+                    const grouped = new Map<string, any[]>();
+                    filtered.forEach(d => {
+                      const base = (d.custom_title || d.doc_type || '').replace(/\s*\(.*?\)\s*$/, '');
+                      if (!grouped.has(base)) grouped.set(base, []);
+                      grouped.get(base)!.push(d);
+                    });
+                    for (const [base, docs] of grouped) {
+                      const sign = docs.find(d => d.action_type === 'sign');
+                      const fill = docs.find(d => d.action_type === 'fill');
+                      const both = docs.find(d => d.action_type === 'sign_fill');
+                      if (sign && fill) {
+                        rows.push({ id: `combined-${base}`, isCombined: true, sign, fill, base });
+                      } else {
+                        docs.forEach(d => rows.push(d));
+                      }
+                    }
+                    return rows.map(row => {
+                      if (row.isCombined) {
+                        const d = row.sign;
+                        const fillDoc = row.fill;
+                        const bothReturned = d.returned_file_path && fillDoc.returned_file_path;
+                        const anyReturned = d.returned_file_path || fillDoc.returned_file_path;
+                        return (
+                        <tr key={row.id} style={{borderBottom:'1px solid var(--line)'}}>
+                          <td style={{padding:'10px 8px'}}>
+                            <div style={{fontWeight:600, color:'var(--ink)'}}>
+                              {row.base}
+                              <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>(توقيع) و (تعبئة وإرجاع)</span>
+                            </div>
+                            {anyReturned && (
+                              <div style={{marginTop:4}}>
+                                <span style={{display:'inline-flex', alignItems:'center', gap:4, background: bothReturned ? '#E7F8EE' : '#FFF6E5', color: bothReturned ? '#15803D' : '#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
+                                  {bothReturned ? <CheckCircle size={10} weight="fill" /> : <ArrowsClockwise size={10} weight="bold" />}
+                                  {bothReturned ? 'تمت الإعادة (توقيع وتعبئة)' : anyReturned ? 'جاري الإعادة' : ''}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td style={{textAlign:'center', padding:'10px 8px'}}>
+                            {bothReturned ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
+                             anyReturned ? <span className="badge badge-warning" style={{fontSize:11}}>قيد الإجراء</span> :
+                             <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>}
+                          </td>
+                          <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
+                            {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                          </td>
+                          <td style={{textAlign:'left', padding:'10px 8px'}}>
+                            <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                              {d.file_path && (
+                                <>
+                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <Eye size={14} />
+                                  </button>
+                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <DownloadSimple size={14} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        );
+                      }
+                      const d = row;
+                      const actionLabel = d.action_type === 'sign' ? 'توقيع' : d.action_type === 'fill' ? 'تعبئة وإرجاع' : d.action_type === 'sign_fill' ? 'توقيع وتعبئة' : 'رفع';
+                      const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
                     return (
                     <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
                       <td style={{padding:'10px 8px'}}>
@@ -1019,7 +1085,9 @@ export function Profile() {
                         </div>
                       </td>
                     </tr>
-                  )})}
+                  );
+                });
+              })()}
                 </tbody>
               </table>
               )}
@@ -1559,42 +1627,36 @@ export function Profile() {
               } onClick={async () => {
                 try {
                   let total = 0;
-                  const type = requestActionType;
+                  const types = Array.from(requestActionTypes);
+                  const primaryType = types[0] || 'view';
 
                   if (requestFiles.length > 0) {
                     for (const file of requestFiles) {
                       const title = requestTitle.trim() || file.name.replace(/\.\w+$/, '') || 'مستند';
-                      await api.uploadSignedDocument(Number(id), 'OTHER', file, title, type);
+                      await api.uploadSignedDocument(Number(id), 'OTHER', file, title, primaryType);
+                      for (let i = 1; i < types.length; i++) {
+                        await api.post(`/interns/${id}/document-lifecycle`, { document_type: 'OTHER', custom_title: title, action_type: types[i] });
+                      }
                     }
                     total += requestFiles.length;
-                  }
-
-                  if (selectedVaultDocs.length > 0) {
-                     for (const vd of selectedVaultDocs) {
-                       const title = requestTitle.trim() || vd || 'مستند';
-                       await api.post(`/interns/${id}/vault-attach`, {
-                         vault_name: vd, doc_type: 'OTHER', custom_title: title, action_type: type
-                       });
-                     }
-                     total += selectedVaultDocs.length;
-                  }
-
-                  if (requestFiles.length === 0 && selectedVaultDocs.length === 0 && requestTitle.trim()) {
-                    await api.post(`/interns/${id}/document-lifecycle`, { document_type: 'OTHER', custom_title: requestTitle.trim(), action_type: type });
+                  } else if (requestTitle.trim()) {
+                    const title = requestTitle.trim();
+                    for (const t of types) {
+                      await api.post(`/interns/${id}/document-lifecycle`, { document_type: 'OTHER', custom_title: title, action_type: t });
+                    }
                     total += 1;
                   }
 
                   if (total > 0) toast.success(`تم إرسال ${total} مستند${total > 1 ? 'ات' : ''} بنجاح`);
                   setShowRequestModal(false);
                   setRequestFiles([]);
-                  setSelectedVaultDocs([]);
                   setRequestActionTypes(new Set(['view']));
                   fetchDocsLifecycle();
                 } catch (err) {
                   toast.error('فشل إرسال الطلب');
                 }
               }}>
-                إرسال{(requestFiles.length + selectedVaultDocs.length) > 1 ? ` (${requestFiles.length + selectedVaultDocs.length})` : ''}
+                إرسال{requestFiles.length > 1 || requestActionTypes.size > 1 ? ` (${requestFiles.length || 1})` : ''}
               </button>
             </div>
           </div>
@@ -1655,11 +1717,12 @@ export function Profile() {
                         </div>
 
                         {/* Actions */}
-                        <div style={{display:'flex', gap:8, width:'100%', marginTop:'auto'}} onClick={e => e.stopPropagation()}>
-                          <button className="btn" style={{flex:1, padding:'8px 0', background:'#1F2937', color:'#fff', border:'none', borderRadius:8, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', gap:6}} onClick={() => window.open(API_BASE + '/vault/' + encodeURIComponent(vd.name))}>
-                            <DownloadSimple size={16} /> تحميل
-                          </button>
-                          <button className="btn" style={{flex:1, padding:'8px 0', background:'#fff', color:'#111827', border:'1px solid #E5E7EB', borderRadius:8, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', gap:6}} onClick={() => window.open(API_BASE + '/vault/' + encodeURIComponent(vd.name), '_blank')}>
+                        <div style={{display:'flex', width:'100%', marginTop:'auto'}} onClick={e => e.stopPropagation()}>
+                          <button className="btn" style={{flex:1, padding:'8px 0', background:'#fff', color:'#111827', border:'1px solid #E5E7EB', borderRadius:8, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', gap:6}} onClick={() => {
+                            const url = API_BASE + '/vault/' + encodeURIComponent(vd.name);
+                            toast.info('جاري إعداد المستند للعرض...');
+                            handleViewFile(url, vd.name).catch(() => toast.error('حدث خطأ أثناء الفتح'));
+                          }}>
                             <Eye size={16} /> عرض
                           </button>
                         </div>
@@ -1669,8 +1732,15 @@ export function Profile() {
                 </div>
               )}
             </div>
-            <div className="modal-foot" style={{background:'#F9FAFB', borderTop:'1px solid #E5E7EB', padding:'16px 24px', borderRadius:'0 0 16px 16px'}}>
-              <button className="btn btn-gold" style={{width:'100%'}} onClick={() => setShowVaultModal(false)}>
+            <div className="modal-foot" style={{background:'#F9FAFB', borderTop:'1px solid #E5E7EB', padding:'16px 24px', borderRadius:'0 0 16px 16px', display:'flex', justifyContent:'center'}}>
+              <button className="btn btn-gold" style={{width:'100%', display:'flex', justifyContent:'center', alignItems:'center'}} onClick={() => {
+                if (selectedVaultDocs.length > 0 && !requestTitle.trim()) {
+                  const docName = selectedVaultDocs[0];
+                  const title = docName.includes('.') ? docName.split('.').slice(0, -1).join('.') : docName;
+                  setRequestTitle(title);
+                }
+                setShowVaultModal(false);
+              }}>
                 تأكيد الاختيار {selectedVaultDocs.length > 0 ? '(' + selectedVaultDocs.length + ')' : ''}
               </button>
             </div>
@@ -1697,10 +1767,11 @@ export function Profile() {
                 <div style={{fontSize:12, color:'#6B7280', marginTop:2}}>مستند من الخزنة</div>
               </div>
               <div style={{display:'grid', gridTemplateColumns:'1fr', gap:12}}>
-                {(['view','sign','fill'] as const).map(type => {
+                {(['view','sign','sign_fill','fill'] as const).map(type => {
                   const labels = {
                     view: { title: 'عرض فقط', desc: 'المتدرب يرى ويحمل المستند', icon: 'Eye', color: '#0284C7', bg: '#E0F2FE' },
                     sign: { title: 'توقيع', desc: 'المتدرب يوقع ويعيد النسخة', icon: 'Pen', color: '#7C3AED', bg: '#EDE9FE' },
+                    sign_fill: { title: 'توقيع وتعبئة', desc: 'المتدرب يوقع ويعبي النموذج ويعيده', icon: 'ClipboardText', color: '#B45309', bg: '#FEF3C7' },
                     fill: { title: 'تعبئة وإرجاع', desc: 'المتدرب يعبي النموذج ويعيده', icon: 'ClipboardText', color: '#DC2626', bg: '#FCE8E8' },
                   }[type];
                   return (

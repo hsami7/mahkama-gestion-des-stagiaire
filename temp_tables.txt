@@ -1,0 +1,12 @@
+359: toast.warning('لا يمكن قبول المتدرب. يرجى التأكد من رفع جميع المستندات المطلوبة أولاً.');
+793: if (!window.confirm('هل أنت متأكد من إنهاء التدريب؟ سيتم مراجعة الوثائق وإصدار شهادة التدريب.')) return;
+920: <h3><FileText weight="bold" className="icon" /> مركز المستندات</h3>
+931: {/* Section 1: المستندات المطلوبة من المتدرب (Incoming) */}
+933: <div className="section-title" style={{marginBottom:8}}><h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--gold-dark)'}}>المستندات المطلوبة من المتدرب</h4></div>
+998: {/* Section 2: الوثائق الموقعة من الإدارة (Outgoing Signed Docs) */}
+1192: <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>بناءً على مراجعة المستندات والمقابلة، يرجى اتخاذ القرار النهائي.</p>
+1341: <div style={{ fontSize: '12.5px', color: 'var(--slate)', marginTop: '4px' }}>ملف من صفحة واحدة: المعلومات الشخصية والأكاديمية وقائمة بالمستندات المرفوعة.</div>
+1349: <FileText weight="bold" size={18} color="#1E5631" /> الملف الكامل مع جميع المستندات
+1351: <div style={{ fontSize: '12.5px', color: 'var(--slate)', marginTop: '4px' }}>ملف متعدد الصفحات: بيانات المتدرب متبوعة بجميع المستندات المرفوعة (الاتفاقية، البطاقة الوطنية، التأمين، السيرة الذاتية...).</div>
+1583: <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>سيظهر السبب للمتدرب في لوحة المستندات الخاصة به</small>
+1612: <h3>إضافة من خزنة المستندات</h3>

@@ -1,0 +1,77 @@
+          <div style={{marginBottom:16}}>
+            <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
+              <thead>
+                <tr style={{borderBottom:'1px solid var(--line)'}}>
+                  <th style={{textAlign:'right', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>الوثيقة</th>
+                  <th style={{textAlign:'center', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
+                  <th style={{textAlign:'center', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>تاريخ التحديث</th>
+                  <th style={{textAlign:'left', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
+                </tr>
+              </thead>
+              <tbody>
+                {docsLifecycle.length === 0 && (
+                  <tr><td colSpan={4} style={{textAlign:'center', padding:'16px 8px', color:'var(--slate-light)'}}>لا توجد مستندات</td></tr>
+                )}
+                {docsLifecycle.map(d => {
+                  return (
+                    <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
+                      <td style={{padding:'10px 8px'}}>
+                        <div style={{fontWeight:600, color:'var(--ink)'}}>{DOC_TYPE_LABELS[d.doc_type] || sanitizeTitle(d.label)}</div>
+                        {d.requires_return && !d.returned_file_path && (
+                          <div style={{marginTop:4}}><span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#FEF3C7', color:'#B45309', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>يتطلب التعبئة</span></div>
+                        )}
+                        {d.requires_return && d.returned_file_path && (
+                          <div style={{marginTop:4}}><span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}><CheckCircle size={11} weight="fill" /> تم إرجاع النسخة المعبأة</span></div>
+                        )}
+                        {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
+                          <div style={{fontSize:11, color:'var(--danger)', marginTop:4, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
+                            <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{textAlign:'center', padding:'10px 8px'}}>
+                        {!d.file_path && !d.returned_file_path ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>غير مرفوع</span> :
+                         d.status === 'PENDING_REVIEW' ? <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span> :
+                         d.status === 'APPROVED_AND_SIGNED' ? <span className="badge badge-success" style={{fontSize:11}}>مقبول</span> :
+                         d.status === 'REVISION_REQUESTED' ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> : <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>}
+                      </td>
+                      <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)'}}>
+                        {formatDate(d.updated_at || d.created_at)}
+                      </td>
+                      <td style={{textAlign:'left', padding:'10px 8px'}}>
+                        <div style={{display:'flex', gap:4, justifyContent:'flex-end', flexWrap:'wrap'}}>
+                          {d.file_path && (
+                            <>
+                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{padding:'4px 8px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <Eye size={14} /> معاينة
+                              </button>
+                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{padding:'4px 8px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <DownloadSimple size={14} /> تحميل
+                              </button>
+                            </>
+                          )}
+                          {d.returned_file_path && (
+                            <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} title="معاينة المعبأة" style={{padding:'4px 8px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <Eye size={14} /> المعبأة
+                            </button>
+                          )}
+                          {d.status !== 'MISSING' && (d.file_path || d.returned_file_path) && (
+                            <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة الرفع" style={{padding:'4px 8px',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                              <ArrowsClockwise size={14} /> إعادة
+                            </button>
+                          )}
+                          {d.status === 'PENDING_REVIEW' && (
+                            <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{padding:'4px 8px',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                              <CheckCircle size={14} /> قبول
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}

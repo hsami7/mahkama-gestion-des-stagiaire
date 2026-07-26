@@ -1,0 +1,388 @@
+class Intern(db.Model):
+    __tablename__ = 'interns'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(150), nullable=False)
+    name_fr = db.Column(db.String(150), nullable=True)
+    email = db.Column(db.String(150), nullable=True)
+    national_id = db.Column(db.String(50), nullable=True)
+    department = db.Column(db.String(100), nullable=True)
+    encadrant = db.Column(db.String(150), nullable=True)
+    status = db.Column(db.String(50), default='قيد المراجعة')
+    source = db.Column(db.String(100), default='إضافة يدوية')
+    photo_path = db.Column(db.String(255), nullable=True)
+    phone = db.Column(db.String(50), nullable=True)
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
+    date_of_birth = db.Column(db.Date, nullable=True)
+    university = db.Column(db.String(150), nullable=True)
+    address = db.Column(db.Text, nullable=True)
+    documents = db.Column(db.Text, nullable=True)
+    evaluation = db.Column(db.Text, nullable=True)
+
+class Attendance(db.Model):
+    __tablename__ = 'attendance'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
+    date = db.Column(db.String(20), nullable=False)
+    status = db.Column(db.String(20), nullable=False)
+
+class DocumentRequest(db.Model):
+    __tablename__ = 'document_requests'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
+    document_type = db.Column(db.String(50), nullable=False) # e.g. 'resume', 'id', 'other'
+    custom_title = db.Column(db.String(150), nullable=True)  # Title if document_type == 'other'
+    note = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='pending') # 'pending' or 'fulfilled'
+    created_at = db.Column(db.String(50), nullable=False)
+    template_path = db.Column(db.String(255), nullable=True)
+    lifecycle_id = db.Column(db.Integer, db.ForeignKey('document_lifecycle.id'), nullable=True)
+class Form(db.Model):
+    __tablename__ = 'forms'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    form_data = db.Column(db.Text, nullable=False)
+    title = db.Column(db.String(200), nullable=True)
+    slug = db.Column(db.String(50), unique=True, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.String(50), nullable=True)
+
+class FormSubmission(db.Model):
+    __tablename__ = 'form_submissions'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    form_id = db.Column(db.Integer, db.ForeignKey('forms.id'), nullable=False)
+    submitted_data = db.Column(db.Text, nullable=False)  # JSON string
+    status = db.Column(db.String(20), default='pending')  # pending | approved | rejected
+    submitted_at = db.Column(db.String(50), nullable=True)
+    rejection_reason = db.Column(db.Text, nullable=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=True)
+
+class Message(db.Model):
+    __tablename__ = 'messages'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
+    sender_role = db.Column(db.String(20), nullable=False)  # 'admin' or 'intern'
+    sender_name = db.Column(db.String(150), nullable=True)
+    body = db.Column(db.Text, nullable=True)
+    attachment_path = db.Column(db.String(255), nullable=True)
+    attachment_name = db.Column(db.String(255), nullable=True)
+    waiting_for_reply = db.Column(db.Boolean, default=False)
+    expected_format = db.Column(db.String(20), nullable=True)  # 'text', 'pdf', 'word', 'any'
+    replied = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.String(50), nullable=False)
+
+class SystemLog(db.Model):
+    __tablename__ = 'system_logs'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.Column(db.String(150), nullable=True)
+    action = db.Column(db.Text, nullable=False)
+
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
+    type = db.Column(db.String(50), nullable=False) # REJECTION, REASSIGNMENT, REQUEST, STAGE_COMPLETE, GENERIC
+    title = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text, nullable=True)
+    related_doc_id = db.Column(db.Integer, db.ForeignKey('document_lifecycle.id'), nullable=True)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+class AuditEvent(db.Model):
+    __tablename__ = 'audit_events'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    actor_role = db.Column(db.String(50), nullable=True)
+    action = db.Column(db.String(255), nullable=False)
+    doc_id = db.Column(db.Integer, db.ForeignKey('document_lifecycle.id'), nullable=True)
+    from_status = db.Column(db.String(50), nullable=True)
+    to_status = db.Column(db.String(50), nullable=True)
+    note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+DOC_TYPES = [
+    'CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED',
+    'FINAL_REPORT', 'ATTESTATION_SIGNED', 'OTHER'
+]
+DOC_STATUSES = ['MISSING', 'PENDING_REVIEW', 'REVISION_REQUESTED', 'APPROVED_AND_SIGNED']
+
+class DocumentLifecycle(db.Model):
+    __tablename__ = 'document_lifecycle'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
+    doc_type = db.Column(db.String(50), nullable=False)
+    file_path = db.Column(db.String(255), nullable=True)
+    uploaded_by = db.Column(db.String(20), nullable=True)   # 'INTERN' or 'ADMIN'
+    status = db.Column(db.String(30), default='MISSING')
+    rejection_reason = db.Column(db.Text, nullable=True)
+    is_visible_to_intern = db.Column(db.Boolean, default=False)
+    custom_title = db.Column(db.String(150), nullable=True)
+    requires_return = db.Column(db.Boolean, default=False)
+    returned_file_path = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=True)
+    updated_at = db.Column(db.DateTime, nullable=True)
+    lifecycle_type = db.Column(db.String(20), default='SIGN')
+    form_schema = db.Column(db.Text, nullable=True)
+    form_data = db.Column(db.Text, nullable=True)
+    assigned_to_intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=True)
+    signed_by = db.Column(db.String(150), nullable=True)
+    correction_round = db.Column(db.Integer, default=0)
+    parent_id = db.Column(db.Integer, db.ForeignKey('document_lifecycle.id'), nullable=True)
+
+    intern = db.relationship('Intern', foreign_keys=[intern_id], backref='documents_lifecycle')
+    assigned_to = db.relationship('Intern', foreign_keys=[assigned_to_intern_id])
+    parent = db.relationship('DocumentLifecycle', remote_side=[id])
+
+def log_action(user, action):
+    try:
+        new_log = SystemLog(user=user, action=action)
+        db.session.add(new_log)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Failed to log action: {e}")
+
+# Old smtp logic removed. We now use email_service.py for Gmail integration.
+def send_email(to_email: str, subject: str, body_html: str):
+    email_service.send_email(to_email, subject, body_html)
+
+
+def init_db():
+    with app.app_context():
+        db.create_all()
+        # Auto-add newer columns to existing DBs
+        try:
+            cols = [c['name'] for c in db.inspect(db.engine).get_columns('interns')]
+            if 'evaluation' not in cols:
+                db.session.execute(db.text('ALTER TABLE interns ADD COLUMN evaluation TEXT'))
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Migration check failed: {e}")
+        # Auto-add username column to users table
+        try:
+            ucols = [c['name'] for c in db.inspect(db.engine).get_columns('users')]
+            if 'username' not in ucols:
+                db.session.execute(db.text('ALTER TABLE users ADD COLUMN username VARCHAR(80)'))
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"User migration failed: {e}")
+        # Populate username from email for existing users
+        try:
+            for u in User.query.filter_by(username=None).all():
+                if u.email:
+                    u.username = u.email.split('@')[0]
+                else:
+                    u.username = f"user_{u.id}"
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        # Fix existing users where username equals email
+        try:
+            for u in User.query.all():
+                if u.username and u.email and u.username == u.email:
+                    u.username = u.email.split('@')[0]
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        # Migrate legacy doc JSON to DocumentLifecycle
+        try:
+            _migrate_legacy_documents()
+        except Exception as e:
+            print(f"Document migration skipped: {e}")
+        # Add requires_return column if missing
+        try:
+            with db.engine.connect() as conn:
+                from sqlalchemy import text
+                conn.execute(text("ALTER TABLE document_lifecycle ADD COLUMN requires_return BOOLEAN DEFAULT 0"))
+                conn.commit()
+        except Exception:
+            db.session.rollback()
+        try:
+            with db.engine.connect() as conn:
+                from sqlalchemy import text
+                conn.execute(text("ALTER TABLE document_lifecycle ADD COLUMN returned_file_path VARCHAR(255)"))
+                conn.commit()
+        except Exception:
+            db.session.rollback()
+        # Migrate Form table — add new columns if missing
+        try:
+            form_cols = [c['name'] for c in db.inspect(db.engine).get_columns('forms')]
+            with db.engine.connect() as conn:
+                from sqlalchemy import text as sql_text
+                if 'title' not in form_cols:
+                    conn.execute(sql_text('ALTER TABLE forms ADD COLUMN title VARCHAR(200)'))
+                if 'slug' not in form_cols:
+                    conn.execute(sql_text('ALTER TABLE forms ADD COLUMN slug VARCHAR(50)'))
+                if 'is_active' not in form_cols:
+                    conn.execute(sql_text('ALTER TABLE forms ADD COLUMN is_active BOOLEAN DEFAULT 1'))
+                if 'created_at' not in form_cols:
+                    conn.execute(sql_text('ALTER TABLE forms ADD COLUMN created_at VARCHAR(50)'))
+                conn.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Form migration: {e}")
+        # Create default Admin user if none exists
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            # Check if there's an admin by email for backward compat
+            admin = User.query.filter_by(email='admin@mahkama.ma').first()
+            if admin:
+                admin.username = 'admin'
+            else:
+                hashed_pw = generate_password_hash('admin123')
+                admin = User(username='admin', name='مدير النظام', password=hashed_pw, role='Admin')
+                db.session.add(admin)
+            db.session.commit()
+
+        # DocumentRequest lifecycle_id
+        try:
+            req_cols = [c['name'] for c in db.inspect(db.engine).get_columns('document_requests')]
+            with db.engine.connect() as conn:
+                from sqlalchemy import text as sql_text
+                if 'lifecycle_id' not in req_cols:
+                    conn.execute(sql_text('ALTER TABLE document_requests ADD COLUMN lifecycle_id INTEGER'))
+                conn.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"DocumentRequest migration failed: {e}")
+
+        # DocumentLifecycle new columns
+        try:
+            dl_cols = [c['name'] for c in db.inspect(db.engine).get_columns('document_lifecycle')]
+            with db.engine.connect() as conn:
+                from sqlalchemy import text as sql_text
+                if 'lifecycle_type' not in dl_cols:
+                    conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN lifecycle_type VARCHAR(20) DEFAULT 'SIGN'"))
+                if 'form_schema' not in dl_cols:
+                    conn.execute(sql_text('ALTER TABLE document_lifecycle ADD COLUMN form_schema TEXT'))
+                if 'form_data' not in dl_cols:
+                    conn.execute(sql_text('ALTER TABLE document_lifecycle ADD COLUMN form_data TEXT'))
+                if 'assigned_to_intern_id' not in dl_cols:
+                    conn.execute(sql_text('ALTER TABLE document_lifecycle ADD COLUMN assigned_to_intern_id INTEGER'))
+                if 'signed_by' not in dl_cols:
+                    conn.execute(sql_text('ALTER TABLE document_lifecycle ADD COLUMN signed_by VARCHAR(150)'))
+                if 'correction_round' not in dl_cols:
+                    conn.execute(sql_text('ALTER TABLE document_lifecycle ADD COLUMN correction_round INTEGER DEFAULT 0'))
+                if 'parent_id' not in dl_cols:
+                    conn.execute(sql_text('ALTER TABLE document_lifecycle ADD COLUMN parent_id INTEGER'))
+                conn.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"DocumentLifecycle migration failed: {e}")
+
+        # Date string to DATE migrations
+        try:
+            with db.engine.connect() as conn:
+                from sqlalchemy import text as sql_text
+                # SQLite ALTER TABLE doesn't support changing column types easily.
+                # Since sqlite is loosely typed, we don't strictly need to alter the schema 
+                # type in SQLite, but we can do a data normalization pass here if we wanted.
+                # The python models will be updated to Date/DateTime.
+                pass
+        except Exception as e:
+            db.session.rollback()
+
+
+
+def _migrate_legacy_documents():
+    """Migrate `interns.documents` JSON blob into DocumentLifecycle records."""
+    import json
+    TYPE_MAP = {
+        'cin': 'CIN', 'id': 'CIN', 'identite': 'CIN',
+        'cv': 'CV', 'resume': 'CV',
+        'insurance': 'INSURANCE', 'assurance': 'INSURANCE',
+        'demande': 'DEMANDE',
+        'convention': 'CONVENTION_SIGNED',
+        'photo': 'CIN',
+    }
+    interns = Intern.query.all()
+    now = datetime.now(timezone.utc).isoformat()
+    for intern in interns:
+        if not intern.documents:
+            continue
+        try:
+            docs = json.loads(intern.documents)
+        except Exception:
+            continue
+        if not isinstance(docs, dict):
+            continue
+        for k, v in docs.items():
+            if k == 'others':
+                if isinstance(v, list):
+                    for o in v:
+                        if isinstance(o, dict) and o.get('file'):
+                            title = o.get('name', 'مستند إضافي')
+                            existing = DocumentLifecycle.query.filter_by(
+                                intern_id=intern.id, custom_title=title
+                            ).first()
+                            if existing:
+                                continue
+                            dl = DocumentLifecycle(
+                                intern_id=intern.id, doc_type='OTHER',
+                                file_path=o['file'], uploaded_by='INTERN',
+                                status='PENDING_REVIEW', is_visible_to_intern=False,
+                                custom_title=title, created_at=now, updated_at=now
+                            )
+                            db.session.add(dl)
+                continue
+            if not v:
+                continue
+            doc_type = TYPE_MAP.get(k.strip().lower(), 'OTHER')
+            existing = DocumentLifecycle.query.filter_by(
+                intern_id=intern.id, doc_type=doc_type
+            ).filter(
+                DocumentLifecycle.custom_title.is_(None)
+            ).first()
+            if existing:
+                continue
+            dl = DocumentLifecycle(
+                intern_id=intern.id, doc_type=doc_type,
+                file_path=str(v) if isinstance(v, str) else None,
+                uploaded_by='INTERN',
+                status='PENDING_REVIEW', is_visible_to_intern=False,
+                created_at=now, updated_at=now
+            )
+            db.session.add(dl)
+        db.session.commit()
+
+# --- AUTHENTICATION ROUTES ---
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username', data.get('email', '')).strip()
+    password = data.get('password')
+    
+    user = User.query.filter((User.username == username) | (User.email == username)).first()
+    
+    if user and check_password_hash(user.password, password):
+        access_token = create_access_token(
+            identity=str(user.id),
+            additional_claims={
+                'name': user.name, 
+                'role': user.role, 
+                'permissions': user.permissions
+            }
+        )
+        log_action(user.name, "قام بتسجيل الدخول إلى النظام")
+        return jsonify(
+            access_token=access_token, 
+            user={'id': user.id, 'name': user.name, 'role': user.role, 'permissions': user.permissions}
+        ), 200
+        
+    return jsonify({"msg": "اسم المستخدم أو كلمة المرور غير صحيحة"}), 401
+
+
+# --- USERS ROUTES (Admin Only) ---
+@app.route('/api/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    users = User.query.all()
+    return jsonify([{"id": u.id, "name": u.name, "username": u.username, "email": u.email, "role": u.role, "permissions": u.permissions} for u in users])
+
+@

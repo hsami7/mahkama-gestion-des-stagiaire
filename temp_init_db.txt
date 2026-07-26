@@ -1,313 +1,3 @@
-import os
-import json
-import uuid
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-from werkzeug.utils import secure_filename
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timedelta, timezone, date
-import re
-import base64
-import email_service
-import google_sheets_service
-import microsoft_excel_service
-import google_forms_api
-
-app = Flask(__name__)
-CORS(app)
-
-# Configurations
-app.config['JWT_SECRET_KEY'] = 'mahkama-secret-key-2026!!secret!!' # Change in production
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024 # 20MB max upload
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.dirname(__file__), 'instance', 'database.sqlite')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-jwt = JWTManager(app)
-db = SQLAlchemy(app)
-
-# Allow download endpoints (opened via window.open) to authenticate using ?token=...
-# in addition to the standard Authorization: Bearer header.
-app.config['JWT_TOKEN_LOCATION'] = ['headers', 'query_string']
-app.config['JWT_QUERY_STRING_NAME'] = 'token'
-
-# Ensure upload directory exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-def _ext_for_file_type(file_type: str) -> list:
-    """Return the list of allowed extensions for the given logical file_type."""
-    return FILE_TYPE_EXTENSIONS.get((file_type or '').strip().lower(), FILE_TYPE_EXTENSIONS['any'])
-
-
-def _allowed_file(file_name: str, file_type: str) -> bool:
-    ft = (file_type or '').strip().lower() or 'any'
-    return any(file_name.lower().endswith(ext) for ext in _ext_for_file_type(ft))
-
-
-def _file_extension(file_name: str, file_type: str) -> str:
-    """Pick the canonical extension (incl. leading '.') for an upload."""
-    ft = (file_type or '').strip().lower() or 'any'
-    low = (file_name or '').lower()
-    for ext in _ext_for_file_type(ft):
-        if low.endswith(ext):
-            return ext
-    if '.' in low:
-        cand = '.' + low.rsplit('.', 1)[1]
-        return cand if 1 < len(cand) <= 10 else '.pdf'
-    return '.pdf'
-
-
-def friendly_doc_filename(intern_id: int, doc_id, label: str, file_type: str) -> str:
-    """Build an IT-friendly filename: intern-{id}-{doc_id}-{safe-label}.<ext>"""
-    import re
-    base = re.sub(r'[^a-zA-Z0-9_-]+', '_', (label or '').strip()) or 'document'
-    base = base[:40]
-    ext = ''
-    ft = (file_type or '').strip().lower()
-    if ft == 'pdf':
-        ext = '.pdf'
-    elif ft == 'word':
-        ext = '.docx'
-    elif ft == 'excel':
-        ext = '.xlsx'
-    elif ft == 'image':
-        ext = '.png'
-    return f"intern-{intern_id}-{doc_id or 'tmp'}-{base}{ext}"
-
-
-def safe_filename(prefix: str, original: str) -> str:
-    """Generate a safe, unique upload filename while preserving the original extension."""
-    import uuid
-    base = secure_filename(original)
-    # secure_filename may strip the extension for unusual names; recover it from the original
-    ext = ''
-    if '.' in original:
-        ext = '.' + original.rsplit('.', 1)[1].lower()
-        if len(ext) > 10 or not ext[1:].isalnum():
-            ext = ''
-    if not ext and base and '.' in base:
-        ext = '.' + base.rsplit('.', 1)[1].lower()
-    if not base:
-        base = f"{prefix}_{uuid.uuid4().hex}"
-    else:
-        base = base.rsplit('.', 1)[0]  # drop any extension from the base; we re-add it below
-    name = f"{base}{ext}" if ext else base
-    # guarantee uniqueness
-    full = os.path.join(app.config['UPLOAD_FOLDER'], name)
-    if os.path.exists(full):
-        name = f"{base}_{uuid.uuid4().hex[:6]}{ext}"
-    return name
-
-
-# --- MODELS ---
-class User(db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    name = db.Column(db.String(150), nullable=False)
-    email = db.Column(db.String(150), unique=True, nullable=True)
-    password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(50), nullable=False)
-    permissions = db.Column(db.Text, nullable=True)
-
-class Intern(db.Model):
-    __tablename__ = 'interns'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(150), nullable=False)
-    name_fr = db.Column(db.String(150), nullable=True)
-    email = db.Column(db.String(150), nullable=True)
-    national_id = db.Column(db.String(50), nullable=True)
-    department = db.Column(db.String(100), nullable=True)
-    encadrant = db.Column(db.String(150), nullable=True)
-    status = db.Column(db.String(50), default='قيد المراجعة')
-    source = db.Column(db.String(100), default='إضافة يدوية')
-    photo_path = db.Column(db.String(255), nullable=True)
-    phone = db.Column(db.String(50), nullable=True)
-    start_date = db.Column(db.Date, nullable=True)
-    end_date = db.Column(db.Date, nullable=True)
-    date_of_birth = db.Column(db.Date, nullable=True)
-    university = db.Column(db.String(150), nullable=True)
-    address = db.Column(db.Text, nullable=True)
-    documents = db.Column(db.Text, nullable=True)
-    evaluation = db.Column(db.Text, nullable=True)
-
-class Attendance(db.Model):
-    __tablename__ = 'attendance'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
-    date = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), nullable=False)
-
-class DocumentRequest(db.Model):
-    __tablename__ = 'document_requests'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
-    document_type = db.Column(db.String(50), nullable=False) # e.g. 'resume', 'id', 'other'
-    custom_title = db.Column(db.String(150), nullable=True)  # Title if document_type == 'other'
-    note = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(20), default='pending') # 'pending' or 'fulfilled'
-    created_at = db.Column(db.String(50), nullable=False)
-    template_path = db.Column(db.String(255), nullable=True)
-    lifecycle_id = db.Column(db.Integer, db.ForeignKey('document_lifecycle.id'), nullable=True)
-class Form(db.Model):
-    __tablename__ = 'forms'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    form_data = db.Column(db.Text, nullable=False)
-    title = db.Column(db.String(200), nullable=True)
-    slug = db.Column(db.String(50), unique=True, nullable=True)
-    is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.String(50), nullable=True)
-
-class FormSubmission(db.Model):
-    __tablename__ = 'form_submissions'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    form_id = db.Column(db.Integer, db.ForeignKey('forms.id'), nullable=False)
-    submitted_data = db.Column(db.Text, nullable=False)  # JSON string
-    status = db.Column(db.String(20), default='pending')  # pending | approved | rejected
-    submitted_at = db.Column(db.String(50), nullable=True)
-    rejection_reason = db.Column(db.Text, nullable=True)
-    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=True)
-
-class Message(db.Model):
-    __tablename__ = 'messages'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
-    sender_role = db.Column(db.String(20), nullable=False)  # 'admin' or 'intern'
-    sender_name = db.Column(db.String(150), nullable=True)
-    body = db.Column(db.Text, nullable=True)
-    attachment_path = db.Column(db.String(255), nullable=True)
-    attachment_name = db.Column(db.String(255), nullable=True)
-    waiting_for_reply = db.Column(db.Boolean, default=False)
-    expected_format = db.Column(db.String(20), nullable=True)  # 'text', 'pdf', 'word', 'any'
-    replied = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.String(50), nullable=False)
-
-class SystemLog(db.Model):
-    __tablename__ = 'system_logs'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    user = db.Column(db.String(150), nullable=True)
-    action = db.Column(db.Text, nullable=False)
-
-class Notification(db.Model):
-    __tablename__ = 'notifications'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
-    type = db.Column(db.String(50), nullable=False) # REJECTION, REASSIGNMENT, REQUEST, STAGE_COMPLETE, GENERIC
-    title = db.Column(db.String(200), nullable=False)
-    body = db.Column(db.Text, nullable=True)
-    related_doc_id = db.Column(db.Integer, db.ForeignKey('document_lifecycle.id'), nullable=True)
-    is_read = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-
-class AuditEvent(db.Model):
-    __tablename__ = 'audit_events'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    actor_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    actor_role = db.Column(db.String(50), nullable=True)
-    action = db.Column(db.String(255), nullable=False)
-    doc_id = db.Column(db.Integer, db.ForeignKey('document_lifecycle.id'), nullable=True)
-    from_status = db.Column(db.String(50), nullable=True)
-    to_status = db.Column(db.String(50), nullable=True)
-    note = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-# Legacy known doc_types — kept for backward compatibility only. New documents
-# can use an arbitrary doc_type ('OTHER' by default) so that admins/interns can
-# request any document by name. Labels are derived from DocumentLifecycle.custom_title.
-DOC_TYPES = [
-    'CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED',
-    'FINAL_REPORT', 'ATTESTATION_SIGNED', 'OTHER'
-]
-DOC_STATUSES = ['MISSING', 'PENDING_REVIEW', 'REVISION_REQUESTED', 'APPROVED_AND_SIGNED']
-
-# Allowed file types for a requested/uploaded document. Maps the value stored on
-# DocumentLifecycle.file_type to the set of extensions the server will accept.
-FILE_TYPE_EXTENSIONS = {
-    'pdf':   ['.pdf'],
-    'word':  ['.doc', '.docx'],
-    'excel': ['.xls', '.xlsx'],
-    'image': ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'],
-    'any':   ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'],
-}
-# What the document should be used for — drives lifecycle behaviour.
-ACTION_TYPES = {'sign', 'fill', 'view', 'view_or_return'}
-
-class DocumentLifecycle(db.Model):
-    __tablename__ = 'document_lifecycle'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=False)
-    doc_type = db.Column(db.String(50), nullable=False)
-    file_path = db.Column(db.String(255), nullable=True)
-    uploaded_by = db.Column(db.String(20), nullable=True)   # 'INTERN' or 'ADMIN'
-    status = db.Column(db.String(30), default='MISSING')
-    rejection_reason = db.Column(db.Text, nullable=True)
-    is_visible_to_intern = db.Column(db.Boolean, default=False)
-    custom_title = db.Column(db.String(150), nullable=True)
-    requires_return = db.Column(db.Boolean, default=False)
-    returned_file_path = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=True)
-    updated_at = db.Column(db.DateTime, nullable=True)
-    lifecycle_type = db.Column(db.String(20), default='SIGN')
-    form_schema = db.Column(db.Text, nullable=True)
-    form_data = db.Column(db.Text, nullable=True)
-    assigned_to_intern_id = db.Column(db.Integer, db.ForeignKey('interns.id'), nullable=True)
-    signed_by = db.Column(db.String(150), nullable=True)
-    correction_round = db.Column(db.Integer, default=0)
-    parent_id = db.Column(db.Integer, db.ForeignKey('document_lifecycle.id'), nullable=True)
-    file_type = db.Column(db.String(20), default='pdf')
-    action_type = db.Column(db.String(20), default='view')
-    requested_by = db.Column(db.String(20), default='ADMIN')
-
-    intern = db.relationship('Intern', foreign_keys=[intern_id], backref='documents_lifecycle')
-    assigned_to = db.relationship('Intern', foreign_keys=[assigned_to_intern_id])
-    parent = db.relationship('DocumentLifecycle', remote_side=[id])
-
-class DocumentTemplate(db.Model):
-    __tablename__ = 'document_templates'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    label = db.Column(db.String(150), nullable=False)
-    file_type = db.Column(db.String(20), default='pdf')
-    is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-
-def _parse_date(val):
-    """Safely convert a date string to a Python date object for SQLite."""
-    if not val:
-        return None
-    if isinstance(val, date):
-        return val
-    if not isinstance(val, str):
-        return None
-    val = val.strip()
-    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y/%m/%d'):
-        try:
-            return datetime.strptime(val, fmt).date()
-        except ValueError:
-            continue
-    return None
-
-
-def log_action(user, action):
-    try:
-        new_log = SystemLog(user=user, action=action)
-        db.session.add(new_log)
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        print(f"Failed to log action: {e}")
-
-# Old smtp logic removed. We now use email_service.py for Gmail integration.
-def send_email(to_email: str, subject: str, body_html: str):
-    email_service.send_email(to_email, subject, body_html)
-
-
 def init_db():
     with app.app_context():
         db.create_all()
@@ -347,6 +37,11 @@ def init_db():
             db.session.commit()
         except Exception:
             db.session.rollback()
+        # Migrate legacy doc JSON to DocumentLifecycle
+        try:
+            _migrate_legacy_documents()
+        except Exception as e:
+            print(f"Document migration skipped: {e}")
         # Add requires_return column if missing
         try:
             with db.engine.connect() as conn:
@@ -362,20 +57,6 @@ def init_db():
                 conn.commit()
         except Exception:
             db.session.rollback()
-        # Add file_type / action_type / requested_by columns (dynamic document requests)
-        try:
-            dl_cols = [c['name'] for c in db.inspect(db.engine).get_columns('document_lifecycle')]
-            with db.engine.connect() as conn:
-                from sqlalchemy import text as sql_text
-                if 'file_type' not in dl_cols:
-                    conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN file_type VARCHAR(20) DEFAULT 'pdf'"))
-                if 'action_type' not in dl_cols:
-                    conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN action_type VARCHAR(20) DEFAULT 'view'"))
-                if 'requested_by' not in dl_cols:
-                    conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN requested_by VARCHAR(20) DEFAULT 'ADMIN'"))
-                conn.commit()
-        except Exception as e:
-            print(f"document_lifecycle migration: {e}")
         # Migrate Form table — add new columns if missing
         try:
             form_cols = [c['name'] for c in db.inspect(db.engine).get_columns('forms')]
@@ -442,36 +123,67 @@ def init_db():
             db.session.rollback()
             print(f"DocumentLifecycle migration failed: {e}")
 
-        # Create DocumentTemplate table
+
+def _migrate_legacy_documents():
+    """Migrate `interns.documents` JSON blob into DocumentLifecycle records."""
+    import json
+    TYPE_MAP = {
+        'cin': 'CIN', 'id': 'CIN', 'identite': 'CIN',
+        'cv': 'CV', 'resume': 'CV',
+        'insurance': 'INSURANCE', 'assurance': 'INSURANCE',
+        'demande': 'DEMANDE',
+        'convention': 'CONVENTION_SIGNED',
+        'photo': 'CIN',
+    }
+    interns = Intern.query.all()
+    now = datetime.now(timezone.utc).isoformat()
+    for intern in interns:
+        if not intern.documents:
+            continue
         try:
-            db.session.execute(sql_text("""
-                CREATE TABLE IF NOT EXISTS document_templates (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    label VARCHAR(150) NOT NULL,
-                    file_type VARCHAR(20) DEFAULT 'pdf',
-                    is_active BOOLEAN DEFAULT 1,
-                    created_at DATETIME
-                )
-            """))
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            print(f"DocumentTemplate migration: {e}")
-
-        # Date string to DATE migrations
-        try:
-            with db.engine.connect() as conn:
-                from sqlalchemy import text as sql_text
-                # SQLite ALTER TABLE doesn't support changing column types easily.
-                # Since sqlite is loosely typed, we don't strictly need to alter the schema 
-                # type in SQLite, but we can do a data normalization pass here if we wanted.
-                # The python models will be updated to Date/DateTime.
-                pass
-        except Exception as e:
-            db.session.rollback()
-
-
-
+            docs = json.loads(intern.documents)
+        except Exception:
+            continue
+        if not isinstance(docs, dict):
+            continue
+        for k, v in docs.items():
+            if k == 'others':
+                if isinstance(v, list):
+                    for o in v:
+                        if isinstance(o, dict) and o.get('file'):
+                            title = o.get('name', 'مستند إضافي')
+                            existing = DocumentLifecycle.query.filter_by(
+                                intern_id=intern.id, custom_title=title
+                            ).first()
+                            if existing:
+                                continue
+                            dl = DocumentLifecycle(
+                                intern_id=intern.id, doc_type='OTHER',
+                                file_path=o['file'], uploaded_by='INTERN',
+                                status='PENDING_REVIEW', is_visible_to_intern=False,
+                                custom_title=title, created_at=now, updated_at=now
+                            )
+                            db.session.add(dl)
+                continue
+            if not v:
+                continue
+            doc_type = TYPE_MAP.get(k.strip().lower(), 'OTHER')
+            existing = DocumentLifecycle.query.filter_by(
+                intern_id=intern.id, doc_type=doc_type
+            ).filter(
+                DocumentLifecycle.custom_title.is_(None)
+            ).first()
+            if existing:
+                continue
+            dl = DocumentLifecycle(
+                intern_id=intern.id, doc_type=doc_type,
+                file_path=str(v) if isinstance(v, str) else None,
+                uploaded_by='INTERN',
+                status='PENDING_REVIEW', is_visible_to_intern=False,
+                created_at=now, updated_at=now
+            )
+            db.session.add(dl)
+        db.session.commit()
 
 # --- AUTHENTICATION ROUTES ---
 @app.route('/api/login', methods=['POST'])
@@ -713,9 +425,9 @@ def add_intern():
         department=data.get('department'),
         encadrant=data.get('encadrant'),
         phone=data.get('phone'),
-        start_date=_parse_date(data.get('start_date')),
-        end_date=_parse_date(data.get('end_date')),
-        date_of_birth=_parse_date(data.get('date_of_birth')),
+        start_date=data.get('start_date'),
+        end_date=data.get('end_date'),
+        date_of_birth=data.get('date_of_birth'),
         university=data.get('university'),
         address=data.get('address'),
         photo_path=data.get('photo_path'),
@@ -728,20 +440,6 @@ def add_intern():
     
     # Create user account automatically
     create_user_for_intern(new_intern)
-
-    # Auto-create DocumentLifecycle entries for active templates
-    templates = DocumentTemplate.query.filter_by(is_active=True).all()
-    now = datetime.now(timezone.utc)
-    for t in templates:
-        record = DocumentLifecycle(
-            intern_id=new_intern.id, doc_type='OTHER', status='MISSING',
-            uploaded_by='ADMIN', is_visible_to_intern=True,
-            custom_title=t.label, action_type='view',
-            created_at=now, updated_at=now
-        )
-        db.session.add(record)
-    if templates:
-        db.session.commit()
 
     current_user = get_jwt()
     user_name = current_user.get('name') if current_user else 'Unknown'
@@ -763,22 +461,6 @@ def update_intern(intern_id):
     if 'status' in data and data['status'] != intern.status:
         if current_user.get('role') != 'Admin':
             return jsonify({"msg": "Unauthorized: Only Admins can change intern status"}), 403
-        # Auto-create lifecycle entries when activated
-        if data['status'] == 'نشط':
-            templates = DocumentTemplate.query.filter_by(is_active=True).all()
-            now = datetime.now(timezone.utc)
-            existing_titles = {d.custom_title for d in DocumentLifecycle.query.filter_by(intern_id=intern.id).all()}
-            for t in templates:
-                if t.label not in existing_titles:
-                    record = DocumentLifecycle(
-                        intern_id=intern.id, doc_type='OTHER', status='MISSING',
-                        uploaded_by='ADMIN', is_visible_to_intern=True,
-                        custom_title=t.label, action_type='view',
-                        created_at=now, updated_at=now
-                    )
-                    db.session.add(record)
-            if templates:
-                db.session.commit()
             
     intern.name = data.get('name', intern.name)
     if 'name_fr' in data:
@@ -789,9 +471,9 @@ def update_intern(intern_id):
     if 'encadrant' in data:
         intern.encadrant = data.get('encadrant')
     intern.phone = data.get('phone', intern.phone)
-    intern.start_date = _parse_date(data.get('start_date')) if 'start_date' in data else intern.start_date
-    intern.end_date = _parse_date(data.get('end_date')) if 'end_date' in data else intern.end_date
-    intern.date_of_birth = _parse_date(data.get('date_of_birth')) if 'date_of_birth' in data else intern.date_of_birth
+    intern.start_date = data.get('start_date', intern.start_date)
+    intern.end_date = data.get('end_date', intern.end_date)
+    intern.date_of_birth = data.get('date_of_birth', intern.date_of_birth)
     intern.university = data.get('university', intern.university)
     intern.address = data.get('address', intern.address)
     if 'status' in data:
@@ -1238,9 +920,7 @@ def attach_vault_to_intern(intern_id):
     data = request.json or {}
     vault_name = data.get('vault_name')
     doc_type = data.get('doc_type', 'OTHER')
-    action_type = data.get('action_type', 'view')
-    custom_title = data.get('custom_title', '').strip() or None
-    requires_return = action_type in ('sign', 'fill', 'sign_fill')
+    requires_return = data.get('requires_return', False)
     if not vault_name:
         return jsonify({"msg": "vault_name required"}), 400
     src = os.path.join(VAULT_FOLDER, vault_name)
@@ -1251,28 +931,17 @@ def attach_vault_to_intern(intern_id):
     dst = os.path.join(app.config['UPLOAD_FOLDER'], dst_name)
     shutil.copy2(src, dst)
     file_url = f"/api/uploads/{dst_name}"
-    now = datetime.now(timezone.utc)
-    action_labels = {'sign': 'توقيع', 'fill': 'تعبئة وإرجاع', 'sign_fill': 'توقيع وتعبئة وإرجاع'}
-    action_label = action_labels.get(action_type, '')
-    label = custom_title or f'{vault_name} ({action_label})'
+    now = datetime.now(timezone.utc).isoformat()
+    label = f'نموذج: {vault_name}' + (' (يتطلب التعبئة)' if requires_return else '')
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
         uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
         is_visible_to_intern=True, custom_title=label,
-        requires_return=requires_return, action_type=action_type,
+        requires_return=requires_return,
         created_at=now, updated_at=now
     )
     db.session.add(record)
     db.session.commit()
-    if action_type in ('sign', 'fill', 'sign_fill'):
-        notif_titles = {'sign': 'مستند يطلب التوقيع', 'fill': 'مستند يطلب التعبئة', 'sign_fill': 'مستند يطلب التوقيع والتعبئة'}
-        notif_bodies = {'sign': f'المستند "{label}" يتطلب منك توقيعه.', 'fill': f'المستند "{label}" يتطلب منك تعبئته وإرجاعه.', 'sign_fill': f'المستند "{label}" يتطلب منك توقيعه وتعبئته وإرجاعه.'}
-        notif = Notification(intern_id=intern.id, type='REASSIGNMENT',
-            title=notif_titles[action_type],
-            body=notif_bodies[action_type],
-            related_doc_id=record.id)
-        db.session.add(notif)
-        db.session.commit()
     log_action(current_user.get('name'), f"أضاف مستند من الخزنة ({vault_name}){' مع طلب التعبئة' if requires_return else ''} للمتدرب {intern.name}")
     return jsonify({"msg": "تمت الإضافة من الخزنة", "doc_id": record.id}), 200
 
@@ -1374,12 +1043,12 @@ def get_documents_queue():
             "id": d.id,
             "intern_id": d.intern_id,
             "intern_name": intern.name if intern else "مجهول",
-            "document_type": d.doc_type,
+            "document_type": d.document_type,
             "custom_title": d.custom_title,
             "status": d.status,
             "file_path": d.file_path,
             "uploaded_by": d.uploaded_by,
-            "uploaded_at": d.updated_at.isoformat() if d.updated_at else (d.created_at.isoformat() if d.created_at else None),
+            "uploaded_at": d.uploaded_at,
             "rejection_reason": d.rejection_reason,
             "requires_return": d.requires_return
         })
@@ -1437,40 +1106,6 @@ def create_document_request(intern_id):
     log_action(current_user.get('name'), f"طلب مستند ({title_str}) من المتدرب {intern.name if intern else ''}")
     
     return jsonify({"msg": "Request created successfully", "request_id": new_request.id}), 201
-
-
-@app.route('/api/interns/<int:intern_id>/document-lifecycle', methods=['POST'])
-@jwt_required()
-def create_intern_document_lifecycle(intern_id):
-    """Admin creates a DocumentLifecycle record directly (no file, just a request slot)."""
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    intern = db.session.get(Intern, intern_id)
-    if not intern:
-        return jsonify({"msg": "Intern not found"}), 404
-    data = request.json or {}
-    doc_type = (data.get('document_type') or 'OTHER').strip() or 'OTHER'
-    custom_title = data.get('custom_title', '').strip() or None
-    action_type = data.get('action_type', 'view')
-    now = datetime.now(timezone.utc)
-    record = DocumentLifecycle(
-        intern_id=intern.id, doc_type=doc_type, status='MISSING',
-        uploaded_by='ADMIN', is_visible_to_intern=action_type == 'view',
-        custom_title=custom_title, action_type=action_type,
-        created_at=now, updated_at=now
-    )
-    db.session.add(record)
-    db.session.commit()
-    if action_type in ('sign', 'fill'):
-        notif = Notification(intern_id=intern.id, type='REASSIGNMENT',
-            title=f'مستند يطلب {action_type == "sign" and "التوقيع" or "التعبئة"}',
-            body=f'المستند "{custom_title or doc_type}" يتطلب منك {action_type == "sign" and "توقيعه" or "تعبئته وإرجاعه"}.',
-            related_doc_id=record.id)
-        db.session.add(notif)
-        db.session.commit()
-    log_action(current_user.get('name'), f"طلب مستند ({custom_title or doc_type}) من المتدرب {intern.name}")
-    return jsonify({"msg": "تم إنشاء طلب المستند", "doc_id": record.id}), 201
 
 @app.route('/api/intern/profile', methods=['GET'])
 @jwt_required()
@@ -1735,66 +1370,6 @@ def read_notification(nid):
     db.session.commit()
     return jsonify({"success": True})
 
-@app.route('/api/admin/pending-sign-fill-count', methods=['GET'])
-@jwt_required()
-def pending_sign_fill_count():
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    count = DocumentLifecycle.query.filter(
-        DocumentLifecycle.action_type.in_(['sign', 'fill']),
-        DocumentLifecycle.file_path.isnot(None),
-        (DocumentLifecycle.returned_file_path.is_(None) | (DocumentLifecycle.returned_file_path == ''))
-    ).with_entities(DocumentLifecycle.intern_id).distinct().count()
-    return jsonify({"count": count})
-
-
-@app.route('/api/admin/pending-review-count', methods=['GET'])
-@jwt_required()
-def pending_review_count():
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    count = DocumentLifecycle.query.filter(
-        DocumentLifecycle.status == 'PENDING_REVIEW',
-        DocumentLifecycle.uploaded_by == 'INTERN'
-    ).with_entities(DocumentLifecycle.intern_id).distinct().count()
-    return jsonify({"count": count})
-
-
-@app.route('/api/notifications', methods=['GET'])
-@jwt_required()
-def list_notifications():
-    current_user = get_jwt()
-    if current_user.get('role') == 'Intern':
-        user = db.session.get(User, get_jwt_identity())
-        intern = Intern.query.filter_by(email=user.email).first() if user else None
-        if not intern:
-            return jsonify([])
-        notifs = Notification.query.filter_by(intern_id=intern.id).order_by(Notification.created_at.desc()).limit(50).all()
-    elif current_user.get('role') in ('Admin', 'Manager'):
-        notifs = Notification.query.filter(Notification.type == 'GENERIC').order_by(Notification.created_at.desc()).limit(50).all()
-    else:
-        return jsonify({"msg": "Unauthorized"}), 403
-    return jsonify([{
-        "id": n.id, "intern_id": n.intern_id, "type": n.type,
-        "title": n.title, "body": n.body, "related_doc_id": n.related_doc_id,
-        "is_read": n.is_read, "created_at": n.created_at
-    } for n in notifs])
-
-@app.route('/api/notifications/<int:nid>/read', methods=['POST'])
-@jwt_required()
-def mark_notification_read(nid):
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    n = db.session.get(Notification, nid)
-    if not n: return jsonify({"msg": "Not found"}), 404
-    n.is_read = True
-    db.session.commit()
-    return jsonify({"success": True})
-
-
 @app.route('/api/interns/<int:intern_id>/audit', methods=['GET'])
 @jwt_required()
 def get_intern_audit(intern_id):
@@ -1809,7 +1384,6 @@ def get_intern_audit(intern_id):
         "created_at": e.created_at.isoformat() if e.created_at else None
     } for e in events])
 
-
 # --- NEW DOCUMENT WORKFLOW ROUTES ---
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/reject', methods=['POST'])
 @jwt_required()
@@ -1819,7 +1393,7 @@ def reject_document(intern_id, doc_id):
         return jsonify({"msg": "Unauthorized"}), 403
         
     data = request.json or {}
-    reason = data.get('reason') or data.get('rejection_reason')
+    reason = data.get('reason')
     if not reason: return jsonify({"msg": "Reason required"}), 400
     
     doc = db.session.get(DocumentLifecycle, doc_id)
@@ -1839,7 +1413,6 @@ def reject_document(intern_id, doc_id):
                          body=f'تم رفض مستند {doc.custom_title or doc.doc_type} بسبب: {reason}',
                          related_doc_id=doc.id)
     db.session.add(notif)
-    Notification.query.filter_by(related_doc_id=doc.id, type='GENERIC').update({'is_read': True})
     db.session.commit()
     return jsonify({"success": True})
 
@@ -2227,6 +1800,30 @@ def export_interns():
 
 # --- DOCUMENT LIFECYCLE ENDPOINTS ---
 
+DOC_TYPE_LABELS = {
+    'CIN': 'بطاقة التعريف الوطنية (CIN)',
+    'CV': 'السيرة الذاتية (CV)',
+    'INSURANCE': 'التأمين (Assurance)',
+    'DEMANDE': 'طلب التدريب (Demande)',
+    'CONVENTION_SIGNED': 'اتفاقية التدريب الموقعة',
+    'FINAL_REPORT': 'التقرير النهائي',
+    'ATTESTATION_SIGNED': 'شهادة التدريب الموقعة',
+    'OTHER': 'مستند إضافي',
+}
+
+def _seed_doc_records(intern_id):
+    """Ensure one DocumentLifecycle row exists per standard doc_type for this intern."""
+    now = datetime.now(timezone.utc).isoformat()
+    for dt in ['CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED', 'FINAL_REPORT', 'ATTESTATION_SIGNED']:
+        existing = DocumentLifecycle.query.filter_by(intern_id=intern_id, doc_type=dt).filter(
+            DocumentLifecycle.custom_title.is_(None)
+        ).first()
+        if not existing:
+            dl = DocumentLifecycle(intern_id=intern_id, doc_type=dt, status='MISSING',
+                                   created_at=now, updated_at=now)
+            db.session.add(dl)
+    db.session.commit()
+
 
 def _get_doc_type_intern():
     """For intern-portal endpoints: return (intern, user_claims) from JWT matching Intern.email."""
@@ -2248,13 +1845,14 @@ def list_intern_documents(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
+    _seed_doc_records(intern_id)
     docs = DocumentLifecycle.query.filter_by(intern_id=intern_id).order_by(DocumentLifecycle.doc_type).all()
     result = []
     for d in docs:
         result.append({
             "id": d.id,
             "doc_type": d.doc_type,
-            "label": d.custom_title or d.doc_type,
+            "label": d.custom_title or DOC_TYPE_LABELS.get(d.doc_type, d.doc_type),
             "file_path": d.file_path,
             "uploaded_by": d.uploaded_by,
             "status": d.status,
@@ -2265,67 +1863,8 @@ def list_intern_documents(intern_id):
             "returned_file_path": d.returned_file_path,
             "created_at": d.created_at,
             "updated_at": d.updated_at,
-            "file_type": d.file_type or 'pdf',
-            "action_type": d.action_type or 'view',
-            "requested_by": d.requested_by or ('INTERN' if (d.uploaded_by or '') == 'INTERN' else 'ADMIN'),
         })
     return jsonify(result), 200
-
-
-# ──────────────────────────────────────────────
-# Document Templates (admin-managed required docs)
-# ──────────────────────────────────────────────
-@app.route('/api/admin/document-templates', methods=['GET'])
-@jwt_required()
-def get_document_templates():
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    templates = DocumentTemplate.query.order_by(DocumentTemplate.id).all()
-    return jsonify([{
-        "id": t.id, "label": t.label,
-        "file_type": t.file_type, "is_active": t.is_active,
-        "created_at": t.created_at
-    } for t in templates])
-
-@app.route('/api/admin/document-templates', methods=['POST'])
-@jwt_required()
-def create_document_template():
-    if get_jwt().get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    data = request.json
-    if not data or not data.get('label'):
-        return jsonify({"msg": "Label is required"}), 400
-    t = DocumentTemplate(label=data['label'], file_type=data.get('file_type', 'pdf'), is_active=data.get('is_active', True))
-    db.session.add(t)
-    db.session.commit()
-    return jsonify({"id": t.id, "msg": "Template created"}), 201
-
-@app.route('/api/admin/document-templates/<int:tid>', methods=['PUT'])
-@jwt_required()
-def update_document_template(tid):
-    if get_jwt().get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    t = db.session.get(DocumentTemplate, tid)
-    if not t: return jsonify({"msg": "Not found"}), 404
-    data = request.json
-    if 'label' in data: t.label = data['label']
-    if 'file_type' in data: t.file_type = data['file_type']
-    if 'is_active' in data: t.is_active = data['is_active']
-    db.session.commit()
-    return jsonify({"msg": "Updated"})
-
-@app.route('/api/admin/document-templates/<int:tid>', methods=['DELETE'])
-@jwt_required()
-def delete_document_template(tid):
-    if get_jwt().get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    t = db.session.get(DocumentTemplate, tid)
-    if not t: return jsonify({"msg": "Not found"}), 404
-    db.session.delete(t)
-    db.session.commit()
-    return jsonify({"msg": "Deleted"})
-# ──────────────────────────────────────────────
 
 
 @app.route('/api/interns/<int:intern_id>/documents/upload', methods=['POST'])
@@ -2343,11 +1882,9 @@ def upload_intern_document(intern_id):
     elif intern.status == 'مرفوض' and claims.get('role') == 'Intern':
         return jsonify({"msg": "Account not yet activated"}), 403
 
-    doc_type = (request.form.get('doc_type') or 'OTHER').strip() or 'OTHER'
-    # DOC_TYPES is now only a legacy reference set; arbitrary types are allowed.
-    if not doc_type or len(doc_type) > 50:
+    doc_type = request.form.get('doc_type')
+    if not doc_type or doc_type not in DOC_TYPES:
         return jsonify({"msg": "Invalid doc_type"}), 400
-    target_doc_id = request.form.get('doc_id')
 
     if 'file' not in request.files:
         return jsonify({"msg": "No file part"}), 400
@@ -2355,83 +1892,45 @@ def upload_intern_document(intern_id):
     if file.filename == '':
         return jsonify({"msg": "No selected file"}), 400
 
-    custom_title = request.form.get('custom_title')
-    now = datetime.now(timezone.utc)
-
-    if target_doc_id:
-        record = DocumentLifecycle.query.filter_by(
-            id=target_doc_id, intern_id=intern.id
-        ).first()
-        if not record:
-            return jsonify({"msg": "Document slot not found"}), 404
-    else:
-        existing = DocumentLifecycle.query.filter_by(
-            intern_id=intern.id, doc_type=doc_type
-        ).filter(
-            DocumentLifecycle.custom_title.is_(None) if not custom_title else DocumentLifecycle.custom_title == custom_title
-        ).first()
-        record = existing
-
-    file_type = (record.file_type if record else request.form.get('file_type')) or 'pdf'
-    if not record and not request.form.get('file_type'):
-        ext = ('.' + file.filename.rsplit('.', 1)[1].lower()) if '.' in file.filename else ''
-        for ft, exts in FILE_TYPE_EXTENSIONS.items():
-            if ext in exts and ft != 'any':
-                file_type = ft
-                break
-    if not _allowed_file(file.filename, file_type):
-        return jsonify({"msg": f"File type not allowed (expected: {file_type})"}), 400
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"msg": "PDF files only"}), 400
     file.seek(0, os.SEEK_END)
     size = file.tell()
     file.seek(0)
     if size > 15 * 1024 * 1024:
         return jsonify({"msg": "File too large (max 15MB)"}), 400
 
-    label_for_name = (record.custom_title if record else custom_title) or doc_type
+    filename = safe_filename('doc', file.filename)
+    if not filename.lower().endswith('.pdf'):
+        filename += '.pdf'
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    file_url = f"/api/uploads/{filename}"
+
+    custom_title = request.form.get('custom_title')
+    now = datetime.now(timezone.utc).isoformat()
+
+    record = DocumentLifecycle.query.filter_by(
+        intern_id=intern.id, doc_type=doc_type
+    ).filter(
+        DocumentLifecycle.custom_title.is_(None) if not custom_title else DocumentLifecycle.custom_title == custom_title
+    ).first()
 
     if not record:
         record = DocumentLifecycle(
             intern_id=intern.id, doc_type=doc_type,
-            status='PENDING_REVIEW',
+            status='PENDING_REVIEW', file_path=file_url,
             uploaded_by='INTERN', is_visible_to_intern=False,
-            custom_title=custom_title, file_type=file_type,
-            created_at=now, updated_at=now
+            custom_title=custom_title, created_at=now, updated_at=now
         )
         db.session.add(record)
-        db.session.flush()
     else:
+        record.file_path = file_url
         record.status = 'PENDING_REVIEW'
-        record.updated_at = now
-
-    safe_label = re.sub(r'[^\w\s-]', '', label_for_name).strip().replace(' ', '-')[:40].lower() or 'doc'
-    orig_ext = ('.' + file.filename.rsplit('.', 1)[1].lower()) if '.' in file.filename else ''
-    if not orig_ext or len(orig_ext) > 10 or not orig_ext[1:].isalnum():
-        orig_ext = '.pdf'
-    suffix = f"intern-{intern.id}-{record.id}-{safe_label}{orig_ext}"
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], suffix))
-    file_url = f"/api/uploads/{suffix}"
-
-    record.file_path = file_url
-    if not record.id:
-        db.session.flush()
-    else:
-        record.updated_at = now
+        record.uploaded_by = 'INTERN'
+        record.is_visible_to_intern = False
         record.rejection_reason = None
-        if file_type:
-            record.file_type = file_type
-    audit = AuditEvent(actor_user_id=user.id if user else None, actor_role=claims.get('role') if claims else 'Intern',
-                       action='UPLOAD_DOCUMENT', doc_id=record.id, from_status=record.status,
-                       to_status='PENDING_REVIEW', note='Intern re-uploaded document')
-    db.session.add(audit)
-    db.session.commit()
+        record.updated_at = now
 
-    # Notify admins about the upload
-    doc_title = (record.custom_title if record else custom_title) or doc_type
-    admin_notif = Notification(intern_id=intern.id, type='GENERIC',
-        title=f'مستند برفع من {intern.name or "متدرب"}',
-        body=f'تم رفع "{doc_title}" من قبل المتدرب وهو قيد المراجعة.',
-        related_doc_id=record.id)
-    db.session.add(admin_notif)
     db.session.commit()
 
     # Auto-fulfill any pending DocumentRequest for this doc_type
@@ -2457,8 +1956,7 @@ def approve_document(intern_id, doc_id):
         return jsonify({"msg": "Document not found"}), 404
     doc.status = 'APPROVED_AND_SIGNED'
     doc.is_visible_to_intern = True
-    doc.updated_at = datetime.now(timezone.utc)
-    Notification.query.filter_by(related_doc_id=doc.id).update({'is_read': True})
+    doc.updated_at = datetime.now(timezone.utc).isoformat()
     db.session.commit()
     intern = db.session.get(Intern, intern_id)
     log_action(current_user.get('name'), f"قبول مستند ({doc.doc_type}) للمتدرب {intern.name if intern else ''}")
@@ -2478,14 +1976,11 @@ def upload_signed_document(intern_id):
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
 
-    doc_type = (request.form.get('doc_type') or 'OTHER').strip() or 'OTHER'
-    if len(doc_type) > 50:
+    doc_type = request.form.get('doc_type')
+    if not doc_type or doc_type not in DOC_TYPES:
         return jsonify({"msg": "Invalid doc_type"}), 400
 
     custom_title = request.form.get('custom_title', '').strip() or None
-    action_type = (request.form.get('action_type') or '').strip() or None
-    target_doc_id = request.form.get('doc_id')
-    file_type = (request.form.get('file_type') or '').strip().lower() or None
 
     if 'file' not in request.files:
         return jsonify({"msg": "No file part"}), 400
@@ -2493,28 +1988,8 @@ def upload_signed_document(intern_id):
     if file.filename == '':
         return jsonify({"msg": "No selected file"}), 400
 
-    if target_doc_id:
-        existing = DocumentLifecycle.query.filter_by(id=target_doc_id, intern_id=intern.id).first()
-        if not existing:
-            return jsonify({"msg": "Document slot not found"}), 404
-    elif custom_title:
-        existing = DocumentLifecycle.query.filter_by(
-            intern_id=intern.id, doc_type=doc_type, custom_title=custom_title, action_type=action_type or 'view'
-        ).first()
-    else:
-        existing = DocumentLifecycle.query.filter_by(intern_id=intern.id, doc_type=doc_type, action_type=action_type or 'view').filter(
-            DocumentLifecycle.custom_title.is_(None)
-        ).first()
-
-    record_ft = (existing.file_type if existing else file_type) or 'pdf'
-    if not file_type and not (existing and existing.file_type):
-        ext = ('.' + file.filename.rsplit('.', 1)[1].lower()) if '.' in file.filename else ''
-        for ft, exts in FILE_TYPE_EXTENSIONS.items():
-            if ext in exts and ft != 'any':
-                record_ft = ft
-                break
-    if not _allowed_file(file.filename, record_ft):
-        return jsonify({"msg": f"File type not allowed (expected: {record_ft})"}), 400
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"msg": "PDF files only"}), 400
     file.seek(0, os.SEEK_END)
     size = file.tell()
     file.seek(0)
@@ -2522,10 +1997,21 @@ def upload_signed_document(intern_id):
         return jsonify({"msg": "File too large (max 15MB)"}), 400
 
     filename = safe_filename('signed', file.filename)
+    if not filename.lower().endswith('.pdf'):
+        filename += '.pdf'
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     file_url = f"/api/uploads/{filename}"
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).isoformat()
+
+    if custom_title:
+        existing = DocumentLifecycle.query.filter_by(
+            intern_id=intern.id, doc_type=doc_type, custom_title=custom_title
+        ).first()
+    else:
+        existing = DocumentLifecycle.query.filter_by(intern_id=intern.id, doc_type=doc_type).filter(
+            DocumentLifecycle.custom_title.is_(None)
+        ).first()
 
     if existing:
         existing.file_path = file_url
@@ -2534,8 +2020,6 @@ def upload_signed_document(intern_id):
         existing.is_visible_to_intern = True
         if custom_title:
             existing.custom_title = custom_title
-        if file_type:
-            existing.file_type = file_type
         existing.updated_at = now
         db.session.commit()
         log_action(current_user.get('name'), f"رفع نسخة موقعة من {doc_type} للمتدرب {intern.name}")
@@ -2545,8 +2029,6 @@ def upload_signed_document(intern_id):
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
         uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
         is_visible_to_intern=True, custom_title=custom_title,
-        file_type=file_type or 'pdf',
-        action_type=action_type or 'view',
         created_at=now, updated_at=now
     )
     db.session.add(record)
@@ -2571,7 +2053,7 @@ def upload_returned_document(intern_id, doc_id):
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
-    if not doc.requires_return and doc.action_type not in ('sign', 'fill'):
+    if not doc.requires_return:
         return jsonify({"msg": "This document does not require a return upload"}), 400
 
     if 'file' not in request.files:
@@ -2594,7 +2076,7 @@ def upload_returned_document(intern_id, doc_id):
     file_url = f"/api/uploads/{filename}"
 
     doc.returned_file_path = file_url
-    doc.updated_at = datetime.now(timezone.utc)
+    doc.updated_at = datetime.now(timezone.utc).isoformat()
     db.session.commit()
 
     return jsonify({"msg": "تم استلام النسخة المعبأة", "doc_id": doc.id}), 200
@@ -2655,16 +2137,14 @@ def list_my_documents():
         return jsonify({"msg": "Intern not found"}), 404
     if intern.status == 'مرفوض':
         return jsonify({"msg": "Account not yet activated"}), 403
+    _seed_doc_records(intern.id)
     docs = DocumentLifecycle.query.filter_by(intern_id=intern.id).order_by(DocumentLifecycle.doc_type).all()
     result = []
     for d in docs:
-        # The intern only sees rows shared with them or that they uploaded.
-        if not (d.is_visible_to_intern or (d.uploaded_by or '') == 'INTERN'):
-            continue
         entry = {
             "id": d.id,
             "doc_type": d.doc_type,
-            "label": d.custom_title or d.doc_type,
+            "label": d.custom_title or DOC_TYPE_LABELS.get(d.doc_type, d.doc_type),
             "file_path": d.file_path,
             "uploaded_by": d.uploaded_by,
             "status": d.status,
@@ -2675,9 +2155,6 @@ def list_my_documents():
             "returned_file_path": d.returned_file_path,
             "created_at": d.created_at,
             "updated_at": d.updated_at,
-            "file_type": d.file_type or 'pdf',
-            "action_type": d.action_type or 'view',
-            "requested_by": d.requested_by or ('INTERN' if (d.uploaded_by or '') == 'INTERN' else 'ADMIN'),
         }
         result.append(entry)
     return jsonify(result), 200
@@ -2962,18 +2439,6 @@ def _process_submission_to_intern(submission):
     # Automatically create user account for the new intern
     create_user_for_intern(new_intern)
 
-    # Auto-create DocumentLifecycle entries for active templates
-    templates = DocumentTemplate.query.filter_by(is_active=True).all()
-    now = datetime.now(timezone.utc)
-    for t in templates:
-        record = DocumentLifecycle(
-            intern_id=new_intern.id, doc_type='OTHER', status='MISSING',
-            uploaded_by='ADMIN', is_visible_to_intern=True,
-            custom_title=t.label, action_type='view',
-            created_at=now, updated_at=now
-        )
-        db.session.add(record)
-
     return new_intern
 
 @app.route('/api/submissions/<int:sub_id>/approve', methods=['POST'])
@@ -3225,33 +2690,4 @@ threading.Thread(target=auto_sync_loop, daemon=True).start()
 
 if __name__ == '__main__':
     init_db()
-    # Fix: records uploaded before the status-update bug was fixed
-    with app.app_context():
-        fixed = DocumentLifecycle.query.filter(
-            DocumentLifecycle.file_path.isnot(None),
-            DocumentLifecycle.file_path != '',
-            DocumentLifecycle.status == 'MISSING'
-        ).all()
-        for rec in fixed:
-            rec.status = 'PENDING_REVIEW'
-            rec.updated_at = datetime.now(timezone.utc)
-        if fixed:
-            db.session.commit()
-            print(f"Fixed {len(fixed)} document lifecycle records (MISSING→PENDING_REVIEW)")
-
-        # Fix: mark notifications as read for already-approved/rejected docs
-        from sqlalchemy import text as sql_text
-        try:
-            db.session.execute(sql_text("""
-                UPDATE notifications SET is_read = 1
-                WHERE related_doc_id IN (
-                    SELECT id FROM document_lifecycle
-                    WHERE status IN ('APPROVED_AND_SIGNED', 'REVISION_REQUESTED')
-                )
-            """))
-            db.session.commit()
-            print("Marked notifications as read for processed documents")
-        except Exception as e:
-            db.session.rollback()
-            print(f"Notification migration: {e}")
     app.run(host='0.0.0.0', port=5055, debug=True)
