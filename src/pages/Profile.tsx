@@ -904,15 +904,11 @@ export function Profile() {
         <div className="card info-card">
           <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, marginBottom:16}}>
             <h3 style={{margin:0}}><FileText weight="bold" className="icon" /> مركز المستندات</h3>
-            {canManageDocs && (
-            <button className="btn btn-gold sm" onClick={async () => { setRequestTitle(''); setRequestActionTypes(new Set(['view'])); setRequestFiles([]); setSelectedVaultDocs([]); try { setVaultDocs(await api.get('/vault')); } catch {} setShowRequestModal(true); }} style={{fontSize:12, padding:'8px 16px'}}>
-              + طلب مستند / إضافة ملف
-            </button>
-            )}
           </div>
 
-          {/* Filter tabs */}
-          <div style={{display:'flex', gap:8, marginBottom:16}}>
+          {/* Filter tabs + add button */}
+          <div style={{display:'flex', gap:8, marginBottom:16, flexWrap:'wrap', alignItems:'center', justifyContent:'space-between'}}>
+            <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
             {(['all', 'pending', 'completed'] as const).map(tab => {
               const counts = {
                 all: docsLifecycle.length,
@@ -932,6 +928,12 @@ export function Profile() {
                 </button>
               );
             })}
+            </div>
+            {canManageDocs && (
+            <button className="btn btn-gold sm" onClick={async () => { setRequestTitle(''); setRequestActionTypes(new Set(['view'])); setRequestFiles([]); setSelectedVaultDocs([]); try { setVaultDocs(await api.get('/vault')); } catch {} setShowRequestModal(true); }} style={{fontSize:12, padding:'8px 16px'}}>
+              + طلب مستند / إضافة ملف
+            </button>
+            )}
           </div>
 
           {/* Unified table */}
@@ -940,7 +942,7 @@ export function Profile() {
               if (docFilter === 'pending') return d.status !== 'APPROVED_AND_SIGNED';
               if (docFilter === 'completed') return d.status === 'APPROVED_AND_SIGNED';
               return true;
-            });
+            }).sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
             return (
             <div style={{marginBottom:20}}>
               {filtered.length === 0 ? (
@@ -1004,34 +1006,48 @@ export function Profile() {
                              <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>}
                           </td>
                           <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
-                            {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                            {(d.file_path || fillDoc.file_path) ? formatDate((d.file_path ? d : fillDoc).updated_at || (d.file_path ? d : fillDoc).created_at) : '—'}
                           </td>
                           <td style={{textAlign:'left', padding:'10px 8px'}}>
-                            <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                              {d.file_path && (
-                                <>
-                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            <div style={{display:'flex', gap:4, justifyContent:'flex-end', flexWrap:'wrap'}}>
+                              {/* View/download original */}
+                              {(d.file_path || fillDoc.file_path) && (() => {
+                                const fileDoc = d.file_path ? d : fillDoc;
+                                return (
+                                  <>
+                                    <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(fileDoc.id), '_blank')} title="معاينة الأصل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                      <Eye size={14} />
+                                    </button>
+                                    <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(fileDoc.id); a.download = ''; a.click(); }} title="تحميل الأصل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                      <DownloadSimple size={14} />
+                                    </button>
+                                  </>
+                                );
+                              })()}
+                              {/* View returned file */}
+                              {anyReturned && (() => {
+                                const retDoc = d.returned_file_path ? d : fillDoc;
+                                return (
+                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(retDoc.id) + '&returned=1', '_blank')} title="معاينة النسخة المعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                                     <Eye size={14} />
                                   </button>
-                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                    <DownloadSimple size={14} />
-                                  </button>
-                                </>
-                              )}
+                                );
+                              })()}
                             </div>
                           </td>
                         </tr>
                         );
                       }
                       const d = row;
-                      const actionLabel = d.action_type === 'sign' ? 'توقيع' : d.action_type === 'fill' ? 'تعبئة وإرجاع' : d.action_type === 'sign_fill' ? 'توقيع وتعبئة' : 'رفع';
+                      const actionLabelMap: any = { 'view': 'عرض فقط', 'sign': 'توقيع', 'fill': 'تعبئة وإرجاع', 'sign_fill': 'توقيع وتعبئة' };
+                      const actionLabel = actionLabelMap[d.action_type] || 'رفع';
                       const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
                     return (
                     <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
                       <td style={{padding:'10px 8px'}}>
                         <div style={{fontWeight:600, color:'var(--ink)'}}>
                           {d.custom_title || d.doc_type}
-                          {d.action_type !== 'view' && <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>({actionLabel})</span>}
+                          {actionLabel && <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>({actionLabel})</span>}
                         </div>
                         {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
                           <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
@@ -1076,6 +1092,12 @@ export function Profile() {
                                 <DownloadSimple size={14} />
                               </button>
                             </>
+                          )}
+                          {/* View returned file */}
+                          {d.returned_file_path && (
+                            <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} title="معاينة النسخة المعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                              <Eye size={14} />
+                            </button>
                           )}
                           {canManageDocs && d.status === 'RETURNED' && (
                             <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>

@@ -403,9 +403,6 @@ export function InternPortal() {
               <div className="card" style={{ padding: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
                   <h3 style={{ margin: 0, fontSize: 17 }}><FileText weight="bold" style={{ display: 'inline', marginLeft: 6 }} /> مركز المستندات</h3>
-                  <button className="btn btn-gold sm" onClick={() => { setInternUploadTitle(''); setInternUploadFile(null); setShowInternUploadModal(true); }} style={{ fontSize: 12, padding: '8px 16px' }}>
-                    <UploadSimple size={14} /> إضافة ملف
-                  </button>
                 </div>
 
                 {/* Required docs list */}
@@ -449,10 +446,11 @@ export function InternPortal() {
                     if (docFilter === 'pending') return d.status !== 'APPROVED_AND_SIGNED';
                     if (docFilter === 'completed') return d.status === 'APPROVED_AND_SIGNED';
                     return true;
-                  });
+                  }).sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
                   return (
                     <>
-                      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {tabs.map(tab => (
                           <button key={tab} onClick={() => setDocFilter(tab)} style={{
                             padding: '6px 14px', borderRadius: 20, border: '1px solid var(--line)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
@@ -464,6 +462,10 @@ export function InternPortal() {
                             {counts[tab] > 0 && <span style={{ fontSize: 10, background: docFilter === tab ? 'rgba(255,255,255,.2)' : 'var(--paper)', borderRadius: 10, padding: '1px 7px' }}>{counts[tab]}</span>}
                           </button>
                         ))}
+                        </div>
+                        <button className="btn btn-gold sm" onClick={() => { setInternUploadTitle(''); setInternUploadFile(null); setShowInternUploadModal(true); }} style={{ fontSize: 12, padding: '8px 16px' }}>
+                          <UploadSimple size={14} /> إضافة ملف
+                        </button>
                       </div>
 
                       {/* Pending actions banner */}
@@ -602,7 +604,16 @@ export function InternPortal() {
                                     <td style={{ padding: '10px 8px' }}>
                                       <div style={{ fontWeight: 600, color: 'var(--ink)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fileLabel}>
                                         {fileLabel}
-                                        {isSignFill && <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>({d.action_type === 'sign' ? 'توقيع' : d.action_type === 'fill' ? 'تعبئة وإرجاع' : d.action_type === 'sign_fill' ? 'توقيع وتعبئة' : ''})</span>}
+                                        {(() => {
+                                          const badgeMap: any = {
+                                            'view': 'عرض فقط',
+                                            'sign': 'توقيع',
+                                            'fill': 'تعبئة وإرجاع',
+                                            'sign_fill': 'توقيع وتعبئة',
+                                          };
+                                          const label = badgeMap[d.action_type];
+                                          return label ? <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>({label})</span> : null;
+                                        })()}
                                       </div>
                                       {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
                                         <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2, background: '#FFF0EE', padding: '3px 6px', borderRadius: 4 }}>
