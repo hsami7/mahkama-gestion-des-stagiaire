@@ -113,8 +113,8 @@ export const api = {
   getInternDocuments: (internId: number) =>
     api.get(`/interns/${internId}/documents`),
 
-  uploadInternDocument: (internId: number, docType: string, file: File) =>
-    api.uploadFile(`/interns/${internId}/documents/upload`, file, { doc_type: docType }),
+  uploadInternDocument: (internId: number, docType: string, file: File, docId?: number, customTitle?: string) =>
+    api.uploadFile(`/interns/${internId}/documents/upload`, file, { doc_type: docType, ...(docId ? { doc_id: String(docId) } : {}), ...(customTitle ? { custom_title: customTitle } : {}) }),
 
   approveDocument: (internId: number, docId: number) =>
     api.post(`/interns/${internId}/documents/${docId}/approve`, {}),
@@ -122,8 +122,8 @@ export const api = {
   rejectDocument: (internId: number, docId: number, reason: string) =>
     api.post(`/interns/${internId}/documents/${docId}/reject`, { rejection_reason: reason }),
 
-  uploadSignedDocument: (internId: number, docType: string, file: File, customTitle?: string) =>
-    api.uploadFile(`/interns/${internId}/documents/signed`, file, { doc_type: docType, ...(customTitle ? { custom_title: customTitle } : {}) }),
+  uploadSignedDocument: (internId: number, docType: string, file: File, customTitle?: string, actionType?: string) =>
+    api.uploadFile(`/interns/${internId}/documents/signed`, file, { doc_type: docType, ...(customTitle ? { custom_title: customTitle } : {}), ...(actionType ? { action_type: actionType } : {}) }),
 
   getMyDocuments: () => api.get('/intern/documents'),
 

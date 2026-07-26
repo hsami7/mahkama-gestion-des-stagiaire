@@ -1,12 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Users, FileText, SquaresFour, Gear, Archive, SignOut, ShieldCheck, House, CalendarCheck, ChartLine } from '@phosphor-icons/react';
+import { api } from '../services/api';
 
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
+  const [signFillCount, setSignFillCount] = useState(0);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
+
+  useEffect(() => {
+    if (user?.role !== 'Intern') {
+      const fetchCounts = async () => {
+        try {
+          const [a, b] = await Promise.all([
+            api.get('/admin/pending-sign-fill-count'),
+            api.get('/admin/pending-review-count')
+          ]);
+          setSignFillCount(a.count);
+          setPendingReviewCount(b.count);
+        } catch {}
+      };
+      fetchCounts();
+      const interval = setInterval(fetchCounts, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [user?.role]);
   
   const isIntern = user?.role === 'Intern';
   const isAdmin = user?.role === 'Admin';
@@ -84,9 +105,17 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               className={`nav-item ${isActive ? 'active' : ''}`}
+              style={{position:'relative'}}
             >
               {item.icon}
               {item.name}
+              {item.name === 'المتدربين' && (signFillCount > 0 || pendingReviewCount > 0) && (
+                <span style={{
+                  position:'absolute', left:8, top:'50%', transform:'translateY(-50%)',
+                  width:10, height:10, borderRadius:'50%', background:'var(--danger)',
+                  border:'2px solid var(--paper)'
+                }} />
+              )}
             </Link>
           );
         })}

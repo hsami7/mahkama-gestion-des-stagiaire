@@ -1,20 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise, ClipboardText } from '@phosphor-icons/react';
+import { X, CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise, ClipboardText } from '@phosphor-icons/react';
 import { api, API_BASE } from '../services/api';
 import { InternSidebar } from '../components/InternSidebar';
 import { Header } from '../components/Header';
 import '../InternPortal.css';
-
-const DOC_TYPE_LABELS: Record<string, string> = {
-  CIN: 'بطاقة التعريف الوطنية (CIN)',
-  CV: 'السيرة الذاتية (CV)',
-  INSURANCE: 'التأمين (Assurance)',
-  DEMANDE: 'طلب التدريب (Demande)',
-  CONVENTION_SIGNED: 'اتفاقية التدريب الموقعة',
-  FINAL_REPORT: 'التقرير النهائي',
-  ATTESTATION_SIGNED: 'شهادة التدريب الموقعة',
-  OTHER: 'مستند إضافي',
-};
 
 function formatDate(d: string | undefined | null): string {
   if (!d) return '—';
@@ -41,6 +30,10 @@ export function InternPortal() {
   const [internData, setInternData] = useState<any>(null);
   const [toastMsg, setToastMsg] = useState<{msg: string, type: string} | null>(null);
   const [lifecycleDocs, setLifecycleDocs] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showInternUploadModal, setShowInternUploadModal] = useState(false);
+  const [internUploadTitle, setInternUploadTitle] = useState('');
+  const [internUploadFile, setInternUploadFile] = useState<File | null>(null);
 
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
@@ -91,6 +84,7 @@ export function InternPortal() {
     fetchRequests();
     fetchProfile();
     fetchLifecycleDocs();
+    api.get('/notifications').then(setNotifications).catch(() => {});
   }, []);
 
   // Poll for newly created document requests and notify the intern
@@ -114,11 +108,6 @@ export function InternPortal() {
   };
 
   const handleUpload = async (requestId: number, file: File) => {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      showToast('يجب أن يكون الملف بصيغة PDF', 'error');
-      return;
-    }
-
     if (file.size > 15 * 1024 * 1024) {
       showToast('حجم الملف يجب أن لا يتجاوز 15 ميجابايت', 'error');
       return;
@@ -140,25 +129,39 @@ export function InternPortal() {
     }
   };
 
-  const handleProactiveUpload = async (docType: string, file: File) => {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      showToast('يجب أن يكون الملف بصيغة PDF', 'error');
-      return;
-    }
-
+  const handleProactiveUpload = async (docId: number, docType: string, file: File) => {
     if (file.size > 15 * 1024 * 1024) {
       showToast('حجم الملف يجب أن لا يتجاوز 15 ميجابايت', 'error');
       return;
     }
 
-    setUploading(docType as any);
+    setUploading(docId);
 
     try {
-      await api.uploadInternDocument(internData?.id, docType, file);
+      await api.uploadInternDocument(internData?.id, docType, file, docId);
       showToast('تم رفع المستند بنجاح!', 'success');
       fetchLifecycleDocs();
       fetchProfile();
       fetchRequests();
+    } catch (err: any) {
+      showToast(err?.message || 'حدث خطأ أثناء الرفع', 'error');
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handleSignFillUpload = async (docId: number, file: File) => {
+    if (file.size > 15 * 1024 * 1024) {
+      showToast('حجم الملف يجب أن لا يتجاوز 15 ميجابايت', 'error');
+      return;
+    }
+    setUploading(docId);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      await api.post(`/interns/${internData?.id}/documents/${docId}/return-upload`, formData);
+      showToast('تم إرجاع النسخة بنجاح!', 'success');
+      fetchLifecycleDocs();
     } catch (err: any) {
       showToast(err?.message || 'حدث خطأ أثناء الرفع', 'error');
     } finally {
@@ -179,8 +182,16 @@ export function InternPortal() {
   // A request is only "actionable" (still nagging) if its document is not yet uploaded.
   const missingCount = useMemo(() => requests.filter((r: any) => !isRequestUploaded(r)).length, [requests, lifecycleDocs]);
 
-  // Pending re-upload requests that are still truly missing a document (drives the banner + dot)
-  const pendingCount = useMemo(() => requests.filter((r: any) => !isRequestUploaded(r)).length, [requests, lifecycleDocs]);
+  // Pending re-upload requests + sign/fill docs that need attention + revision-requested docs
+  const pendingCount = useMemo(() => {
+    const reqs = requests.filter((r: any) => !isRequestUploaded(r)).length;
+    const signFill = lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill') && d.file_path && !d.returned_file_path).length;
+    const revisionReqs = lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length;
+    return reqs + signFill + revisionReqs;
+  }, [requests, lifecycleDocs]);
+
+  // Count of revision-requested docs (for main page alert)
+  const revisionCount = useMemo(() => lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length, [lifecycleDocs]);
 
   // Orange/yellow palette for request notifications
   const REQ_BG = '#FFF6E5';
@@ -210,7 +221,12 @@ export function InternPortal() {
         onLogout={handleLogout} 
       />
       <div className="main">
-        <Header title={getPageTitle(activeTab)} missingCount={missingCount} />
+        <Header title={getPageTitle(activeTab)} missingCount={missingCount} notifications={notifications} onReadNotification={async (id) => {
+          try {
+            await api.post(`/notifications/${id}/read`, {});
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+          } catch {}
+        }} onNotificationClick={() => setActiveTab('documents')} />
 
         <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', background: 'var(--paper)' }}>
           {/* STATUS */}
@@ -229,10 +245,13 @@ export function InternPortal() {
                   <div className="alert req" style={{display:'flex', alignItems:'flex-start', gap:10, padding:'16px 18px', borderRadius:'12px', marginBottom:18, fontSize:'13.5px', fontWeight:700, background: REQ_BG, color: REQ_FG, border:`1px solid ${REQ_BORDER}`}}>
                     <svg className="icon" viewBox="0 0 24 24" style={{stroke: REQ_FG, width:24, height:24, flexShrink:0, marginTop:2}}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
                     <div>
-                      لديك {pendingCount} طلب لإعادة رفع مستند من الإدارة — <span style={{textDecoration:'underline', cursor:'pointer'}} onClick={() => setActiveTab('docs')}>عرض الطلبات</span>
+                      لديك {pendingCount} طلب لإعادة رفع مستند من الإدارة — <span style={{textDecoration:'underline', cursor:'pointer'}} onClick={() => setActiveTab('documents')}>عرض الطلبات</span>
                       <ul style={{margin:'8px 0 0', paddingRight:18, fontWeight:500, fontSize:12.5, lineHeight:1.9}}>
                         {requests.filter((r: any) => !isRequestUploaded(r)).map((r: any) => (
                           <li key={r.id}>{r.custom_title || r.document_type}{r.note ? ` — ${r.note}` : ''}</li>
+                        ))}
+                        {lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).map(d => (
+                          <li key={d.id}>{d.custom_title || d.doc_type} — {d.rejection_reason}</li>
                         ))}
                       </ul>
                     </div>
@@ -247,7 +266,39 @@ export function InternPortal() {
                   </div>
                 </div>
 
-
+                {/* Required documents list — pending state */}
+                <div className="card" style={{padding:24, marginBottom:18, borderTop:'3px solid var(--brand, #9B8B6B)'}}>
+                  <div style={{marginBottom:12}}>
+                    <h3 style={{fontSize:15, margin:0, color:'var(--brand, #9B8B6B)'}}>الوثائق المطلوبة</h3>
+                    <p style={{fontSize:12.5, color:'var(--slate)', margin:'2px 0 0'}}>يرجى تجهيز المستندات التالية لاستكمال إجراءات التسجيل</p>
+                  </div>
+                  <div style={{fontSize:13, lineHeight:2.2, paddingRight:4}}>
+                    <div style={{display:'flex', justifyContent:'space-between'}}>
+                      <span style={{fontWeight:700}}>- طلب من المؤسسة (حامل توقيع وصفة المسؤول)</span>
+<span style={{fontWeight:600, color:'var(--slate)'}}>Demande de Stage (Ecole) -</span>
+                    </div>
+                    <div style={{display:'flex', justifyContent:'space-between'}}>
+                      <span style={{fontWeight:700}}>- نسخة من الشهادة أو الدبلوم المحصل عليه</span>
+                      <span style={{fontWeight:600, color:'var(--slate)'}}>Copie de l'Attestation du Diplôme obtenu -</span>
+                    </div>
+                    <div style={{display:'flex', justifyContent:'space-between'}}>
+                      <span style={{fontWeight:700}}>- طلب خطي (تحديد فترة التدريب)</span>
+                      <span style={{fontWeight:600, color:'var(--slate)'}}>Demande Manuscrite -</span>
+                    </div>
+                    <div style={{display:'flex', justifyContent:'space-between'}}>
+                      <span style={{fontWeight:700}}>- السيرة الذاتية</span>
+                      <span style={{fontWeight:600, color:'var(--slate)'}}>Curriculum Vitae (C. V.) -</span>
+                    </div>
+                    <div style={{display:'flex', justifyContent:'space-between'}}>
+                      <span style={{fontWeight:700}}>- شهادة التأمين على الأخطار</span>
+                      <span style={{fontWeight:600, color:'var(--slate)'}}>Attestation d'Assurance -</span>
+                    </div>
+                    <div style={{display:'flex', justifyContent:'space-between'}}>
+                      <span style={{fontWeight:700}}>- نسخة من البطاقة الوطنية للتعريف / الإقامة</span>
+                      <span style={{fontWeight:600, color:'var(--slate)'}}>Copie de N.I.C / Séjour -</span>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="card" style={{padding: 24}}>
                   <div className="section-title"><h3>آخر التحديثات</h3></div>
@@ -330,6 +381,40 @@ export function InternPortal() {
             <div className="section-title"><h2 style={{fontSize:19, margin:0}}>المستندات والوثائق</h2></div>
             <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>الوثائق الصادرة من الإدارة والمستندات المطلوب منك رفعها</p>
 
+  {/* Required documents list */}
+  <div className="card" style={{padding:24, marginBottom:18, borderTop:'3px solid var(--brand, #9B8B6B)'}}>
+    <div style={{marginBottom:12}}>
+      <h3 style={{fontSize:15, margin:0, color:'var(--brand, #9B8B6B)'}}>الوثائق المطلوبة</h3>
+      <p style={{fontSize:12.5, color:'var(--slate)', margin:'2px 0 0'}}>يرجى تجهيز المستندات التالية لاستكمال إجراءات التسجيل</p>
+    </div>
+    <div style={{fontSize:13, lineHeight:2.2, paddingRight:4}}>
+      <div style={{display:'flex', justifyContent:'space-between'}}>
+        <span style={{fontWeight:700}}>- طلب من المؤسسة (حامل توقيع وصفة المسؤول)</span>
+        <span style={{fontWeight:600, color:'var(--slate)'}}>Demande de Stage (Ecole) -</span>
+      </div>
+      <div style={{display:'flex', justifyContent:'space-between'}}>
+        <span style={{fontWeight:700}}>- نسخة من الشهادة أو الدبلوم المحصل عليه</span>
+        <span style={{fontWeight:600, color:'var(--slate)'}}>Copie de l'Attestation du Diplôme obtenu -</span>
+      </div>
+      <div style={{display:'flex', justifyContent:'space-between'}}>
+        <span style={{fontWeight:700}}>- طلب خطي (تحديد فترة التدريب)</span>
+        <span style={{fontWeight:600, color:'var(--slate)'}}>Demande Manuscrite -</span>
+      </div>
+      <div style={{display:'flex', justifyContent:'space-between'}}>
+        <span style={{fontWeight:700}}>- السيرة الذاتية</span>
+        <span style={{fontWeight:600, color:'var(--slate)'}}>Curriculum Vitae (C. V.) -</span>
+      </div>
+      <div style={{display:'flex', justifyContent:'space-between'}}>
+        <span style={{fontWeight:700}}>- شهادة التأمين على الأخطار</span>
+        <span style={{fontWeight:600, color:'var(--slate)'}}>Attestation d'Assurance -</span>
+      </div>
+      <div style={{display:'flex', justifyContent:'space-between'}}>
+        <span style={{fontWeight:700}}>- نسخة من البطاقة الوطنية للتعريف / الإقامة</span>
+        <span style={{fontWeight:600, color:'var(--slate)'}}>Copie de N.I.C / Séjour -</span>
+      </div>
+    </div>
+  </div>
+
   {/* Card 1: الوثائق من الإدارة */}
   <div className="card" style={{padding:24, marginBottom: 18, borderTop:'3px solid var(--success)'}}>
     <div className="section-title" style={{marginBottom:16}}>
@@ -411,8 +496,11 @@ export function InternPortal() {
 
             {/* Unified Documents List */}
             <div className="card" style={{padding:24, borderTop:'3px solid var(--gold-dark)'}}>
-              <div className="section-title" style={{marginBottom:16}}>
+              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16}}>
                 <h3 style={{fontSize:15, margin:0, color:'var(--gold-dark)'}}>المستندات</h3>
+                <button className="btn btn-gold sm" onClick={() => { setInternUploadTitle(''); setInternUploadFile(null); setShowInternUploadModal(true); }} style={{fontSize:11, padding:'6px 12px'}}>
+                  <UploadSimple size={14} /> إضافة ملف
+                </button>
               </div>
               
               {(() => {
@@ -422,9 +510,78 @@ export function InternPortal() {
                   <div style={{background:'#FFF6E5', border:'1.5px solid #F2D49B', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:12.5, color:'#9A6B00', fontWeight:600}}>
                     {reqDocs.map(d => (
                       <div key={d.id} style={{marginTop:d.rejection_reason ? 6 : 0}}>
-                        <Warning size={14} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة: {d.label || DOC_TYPE_LABELS[d.doc_type as keyof typeof DOC_TYPE_LABELS] || d.custom_title} — {d.rejection_reason}
+                        <Warning size={14} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة: {d.label} — {d.rejection_reason}
                       </div>
                     ))}
+                  </div>
+                );
+              })()}
+
+              {/* Sign / Fill Section */}
+              {(() => {
+                const signFillDocs = lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill') && d.file_path);
+                if (signFillDocs.length === 0) return null;
+                return (
+                  <div style={{marginBottom:16}}>
+                    <div className="section-title" style={{marginBottom:8, display:'flex', alignItems:'center', gap:6}}>
+                      <ArrowsClockwise size={14} weight="bold" style={{color:'var(--gold-dark)'}} />
+                      <h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--gold-dark)'}}>مستندات تتطلب {signFillDocs.some(d => d.action_type === 'sign') ? 'توقيع' : ''}{signFillDocs.some(d => d.action_type === 'sign') && signFillDocs.some(d => d.action_type === 'fill') ? ' / ' : ''}{signFillDocs.some(d => d.action_type === 'fill') ? 'تعبئة' : ''}</h4>
+                    </div>
+                    <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
+                      <thead>
+                        <tr style={{borderBottom:'1px solid var(--line)'}}>
+                          <th style={{textAlign:'right', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
+                          <th style={{textAlign:'center', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>المطلوب</th>
+                          <th style={{textAlign:'center', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
+                          <th style={{textAlign:'left', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {signFillDocs.map(doc => {
+                          const isReturned = !!doc.returned_file_path;
+                          const actionLabel = doc.action_type === 'sign' ? 'توقيع' : 'تعبئة';
+                          return (
+                            <tr key={doc.id} style={{borderBottom:'1px solid var(--line)'}}>
+                              <td style={{padding:'10px 4px', fontWeight:600}}>
+                                {doc.custom_title || doc.doc_type}
+                              </td>
+                              <td style={{textAlign:'center', padding:'10px 4px', color:'var(--slate)', fontSize:11}}>{actionLabel}</td>
+                              <td style={{textAlign:'center', padding:'10px 4px'}}>
+                                {isReturned ? (
+                                  <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
+                                    <CheckCircle size={11} weight="fill" /> تم الإرجاع
+                                  </span>
+                                ) : (
+                                  <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#FEF3C7', color:'#B45309', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
+                                    في انتظار الرد
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{textAlign:'left', padding:'10px 4px'}}>
+                                <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                                  {doc.file_path && (
+                                    <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="تحميل" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                      <DownloadSimple size={14} /> تحميل
+                                    </a>
+                                  )}
+                                  {!isReturned && (
+                                    <>
+                                      <input type="file" id={`sign-upload-${doc.id}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleSignFillUpload(doc.id, e.target.files[0]); }} />
+                                      <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={async () => {
+                                        const input = document.getElementById(`sign-upload-${doc.id}`) as HTMLInputElement;
+                                        input?.click();
+                                      }} disabled={uploading === doc.id}>
+                                        <UploadSimple size={14} /> {uploading === doc.id ? 'جاري...' : 'إعادة الرفع'}
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 );
               })()}
@@ -439,54 +596,47 @@ export function InternPortal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...Object.keys(DOC_TYPE_LABELS)].map(docType => {
-                    const docsOfType = lifecycleDocs.filter(d => d.doc_type === docType);
-                    const docs = docsOfType.length > 0 ? docsOfType : [{ doc_type: docType }];
-                    
-                    return docs.map((doc, idx) => {
-                      const req = requests.find(r => r.document_type === docType);
-                      let status = doc?.status === 'APPROVED_AND_SIGNED' ? 'approved' : doc?.status === 'REVISION_REQUESTED' ? 'rejected' : doc?.file_path ? 'pending' : 'missing';
-                      if (docType === 'FINAL_REPORT' && !doc?.file_path) status = 'missing';
-                      
-                      const statusColor = status === 'approved' ? 'var(--success)' : status === 'rejected' ? 'var(--danger)' : status === 'pending' ? 'var(--gold)' : 'var(--slate-light)';
-                      const docTitle = doc?.custom_title || DOC_TYPE_LABELS[docType as keyof typeof DOC_TYPE_LABELS];
-                      const category = docType === 'FINAL_REPORT' ? 'نهاية التدريب' : docType === 'OTHER' ? 'مستند إضافي' : 'مستند أساسي';
-                      if (docType === 'OTHER' && docsOfType.length === 0) return null;
-                      
-                      return (
-                        <tr key={`${docType}-${idx}`} style={{borderBottom:'1px solid var(--line)'}}>
-                          <td style={{padding:'10px 4px', fontWeight:600}}>
-                            {docTitle}
-                            {doc?.rejection_reason && status === 'rejected' && (
-                              <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
-                                <span style={{fontWeight:600}}><Warning size={12} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة:</span> {doc.rejection_reason}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{textAlign:'center', padding:'10px 4px', color:'var(--slate)', fontSize:11}}>{category}</td>
-                          <td style={{textAlign:'center', padding:'10px 4px', color: statusColor, fontWeight:600, fontSize:12}}>
-                            {status === 'approved' ? <>مقبول <CheckCircle size={12} weight="fill" style={{display:'inline'}} /></> : status === 'rejected' ? 'مطلوب إعادة الرفع' : status === 'pending' ? 'قيد المراجعة' : 'غير مرفوع'}
-                          </td>
-                          <td style={{textAlign:'left', padding:'10px 4px'}}>
-                            <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                              {doc?.file_path && (
-                                <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                                  <Eye size={14} /> معاينة
-                                </a>
-                              )}
-                              {(status === 'missing' || status === 'rejected') && (
-                                <>
-                                  <input type="file" id={`doc-upload-${docType}-${idx}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleProactiveUpload(docType, e.target.files[0]); }} />
-                                  <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`doc-upload-${docType}-${idx}`)?.click()} disabled={uploading === docType}>
-                                    <UploadSimple size={14} /> {uploading === docType ? 'جاري...' : 'رفع'}
-                                  </button>
-                                </>
-                              )}
+                  {lifecycleDocs.length === 0 ? (
+                    <tr><td colSpan={4} style={{textAlign:'center', padding:'20px', color:'var(--slate-light)'}}>لا توجد مستندات بعد</td></tr>
+                  ) : lifecycleDocs.map((doc: any) => {
+                    const req = requests.find(r => r.document_type === doc.doc_type);
+                    let status = doc.status === 'APPROVED_AND_SIGNED' ? 'approved' : doc.status === 'REVISION_REQUESTED' ? 'rejected' : doc.file_path ? 'pending' : 'missing';
+                    const statusColor = status === 'approved' ? 'var(--success)' : status === 'rejected' ? 'var(--danger)' : status === 'pending' ? 'var(--gold)' : 'var(--slate-light)';
+                    const docTitle = doc.custom_title || doc.doc_type;
+                    const acceptExts = doc.file_type === 'pdf' ? '.pdf' : doc.file_type === 'word' ? '.doc,.docx' : doc.file_type === 'excel' ? '.xls,.xlsx' : doc.file_type === 'image' ? '.png,.jpg,.jpeg,.gif,.bmp,.webp' : undefined;
+                    return (
+                      <tr key={doc.id} style={{borderBottom:'1px solid var(--line)'}}>
+                        <td style={{padding:'10px 4px', fontWeight:600}}>
+                          {docTitle}
+                          {doc.rejection_reason && status === 'rejected' && (
+                            <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
+                              <span style={{fontWeight:600}}><Warning size={12} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة:</span> {doc.rejection_reason}
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    });
+                          )}
+                        </td>
+                        <td style={{textAlign:'center', padding:'10px 4px', color:'var(--slate)', fontSize:11}}>{doc.file_type || 'pdf'}</td>
+                        <td style={{textAlign:'center', padding:'10px 4px', color: statusColor, fontWeight:600, fontSize:12}}>
+                          {status === 'approved' ? <>مقبول <CheckCircle size={12} weight="fill" style={{display:'inline'}} /></> : status === 'rejected' ? 'مطلوب إعادة الرفع' : status === 'pending' ? 'قيد المراجعة' : 'غير مرفوع'}
+                        </td>
+                        <td style={{textAlign:'left', padding:'10px 4px'}}>
+                          <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                            {doc.file_path && (
+                              <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
+                                <Eye size={14} /> معاينة
+                              </a>
+                            )}
+                            {(status === 'missing' || status === 'rejected') && (
+                              <>
+                                <input type="file" id={`doc-upload-${doc.id}`} style={{display:'none'}} accept={acceptExts} onChange={e => { if (e.target.files?.[0]) handleProactiveUpload(doc.id, doc.doc_type, e.target.files[0]); }} />
+                                <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`doc-upload-${doc.id}`)?.click()} disabled={uploading === doc.id}>
+                                  <UploadSimple size={14} /> {uploading === doc.id ? 'جاري...' : 'رفع'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
                   })}
                 </tbody>
               </table>
@@ -594,7 +744,54 @@ export function InternPortal() {
             <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>ملفي
           </div>
         </div>
-      </div>
+        </div>
+
+      {showInternUploadModal && (
+        <div className="overlay on" style={{display:'flex'}}>
+          <div className="modal" style={{maxWidth:460}}>
+            <div className="modal-head">
+              <h3>إضافة ملف</h3>
+              <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={() => setShowInternUploadModal(false)}><X size={14} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>اسم المستند</label>
+                <input type="text" className="input" value={internUploadTitle} onChange={e => setInternUploadTitle(e.target.value)} placeholder="شهادة خبرة، تقرير ..." />
+              </div>
+              <div className="form-group">
+                <label>الملف</label>
+                <input type="file" className="input" onChange={e => setInternUploadFile(e.target.files?.[0] || null)} />
+                {internUploadFile && (
+                  <div style={{marginTop:6, padding:'6px 10px', background:'#EFF6FF', borderRadius:6, border:'1px solid #BFDBFE', fontSize:12, display:'flex', alignItems:'center', gap:6}}>
+                    <FileText size={14} color="#2563EB" />
+                    <span style={{fontWeight:600}}>{internUploadFile.name}</span>
+                    <button className="btn btn-ghost sm" onClick={() => setInternUploadFile(null)} style={{marginRight:'auto', padding:2}}><X size={14} /></button>
+                  </div>
+                )}
+                <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>سيتم رفع الملف وإرساله للإدارة للمراجعة</small>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-ghost" onClick={() => setShowInternUploadModal(false)}>إلغاء</button>
+              <button className="btn btn-gold" disabled={!internUploadFile} onClick={async () => {
+                const title = internUploadTitle.trim() || internUploadFile?.name.replace(/\.\w+$/, '') || 'مستند';
+                try {
+                  await api.uploadInternDocument(internData?.id, 'OTHER', internUploadFile, undefined, title);
+                  setShowInternUploadModal(false);
+                  setInternUploadFile(null);
+                  setInternUploadTitle('');
+                  fetchLifecycleDocs();
+                  setToastMsg({msg:'تم رفع الملف بنجاح', type:'success'});
+                } catch {
+                  setToastMsg({msg:'فشل رفع الملف', type:'error'});
+                }
+              }}>
+                <UploadSimple size={14} /> رفع الملف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div id="toast" className={toastMsg ? 'on' : ''} style={{
         position: 'fixed', bottom: 26, left: '50%', transform: toastMsg ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(20px)',

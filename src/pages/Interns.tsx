@@ -27,8 +27,6 @@ function remainingDays(endDate?: string): number | null {
 const defaultIntern = { 
   name: '', name_fr: '', encadrant: '', email: '', national_id: '', department: '',
   phone: '', start_date: '', end_date: '', date_of_birth: '', university: '', address: '', photo_path: '',
-  documents: { id: null, convention: null, demande: null, insurance: null, resume: null } as { [key: string]: string | null },
-  other_documents: [] as {name: string, file: string | null}[]
 };
 
 export function Interns() {
@@ -99,39 +97,7 @@ const filteredInterns = useMemo(() => {
     }
   }, [location.state]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, docType: string, index?: number) => {
-    if (!e.target.files || !e.target.files[0]) return;
-    const file = e.target.files[0];
-    
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      toast.warning('عذراً، يُسمح فقط برفع ملفات PDF');
-      return;
-    }
-    
-    if (file.size > 5 * 1024 * 1024) {
-      toast.warning('عذراً، حجم الملف يجب أن لا يتجاوز 5 ميجابايت');
-      return;
-    }
 
-    try {
-      const res = await api.uploadFile('/documents', file);
-      const filename = res.filename;
-      
-      if (docType === 'other' && index !== undefined) {
-        const newOther = [...newIntern.other_documents];
-        newOther[index].file = filename;
-        setNewIntern({...newIntern, other_documents: newOther});
-      } else {
-        setNewIntern({
-          ...newIntern,
-          documents: { ...newIntern.documents, [docType]: filename }
-        });
-      }
-    } catch (err) {
-      console.error('File upload error', err);
-      toast.error('فشل رفع الملف');
-    }
-  };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
@@ -155,28 +121,11 @@ const filteredInterns = useMemo(() => {
     }
   };
 
-  const addOtherDocument = () => {
-    setNewIntern({
-      ...newIntern, 
-      other_documents: [...newIntern.other_documents, {name: '', file: null}]
-    });
-  };
 
-  const removeDocument = (docType: string) => {
-    setNewIntern({
-      ...newIntern,
-      documents: { ...newIntern.documents, [docType]: null }
-    });
-  };
 
-  const removeOtherDocument = (index: number) => {
-    const newOthers = [...newIntern.other_documents];
-    newOthers.splice(index, 1);
-    setNewIntern({
-      ...newIntern,
-      other_documents: newOthers
-    });
-  };
+
+
+
 
   const handleAddIntern = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -472,94 +421,6 @@ const filteredInterns = useMemo(() => {
               />
             </div>
 
-            <div style={{ marginBottom: '28px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px dashed var(--line)' }}>
-                <h4 style={{ fontSize: '15px', margin: 0 }}>المستندات المرفقة</h4>
-                <span style={{ fontSize: '11px', color: 'var(--slate)', background: 'var(--paper)', padding: '4px 8px', borderRadius: '4px' }}>
-                  ملفات PDF فقط (الحد الأقصى: 5 ميجابايت)
-                </span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
-                {[
-                  { id: 'id', label: 'بطاقة التعريف الوطنية' },
-                  { id: 'convention', label: 'اتفاقية التدريب (Convention de stage)' },
-                  { id: 'demande', label: 'طلب التدريب (Demande de stage)' },
-                  { id: 'insurance', label: 'تأمين (Insurance)' },
-                  { id: 'resume', label: 'السيرة الذاتية (Resume)' },
-                ].map(doc => (
-                  <div key={doc.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: 600 }}>{doc.label}</label>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <label style={{ 
-                        flex: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                        background: newIntern.documents[doc.id as keyof typeof newIntern.documents] ? 'var(--success-bg)' : 'var(--paper)', 
-                        color: newIntern.documents[doc.id as keyof typeof newIntern.documents] ? 'var(--success)' : 'var(--slate)', 
-                        border: `1px dashed ${newIntern.documents[doc.id as keyof typeof newIntern.documents] ? 'var(--success)' : 'var(--line)'}`, 
-                        padding: '10px', borderRadius: '8px', fontSize: '12px', transition: 'all 0.2s', margin: 0 
-                      }}>
-                        <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={(e) => handleFileUpload(e, doc.id)} />
-                        {newIntern.documents[doc.id as keyof typeof newIntern.documents] ? <>تم الرفع <CheckCircle size={12} weight="fill" /></> : 'اختر ملف PDF...'}
-                      </label>
-                      {newIntern.documents[doc.id as keyof typeof newIntern.documents] && (
-                        <button type="button" onClick={() => removeDocument(doc.id as any)} style={{ flexShrink: 0, padding: '4px', background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="حذف">
-                          <X size={16} weight="bold" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {newIntern.other_documents.length > 0 && (
-                <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
-                  {newIntern.other_documents.map((otherDoc, idx) => (
-                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', position: 'relative' }}>
-                      <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 2 }}>
-                        <button type="button" onClick={() => removeOtherDocument(idx)} style={{ background: 'var(--danger-bg)', border: 'none', borderRadius: '4px', cursor: 'pointer', color: 'var(--danger)', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="حذف المستند">
-                          <X size={14} weight="bold" />
-                        </button>
-                      </div>
-                      <input 
-                        type="text" 
-                        placeholder="اسم المستند..." 
-                        value={otherDoc.name}
-                        onChange={(e) => {
-                          const newOthers = [...newIntern.other_documents];
-                          newOthers[idx].name = e.target.value;
-                          setNewIntern({...newIntern, other_documents: newOthers});
-                        }}
-                        style={{ fontSize: '12px', padding: '6px 8px', border: '1px solid var(--line)', borderRadius: '4px', outline: 'none', width: 'calc(100% - 28px)' }}
-                      />
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <label style={{ 
-                          flex: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                          background: otherDoc.file ? 'var(--success-bg)' : '#fff', 
-                          color: otherDoc.file ? 'var(--success)' : 'var(--slate)', 
-                          border: `1px dashed ${otherDoc.file ? 'var(--success)' : 'var(--line)'}`, 
-                          padding: '8px', borderRadius: '4px', fontSize: '12px', transition: 'all 0.2s', margin: 0 
-                        }}>
-                          <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={(e) => handleFileUpload(e, 'other', idx)} />
-                          {otherDoc.file ? <>تم الرفع <CheckCircle size={12} weight="fill" /></> : 'اختر ملف PDF...'}
-                        </label>
-                        {otherDoc.file && (
-                          <button type="button" onClick={() => {
-                            const newOthers = [...newIntern.other_documents];
-                            newOthers[idx].file = '';
-                            setNewIntern({...newIntern, other_documents: newOthers});
-                          }} style={{ flexShrink: 0, padding: '4px', background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="إزالة الملف">
-                            <X size={14} weight="bold" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              <button type="button" onClick={addOtherDocument} className="btn btn-ghost sm" style={{ marginTop: '16px' }}>
-                <Plus size={14} /> إضافة مستند آخر
-              </button>
-            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', borderTop: '1px solid var(--line-soft)', paddingTop: '20px' }}>
               <div>
                 <TestModeAutofill onFill={(data) => setNewIntern({ ...newIntern, ...data })} />

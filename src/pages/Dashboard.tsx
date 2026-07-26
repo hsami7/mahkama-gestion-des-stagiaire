@@ -342,7 +342,7 @@ export function Dashboard() {
                           <button className="btn btn-ghost sm" onClick={() => setSelectedSub(sub)}>
                             <Eye size={14} /> عرض
                           </button>
-                          <button className="btn btn-ghost sm" onClick={() => setShowCoverage(true)} title="مخطط تغطية المتدربين" style={{ fontSize: '0.7rem', padding: '4px 6px', color: 'var(--gold-dark)' }}>
+                          <button className="btn btn-ghost sm" onClick={() => navigate(`/timeline?selected=${sub.id}`)} title="مخطط تغطية المتدربين" style={{ fontSize: '0.7rem', padding: '4px 6px', color: 'var(--gold-dark)' }}>
                             <ChartBar size={14} /> تغطية
                           </button>
                           {isAdmin && (
@@ -394,7 +394,7 @@ export function Dashboard() {
                           <button className="btn btn-ghost sm" onClick={() => navigate(`/interns/${intern.id}`)}>
                             <Eye size={14} /> عرض
                           </button>
-                          <button className="btn btn-ghost sm" onClick={() => setShowCoverage(true)} title="مخطط تغطية المتدربين" style={{ fontSize: '0.7rem', padding: '4px 6px', color: 'var(--gold-dark)' }}>
+                          <button className="btn btn-ghost sm" onClick={() => navigate(`/timeline?selected=${intern.id}`)} title="مخطط تغطية المتدربين" style={{ fontSize: '0.7rem', padding: '4px 6px', color: 'var(--gold-dark)' }}>
                             <ChartBar size={14} /> تغطية
                           </button>
                           {isAdmin && (
@@ -463,11 +463,38 @@ export function Dashboard() {
                     </div>
                   </td>
                   <td>
-                    {intern.status === 'نشط' && <span className="badge ok" style={{ fontSize: 11 }}><div className="dot"></div>نشط</span>}
-                    {intern.status === 'مستندات ناقصة' && <span className="badge bad" style={{ fontSize: 11 }}><div className="dot"></div>مستندات ناقصة</span>}
-                    {intern.status === 'قيد المراجعة' && <span className="badge warn" style={{ fontSize: 11 }}><div className="dot"></div>قيد المراجعة</span>}
-                    {intern.status === 'منتهي' && <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}><div className="dot"></div>منتهي</span>}
-                    {intern.status === 'مرفوض' && <span className="badge" style={{ fontSize: 11, background: '#FCE8E6', color: '#B3261E', border: '1px solid #F5C6C3' }}><div className="dot" style={{ background: '#B3261E' }}></div>مرفوض</span>}
+                    <select value={intern.status} onChange={async e => {
+                      const newStatus = e.target.value;
+                      try {
+                        await api.put(`/interns/${intern.id}`, { status: newStatus });
+                        setInterns(prev => prev.map(i => i.id === intern.id ? {...i, status: newStatus} : i));
+                      } catch { alert('فشل تغيير الحالة'); }
+                    }} style={{
+                      fontSize: 11, padding: '4px 8px', borderRadius: 6,
+                      border: '1px solid var(--line)', background: 'var(--paper)',
+                      fontWeight: 600, cursor: 'pointer', outline: 'none',
+                      color: intern.status === 'نشط' ? 'var(--ok)' :
+                             intern.status === 'مستندات ناقصة' ? 'var(--bad)' :
+                             intern.status === 'قيد المراجعة' ? '#B45A0C' :
+                             intern.status === 'مرفوض' ? '#B3261E' :
+                             'var(--slate)',
+                      borderColor: intern.status === 'نشط' ? 'var(--ok)' :
+                                   intern.status === 'مستندات ناقصة' ? '#F5C6C3' :
+                                   intern.status === 'قيد المراجعة' ? '#F2D49B' :
+                                   intern.status === 'مرفوض' ? '#F5C6C3' :
+                                   'var(--line)',
+                      background: intern.status === 'مرفوض' ? '#FCE8E6' :
+                                  intern.status === 'مستندات ناقصة' ? '#FCE8E6' :
+                                  intern.status === 'قيد المراجعة' ? '#FFF6E5' :
+                                  intern.status === 'نشط' ? '#E6F7E6' :
+                                  'var(--paper)',
+                    }}>
+                      <option value="قيد المراجعة">قيد المراجعة</option>
+                      <option value="نشط">نشط</option>
+                      <option value="مستندات ناقصة">مستندات ناقصة</option>
+                      <option value="مرفوض">مرفوض</option>
+                      <option value="منتهي">منتهي</option>
+                    </select>
                   </td>
                   <td>
                     <button className="btn btn-ghost sm" onClick={() => navigate(`/interns/${intern.id}`)}>

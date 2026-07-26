@@ -302,6 +302,10 @@ export function Settings() {
         </div>
       )}
 
+      {isAdmin && (
+        <DocumentTemplatesManager />
+      )}
+
       {!isAdmin ? (
         <div className="card" style={{ padding: '22px' }}>
           <p style={{ color: 'var(--slate)' }}>إعدادات النظام قيد التطوير. لا تملك صلاحية الوصول للسجلات.</p>
@@ -346,6 +350,112 @@ export function Settings() {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function DocumentTemplatesManager() {
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [label, setLabel] = useState('');
+  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => { fetchTemplates(); }, []);
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await api.get('/admin/document-templates');
+      setTemplates(res);
+    } catch { /* ignore */ }
+  };
+
+  const addTemplate = async () => {
+    if (!label.trim()) return toast.warning('الرجاء إدخال اسم المستند');
+    setLoading(true);
+    try {
+      await api.post('/admin/document-templates', { label: label.trim() });
+      toast.success('تمت الإضافة');
+      setLabel('');
+      fetchTemplates();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const toggleActive = async (t: any) => {
+    try {
+      await api.put(`/admin/document-templates/${t.id}`, { is_active: !t.is_active });
+      fetchTemplates();
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const removeTemplate = async (id: number) => {
+    try {
+      await api.delete(`/admin/document-templates/${id}`);
+      toast.success('تم الحذف');
+      fetchTemplates();
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  return (
+    <div className="card" style={{ padding: '22px', marginBottom: '22px' }}>
+      <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>قوالب المستندات المطلوبة</h3>
+      <p style={{ fontSize: '13px', color: 'var(--slate)', marginBottom: '16px' }}>
+        المستندات المدرجة هنا تُنشأ تلقائياً لكل متدرب عند إضافته أو عند تفعيل حالته.
+      </p>
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <input
+          placeholder="اسم المستند (مثال: عقد التدريب)"
+          value={label}
+          onChange={e => setLabel(e.target.value)}
+          style={{ flex: 1, minWidth: 200, padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 6 }}
+        />
+        <button className="btn btn-gold" onClick={addTemplate} disabled={loading}>
+          {loading ? '...' : 'إضافة'}
+        </button>
+      </div>
+
+      {templates.length === 0 ? (
+        <p style={{ color: 'var(--slate)', fontSize: '13px' }}>لا توجد قوالب بعد. أضف القالب الأول أعلاه.</p>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--gold-light)' }}>
+              <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>الاسم</th>
+              <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>الحالة</th>
+              <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>إجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            {templates.map(t => (
+              <tr key={t.id} style={{ borderBottom: '1px solid var(--paper)' }}>
+                <td style={{ padding: '10px 8px', fontWeight: 'bold' }}>{t.label}</td>
+                <td style={{ padding: '10px 8px' }}>
+                  <span
+                    onClick={() => toggleActive(t)}
+                    style={{
+                      cursor: 'pointer', padding: '3px 10px', borderRadius: 12, fontSize: '12px',
+                      background: t.is_active ? '#d4edda' : '#f8d7da',
+                      color: t.is_active ? '#155724' : '#721c24'
+                    }}
+                  >
+                    {t.is_active ? 'نشط' : 'معطل'}
+                  </span>
+                </td>
+                <td style={{ padding: '10px 8px' }}>
+                  <button
+                    className="btn btn-ghost"
+                    style={{ color: 'var(--danger)', fontSize: '12px', padding: '4px 10px' }}
+                    onClick={() => removeTemplate(t.id)}
+                  >
+                    حذف
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

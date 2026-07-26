@@ -39,3 +39,5 @@ interns_output.json
 
 # Local agent/skills dir
 .agents/
+backend/google_token.pickle
+backend/integration_settings.json

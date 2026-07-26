@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MagnifyingGlass, Funnel, X, Check, CaretLeft, CaretRight, CalendarBlank, Users, Warning, WarningCircle } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -94,6 +95,7 @@ function DateInput({ value, onChange, placeholder }: { value: string; onChange: 
 
 export function Timeline() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [interns, setInterns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -102,7 +104,10 @@ export function Timeline() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedIds, setSelectedIds] = useState<number[]>(() => {
+    const param = searchParams.get('selected');
+    return param ? [Number(param)] : [];
+  });
   const [anchor, setAnchor] = useState<{ y: number; m: number }>(() => {
     const n = new Date();
     return { y: n.getFullYear(), m: n.getMonth() };
