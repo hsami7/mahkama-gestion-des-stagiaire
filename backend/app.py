@@ -1525,16 +1525,22 @@ def create_intern_document_lifecycle(intern_id):
     now = datetime.now(timezone.utc)
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, status='AWAITING_RETURN' if action_type in ('sign', 'fill', 'sign_fill') else 'MISSING',
-        uploaded_by='ADMIN', is_visible_to_intern=True,
+        uploaded_by='ADMIN', is_visible_to_intern=True, requires_return=action_type in ('sign', 'fill', 'sign_fill'),
         custom_title=custom_title, action_type=action_type,
         created_at=now, updated_at=now
     )
     db.session.add(record)
     db.session.commit()
-    if action_type in ('sign', 'fill'):
+    if action_type in ('sign', 'fill', 'sign_fill'):
+        notif_titles = {'sign': 'مستند يطلب التوقيع', 'fill': 'مستند يطلب التعبئة', 'sign_fill': 'مستند يطلب التوقيع والتعبئة'}
+        notif_bodies = {
+            'sign': f'المستند "{custom_title or doc_type}" يتطلب منك توقيعه.',
+            'fill': f'المستند "{custom_title or doc_type}" يتطلب منك تعبئته وإرجاعه.',
+            'sign_fill': f'المستند "{custom_title or doc_type}" يتطلب منك توقيعه وتعبئته وإرجاعه.',
+        }
         notif = Notification(intern_id=intern.id, type='REASSIGNMENT',
-            title=f'مستند يطلب {action_type == "sign" and "التوقيع" or "التعبئة"}',
-            body=f'المستند "{custom_title or doc_type}" يتطلب منك {action_type == "sign" and "توقيعه" or "تعبئته وإرجاعه"}.',
+            title=notif_titles[action_type],
+            body=notif_bodies[action_type],
             related_doc_id=record.id)
         db.session.add(notif)
         db.session.commit()
@@ -2320,7 +2326,7 @@ def list_intern_documents(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
-    docs = DocumentLifecycle.query.filter_by(intern_id=intern_id).order_by(DocumentLifecycle.doc_type).all()
+    docs = DocumentLifecycle.query.filter_by(intern_id=intern_id).order_by(DocumentLifecycle.created_at.asc()).all()
     result = []
     for d in docs:
         result.append({
@@ -2649,7 +2655,7 @@ def upload_returned_document(intern_id, doc_id):
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
-    if not doc.requires_return and doc.action_type not in ('sign', 'fill'):
+    if not doc.requires_return and doc.action_type not in ('sign', 'fill', 'sign_fill'):
         return jsonify({"msg": "This document does not require a return upload"}), 400
 
     if 'file' not in request.files:
@@ -2744,7 +2750,7 @@ def list_my_documents():
         return jsonify({"msg": "Intern not found"}), 404
     if intern.status == 'مرفوض':
         return jsonify({"msg": "Account not yet activated"}), 403
-    docs = DocumentLifecycle.query.filter_by(intern_id=intern.id).order_by(DocumentLifecycle.doc_type).all()
+    docs = DocumentLifecycle.query.filter_by(intern_id=intern.id).order_by(DocumentLifecycle.created_at.asc()).all()
     result = []
     for d in docs:
         # The intern only sees rows shared with them or that they uploaded.
