@@ -239,6 +239,7 @@ export function Profile() {
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
   const isAdmin = user?.role === 'Admin';
+  const canManageDocs = isAdmin || (user?.role === 'Manager' && user?.can_manage_documents);
   let canAssignEncadrant = isAdmin;
   let canApproveInterns = isAdmin;
   let canEvaluateInterns = isAdmin;
@@ -903,9 +904,11 @@ export function Profile() {
         <div className="card info-card">
           <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, marginBottom:16}}>
             <h3 style={{margin:0}}><FileText weight="bold" className="icon" /> مركز المستندات</h3>
+            {canManageDocs && (
             <button className="btn btn-gold sm" onClick={async () => { setRequestTitle(''); setRequestActionTypes(new Set(['view'])); setRequestFiles([]); setSelectedVaultDocs([]); try { setVaultDocs(await api.get('/vault')); } catch {} setShowRequestModal(true); }} style={{fontSize:12, padding:'8px 16px'}}>
               + طلب مستند / إضافة ملف
             </button>
+            )}
           </div>
 
           {/* Filter tabs */}
@@ -913,7 +916,7 @@ export function Profile() {
             {(['all', 'pending', 'completed'] as const).map(tab => {
               const counts = {
                 all: docsLifecycle.length,
-                pending: docsLifecycle.filter(d => d.status !== 'APPROVED_AND_SIGNED' || (d.action_type === 'sign' || d.action_type === 'fill') && d.file_path && !d.returned_file_path).length,
+                pending: docsLifecycle.filter(d => d.status !== 'APPROVED_AND_SIGNED').length,
                 completed: docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED').length
               };
               const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل' };
@@ -934,7 +937,7 @@ export function Profile() {
           {/* Unified table */}
           {(() => {
             const filtered = docsLifecycle.filter(d => {
-              if (docFilter === 'pending') return d.status !== 'APPROVED_AND_SIGNED' || ((d.action_type === 'sign' || d.action_type === 'fill') && d.file_path && !d.returned_file_path);
+              if (docFilter === 'pending') return d.status !== 'APPROVED_AND_SIGNED';
               if (docFilter === 'completed') return d.status === 'APPROVED_AND_SIGNED';
               return true;
             });
@@ -1051,11 +1054,13 @@ export function Profile() {
                         )}
                       </td>
                       <td style={{textAlign:'center', padding:'10px 8px'}}>
-                        {d.status === 'MISSING' && !d.file_path ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span> :
+                        {d.status === 'AWAITING_RETURN' ? <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع</span> :
+                         d.status === 'RETURNED' ? <span className="badge badge-warning" style={{fontSize:11}}>بانتظار المراجعة</span> :
+                         d.status === 'MISSING' && !d.file_path ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span> :
                          d.status === 'PENDING_REVIEW' ? <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span> :
                          d.status === 'APPROVED_AND_SIGNED' ? <span className="badge badge-success" style={{fontSize:11}}>مقبول</span> :
                          d.status === 'REVISION_REQUESTED' ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> :
-                         <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>{({MISSING: 'بانتظار الرفع', PENDING_REVIEW: 'قيد المراجعة', APPROVED_AND_SIGNED: 'مقبول', REVISION_REQUESTED: 'مطلوب إعادة'})[d.status] || d.status}</span>}
+                         <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>{({AWAITING_RETURN: 'بانتظار التوقيع', RETURNED: 'بانتظار المراجعة', MISSING: 'بانتظار الرفع', PENDING_REVIEW: 'قيد المراجعة', APPROVED_AND_SIGNED: 'مقبول', REVISION_REQUESTED: 'مطلوب إعادة'})[d.status] || d.status}</span>}
                       </td>
                       <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
                         {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
@@ -1072,12 +1077,17 @@ export function Profile() {
                               </button>
                             </>
                           )}
-                          {d.status === 'PENDING_REVIEW' && (
+                          {canManageDocs && d.status === 'RETURNED' && (
                             <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                               <CheckCircle size={14} />
                             </button>
                           )}
-                          {d.status !== 'MISSING' && (
+                          {canManageDocs && d.status === 'PENDING_REVIEW' && (
+                            <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                              <CheckCircle size={14} />
+                            </button>
+                          )}
+                          {canManageDocs && d.status !== 'MISSING' && (
                             <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
                               <ArrowsClockwise size={14} />
                             </button>
@@ -1627,7 +1637,8 @@ export function Profile() {
               } onClick={async () => {
                 try {
                   let total = 0;
-                  const types = Array.from(requestActionTypes);
+                  let types = Array.from(requestActionTypes);
+                  if (types.includes('sign') && types.includes('fill')) types = ['sign_fill'];
                   const primaryType = types[0] || 'view';
 
                   if (requestFiles.length > 0) {

@@ -28,12 +28,13 @@ export function InternPortal() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<number | string | null>(null);
   const [internData, setInternData] = useState<any>(null);
-  const [toastMsg, setToastMsg] = useState<{msg: string, type: string} | null>(null);
+  const [toastMsg, setToastMsg] = useState<{ msg: string, type: string } | null>(null);
   const [lifecycleDocs, setLifecycleDocs] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showInternUploadModal, setShowInternUploadModal] = useState(false);
   const [internUploadTitle, setInternUploadTitle] = useState('');
   const [internUploadFile, setInternUploadFile] = useState<File | null>(null);
+  const [docFilter, setDocFilter] = useState('all');
 
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
@@ -84,7 +85,7 @@ export function InternPortal() {
     fetchRequests();
     fetchProfile();
     fetchLifecycleDocs();
-    api.get('/notifications').then(setNotifications).catch(() => {});
+    api.get('/notifications').then(setNotifications).catch(() => { });
   }, []);
 
   // Poll for newly created document requests and notify the intern
@@ -92,7 +93,7 @@ export function InternPortal() {
     const interval = setInterval(() => {
       fetchRequests(true);
       fetchLifecycleDocs();
-      api.get('/notifications').then(setNotifications).catch(() => {});
+      api.get('/notifications').then(setNotifications).catch(() => { });
     }, 10000);
     return () => clearInterval(interval);
   }, [internData?.id]);
@@ -186,13 +187,13 @@ export function InternPortal() {
   // Pending re-upload requests + sign/fill docs that need attention + revision-requested docs
   const pendingCount = useMemo(() => {
     const reqs = requests.filter((r: any) => !isRequestUploaded(r)).length;
-    const signFill = lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && d.file_path && !d.returned_file_path).length;
+    const signFill = lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && !d.returned_file_path).length;
     const revisionReqs = lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length;
     return reqs + signFill + revisionReqs;
   }, [requests, lifecycleDocs]);
 
   // Count of sign/fill lifecycle docs that need the intern's return
-  const signFillCount = useMemo(() => lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && d.file_path && !d.returned_file_path).length, [lifecycleDocs]);
+  const signFillCount = useMemo(() => lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && !d.returned_file_path).length, [lifecycleDocs]);
 
   // Count of revision-requested docs (for main page alert)
   const revisionCount = useMemo(() => lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length, [lifecycleDocs]);
@@ -214,22 +215,22 @@ export function InternPortal() {
 
   return (
     <div className="app-container">
-      <InternSidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        internData={internData} 
-        user={user} 
-        missingCount={missingCount} 
-        pendingCount={pendingCount} 
-        reqDotColor={REQ_DOT} 
-        onLogout={handleLogout} 
+      <InternSidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        internData={internData}
+        user={user}
+        missingCount={missingCount}
+        pendingCount={pendingCount}
+        reqDotColor={REQ_DOT}
+        onLogout={handleLogout}
       />
       <div className="main">
         <Header title={getPageTitle(activeTab)} missingCount={missingCount} notifications={notifications} onReadNotification={async (id) => {
           try {
             await api.post(`/notifications/${id}/read`, {});
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-          } catch {}
+          } catch { }
         }} onNotificationClick={() => setActiveTab('documents')} />
 
         <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', background: 'var(--paper)' }}>
@@ -237,20 +238,20 @@ export function InternPortal() {
           <div className={`view ${activeTab === 'status' ? 'on' : ''} p-wrap`}>
             <div className="welcome-row">
               <div className="welcome-photo">
-                {internData?.photo_path ? <img src={internData.photo_path} alt="avatar" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'100%', height:'100%', padding:'15%', color:'var(--slate)'}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
+                {internData?.photo_path ? <img src={internData.photo_path} alt="avatar" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '100%', height: '100%', padding: '15%', color: 'var(--slate)' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>}
               </div>
-              <div><h2>مرحبًا، {internData?.name || user?.name} <HandWaving size={22} weight="fill" style={{display:'inline'}} /></h2><p>{internData?.email || user?.email}</p></div>
+              <div><h2>مرحبًا، {internData?.name || user?.name} <HandWaving size={22} weight="fill" style={{ display: 'inline' }} /></h2><p>{internData?.email || user?.email}</p></div>
             </div>
 
             {/* PENDING STATE */}
             {(!internData?.status || internData?.status === 'قيد المراجعة') && (
               <div className="state-block on">
                 {pendingCount > 0 && (
-                  <div className="alert req" style={{display:'flex', alignItems:'flex-start', gap:10, padding:'16px 18px', borderRadius:'12px', marginBottom:18, fontSize:'13.5px', fontWeight:700, background: REQ_BG, color: REQ_FG, border:`1px solid ${REQ_BORDER}`}}>
-                    <svg className="icon" viewBox="0 0 24 24" style={{stroke: REQ_FG, width:24, height:24, flexShrink:0, marginTop:2}}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                  <div className="alert req" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '16px 18px', borderRadius: '12px', marginBottom: 18, fontSize: '13.5px', fontWeight: 700, background: REQ_BG, color: REQ_FG, border: `1px solid ${REQ_BORDER}` }}>
+                    <svg className="icon" viewBox="0 0 24 24" style={{ stroke: REQ_FG, width: 24, height: 24, flexShrink: 0, marginTop: 2 }}><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
                     <div>
-                      لديك {pendingCount} طلب لإعادة رفع مستند من الإدارة — <span style={{textDecoration:'underline', cursor:'pointer'}} onClick={() => setActiveTab('documents')}>عرض الطلبات</span>
-                      <ul style={{margin:'8px 0 0', paddingRight:18, fontWeight:500, fontSize:12.5, lineHeight:1.9}}>
+                      لديك {pendingCount} طلب لإعادة رفع مستند من الإدارة — <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => setActiveTab('documents')}>عرض الطلبات</span>
+                      <ul style={{ margin: '8px 0 0', paddingRight: 18, fontWeight: 500, fontSize: 12.5, lineHeight: 1.9 }}>
                         {requests.filter((r: any) => !isRequestUploaded(r)).map((r: any) => (
                           <li key={r.id}>{r.custom_title || r.document_type}{r.note ? ` — ${r.note}` : ''}</li>
                         ))}
@@ -261,59 +262,59 @@ export function InternPortal() {
                     </div>
                   </div>
                 )}
-                
-                <div className="card" style={{marginBottom:18, padding:24}}>
-                  <div className="intern-stepper" style={{display:'flex', alignItems:'center'}}>
-                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}><CheckCircle weight="fill" size={18} /></div><small style={{display:'block',color:'var(--slate)'}}>إنشاء الحساب</small></div>
-                    <div className={`intern-step ${missingCount > 0 ? 'active' : 'done'}`} style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:missingCount>0?'var(--gold)':'var(--success)',color:missingCount>0?'#2A2005':'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2, boxShadow:missingCount>0?'0 0 0 5px rgba(201,162,39,.18)':'none'}}>{missingCount>0?'2':<CheckCircle weight="fill" size={18} />}</div><small style={{display:'block',color:'var(--slate)'}}>رفع المستندات</small></div>
-                    <div className={`intern-step ${missingCount === 0 ? 'active' : ''}`} style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:missingCount===0?'var(--gold)':'var(--paper)',border:missingCount===0?'none':'2px solid var(--line)',color:missingCount===0?'#2A2005':'var(--slate-light)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2, boxShadow:missingCount===0?'0 0 0 5px rgba(201,162,39,.18)':'none'}}>3</div><small style={{display:'block',color:'var(--slate)'}}>المراجعة والقبول</small></div>
+
+                <div className="card" style={{ marginBottom: 18, padding: 24 }}>
+                  <div className="intern-stepper" style={{ display: 'flex', alignItems: 'center' }}>
+                    <div className="intern-step done" style={{ flex: 1, textAlign: 'center', position: 'relative' }}><div className="sc" style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', position: 'relative', zIndex: 2 }}><CheckCircle weight="fill" size={18} /></div><small style={{ display: 'block', color: 'var(--slate)' }}>إنشاء الحساب</small></div>
+                    <div className={`intern-step ${missingCount > 0 ? 'active' : 'done'}`} style={{ flex: 1, textAlign: 'center', position: 'relative' }}><div className="sc" style={{ width: 34, height: 34, borderRadius: '50%', background: missingCount > 0 ? 'var(--gold)' : 'var(--success)', color: missingCount > 0 ? '#2A2005' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', position: 'relative', zIndex: 2, boxShadow: missingCount > 0 ? '0 0 0 5px rgba(201,162,39,.18)' : 'none' }}>{missingCount > 0 ? '2' : <CheckCircle weight="fill" size={18} />}</div><small style={{ display: 'block', color: 'var(--slate)' }}>رفع المستندات</small></div>
+                    <div className={`intern-step ${missingCount === 0 ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center', position: 'relative' }}><div className="sc" style={{ width: 34, height: 34, borderRadius: '50%', background: missingCount === 0 ? 'var(--gold)' : 'var(--paper)', border: missingCount === 0 ? 'none' : '2px solid var(--line)', color: missingCount === 0 ? '#2A2005' : 'var(--slate-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', position: 'relative', zIndex: 2, boxShadow: missingCount === 0 ? '0 0 0 5px rgba(201,162,39,.18)' : 'none' }}>3</div><small style={{ display: 'block', color: 'var(--slate)' }}>المراجعة والقبول</small></div>
                   </div>
                 </div>
 
                 {/* Required documents list — pending state */}
-                <div className="card" style={{padding:24, marginBottom:18, borderTop:'3px solid var(--brand, #9B8B6B)'}}>
-                  <div style={{marginBottom:12}}>
-                    <h3 style={{fontSize:15, margin:0, color:'var(--brand, #9B8B6B)'}}>الوثائق المطلوبة</h3>
-                    <p style={{fontSize:12.5, color:'var(--slate)', margin:'2px 0 0'}}>يرجى تجهيز المستندات التالية لاستكمال إجراءات التسجيل</p>
+                <div className="card" style={{ padding: 24, marginBottom: 18, borderTop: '3px solid var(--brand, #9B8B6B)' }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <h3 style={{ fontSize: 15, margin: 0, color: 'var(--brand, #9B8B6B)' }}>الوثائق المطلوبة</h3>
+                    <p style={{ fontSize: 12.5, color: 'var(--slate)', margin: '2px 0 0' }}>يرجى تجهيز المستندات التالية لاستكمال إجراءات التسجيل</p>
                   </div>
-                  <div style={{fontSize:13, lineHeight:2.2, paddingRight:4}}>
-                    <div style={{display:'flex', justifyContent:'space-between'}}>
-                      <span style={{fontWeight:700}}>- طلب من المؤسسة (حامل توقيع وصفة المسؤول)</span>
-<span style={{fontWeight:600, color:'var(--slate)'}}>Demande de Stage (Ecole) -</span>
+                  <div style={{ fontSize: 13, lineHeight: 2.2, paddingRight: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700 }}>- طلب من المؤسسة (حامل توقيع وصفة المسؤول)</span>
+                      <span style={{ fontWeight: 600, color: 'var(--slate)' }}>Demande de Stage (Ecole) -</span>
                     </div>
-                    <div style={{display:'flex', justifyContent:'space-between'}}>
-                      <span style={{fontWeight:700}}>- نسخة من الشهادة أو الدبلوم المحصل عليه</span>
-                      <span style={{fontWeight:600, color:'var(--slate)'}}>Copie de l'Attestation du Diplôme obtenu -</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700 }}>- نسخة من الشهادة أو الدبلوم المحصل عليه</span>
+                      <span style={{ fontWeight: 600, color: 'var(--slate)' }}>Copie de l'Attestation du Diplôme obtenu -</span>
                     </div>
-                    <div style={{display:'flex', justifyContent:'space-between'}}>
-                      <span style={{fontWeight:700}}>- طلب خطي (تحديد فترة التدريب)</span>
-                      <span style={{fontWeight:600, color:'var(--slate)'}}>Demande Manuscrite -</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700 }}>- طلب خطي (تحديد فترة التدريب)</span>
+                      <span style={{ fontWeight: 600, color: 'var(--slate)' }}>Demande Manuscrite -</span>
                     </div>
-                    <div style={{display:'flex', justifyContent:'space-between'}}>
-                      <span style={{fontWeight:700}}>- السيرة الذاتية</span>
-                      <span style={{fontWeight:600, color:'var(--slate)'}}>Curriculum Vitae (C. V.) -</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700 }}>- السيرة الذاتية</span>
+                      <span style={{ fontWeight: 600, color: 'var(--slate)' }}>Curriculum Vitae (C. V.) -</span>
                     </div>
-                    <div style={{display:'flex', justifyContent:'space-between'}}>
-                      <span style={{fontWeight:700}}>- شهادة التأمين على الأخطار</span>
-                      <span style={{fontWeight:600, color:'var(--slate)'}}>Attestation d'Assurance -</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700 }}>- شهادة التأمين على الأخطار</span>
+                      <span style={{ fontWeight: 600, color: 'var(--slate)' }}>Attestation d'Assurance -</span>
                     </div>
-                    <div style={{display:'flex', justifyContent:'space-between'}}>
-                      <span style={{fontWeight:700}}>- نسخة من البطاقة الوطنية للتعريف / الإقامة</span>
-                      <span style={{fontWeight:600, color:'var(--slate)'}}>Copie de N.I.C / Séjour -</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700 }}>- نسخة من البطاقة الوطنية للتعريف / الإقامة</span>
+                      <span style={{ fontWeight: 600, color: 'var(--slate)' }}>Copie de N.I.C / Séjour -</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="card" style={{padding: 24}}>
+                <div className="card" style={{ padding: 24 }}>
                   <div className="section-title"><h3>آخر التحديثات</h3></div>
                   <div className="timeline">
-                    <div className="tl-item" style={{display:'flex', gap:14, paddingBottom:20, position:'relative'}}>
-                      <div className="tl-dot" style={{width:30,height:30,borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1,background:'var(--success-bg)', color:'var(--success)'}}><svg className="icon" viewBox="0 0 24 24" style={{width:15, height:15}}><path d="M20 6L9 17l-5-5"/></svg></div>
-                      <div className="tl-body"><b style={{fontSize:13,display:'block'}}>تم إنشاء الحساب بنجاح</b><span style={{fontSize:11.5,color:'var(--slate-light)'}}>مرحباً بك</span></div>
+                    <div className="tl-item" style={{ display: 'flex', gap: 14, paddingBottom: 20, position: 'relative' }}>
+                      <div className="tl-dot" style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, background: 'var(--success-bg)', color: 'var(--success)' }}><svg className="icon" viewBox="0 0 24 24" style={{ width: 15, height: 15 }}><path d="M20 6L9 17l-5-5" /></svg></div>
+                      <div className="tl-body"><b style={{ fontSize: 13, display: 'block' }}>تم إنشاء الحساب بنجاح</b><span style={{ fontSize: 11.5, color: 'var(--slate-light)' }}>مرحباً بك</span></div>
                     </div>
-                    <div className="tl-item" style={{display:'flex', gap:14, position:'relative'}}>
-                      <div className="tl-dot" style={{width:30,height:30,borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1,background:'var(--warning-bg)', color:'var(--warning)'}}><svg className="icon" viewBox="0 0 24 24" style={{width:15, height:15}}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
-                      <div className="tl-body"><b style={{fontSize:13,display:'block'}}>طلبك الآن قيد المراجعة</b><span style={{fontSize:11.5,color:'var(--slate-light)'}}>بانتظار الإدارة</span></div>
+                    <div className="tl-item" style={{ display: 'flex', gap: 14, position: 'relative' }}>
+                      <div className="tl-dot" style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, background: 'var(--warning-bg)', color: 'var(--warning)' }}><svg className="icon" viewBox="0 0 24 24" style={{ width: 15, height: 15 }}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg></div>
+                      <div className="tl-body"><b style={{ fontSize: 13, display: 'block' }}>طلبك الآن قيد المراجعة</b><span style={{ fontSize: 11.5, color: 'var(--slate-light)' }}>بانتظار الإدارة</span></div>
                     </div>
                   </div>
                 </div>
@@ -323,41 +324,41 @@ export function InternPortal() {
             {/* ACCEPTED STATE */}
             {internData?.status === 'نشط' && (
               <div className="state-block on">
-                <div className="hero-accept" style={{position:'relative', overflow:'hidden', borderRadius:16, padding:'30px 28px', marginBottom:20, color:'#fff', background:'linear-gradient(120deg, #1E5631 0%, #2F9E44 100%)'}}>
-                  <div className="hcontent" style={{position:'relative'}}>
-                    <div className="htag" style={{display:'inline-flex', alignItems:'center', gap:6, background:'rgba(255,255,255,.18)', padding:'5px 12px', borderRadius:20, fontSize:11.5, fontWeight:700, marginBottom:14}}><Confetti size={14} weight="fill" /> مبروك</div>
-                    <h2 style={{fontSize:23, margin:'0 0 6px'}}>تم قبولك رسميًا في برنامج التدريب!</h2>
-                    <p style={{margin:0, fontSize:13.5, color:'#DCF3E1', maxWidth:520, lineHeight:1.8}}>يسعدنا إخبارك بأن طلبك قد لقي القبول. ستجد أدناه كل ما تحتاجه للاستعداد ليوم انطلاقك الأول.</p>
+                <div className="hero-accept" style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, padding: '30px 28px', marginBottom: 20, color: '#fff', background: 'linear-gradient(120deg, #1E5631 0%, #2F9E44 100%)' }}>
+                  <div className="hcontent" style={{ position: 'relative' }}>
+                    <div className="htag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.18)', padding: '5px 12px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, marginBottom: 14 }}><Confetti size={14} weight="fill" /> مبروك</div>
+                    <h2 style={{ fontSize: 23, margin: '0 0 6px' }}>تم قبولك رسميًا في برنامج التدريب!</h2>
+                    <p style={{ margin: 0, fontSize: 13.5, color: '#DCF3E1', maxWidth: 520, lineHeight: 1.8 }}>يسعدنا إخبارك بأن طلبك قد لقي القبول. ستجد أدناه كل ما تحتاجه للاستعداد ليوم انطلاقك الأول.</p>
                   </div>
                 </div>
 
                 {/* Pending actions alert for active interns */}
                 {signFillCount > 0 && (
-                  <div className="alert req" style={{display:'flex', alignItems:'flex-start', gap:10, padding:'16px 18px', borderRadius:'12px', marginBottom:18, fontSize:'13.5px', fontWeight:700, background: REQ_BG, color: REQ_FG, border:`1px solid ${REQ_BORDER}`}}>
-                    <Warning size={22} color={REQ_FG} weight="fill" style={{flexShrink:0, marginTop:2}} />
+                  <div className="alert req" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '16px 18px', borderRadius: '12px', marginBottom: 18, fontSize: '13.5px', fontWeight: 700, background: REQ_BG, color: REQ_FG, border: `1px solid ${REQ_BORDER}` }}>
+                    <Warning size={22} color={REQ_FG} weight="fill" style={{ flexShrink: 0, marginTop: 2 }} />
                     <div>
-                      لديك {signFillCount} مستند{signFillCount > 1 ? 'ات' : ''} تتطلب التوقيع أو التعبئة من الإدارة — <span style={{textDecoration:'underline', cursor:'pointer'}} onClick={() => setActiveTab('documents')}>عرض المستندات</span>
+                      لديك {signFillCount} مستند{signFillCount > 1 ? 'ات' : ''} تتطلب التوقيع أو التعبئة من الإدارة — <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => setActiveTab('documents')}>عرض المستندات</span>
                     </div>
                   </div>
                 )}
 
-                <div className="card" style={{marginBottom:18, padding:24}}>
-                  <div className="intern-stepper" style={{display:'flex', alignItems:'center'}}>
-                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}><CheckCircle weight="fill" size={18} /></div><small style={{display:'block',color:'var(--slate)'}}>الإرسال</small></div>
-                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}><CheckCircle weight="fill" size={18} /></div><small style={{display:'block',color:'var(--slate)'}}>المراجعة</small></div>
-                    <div className="intern-step done" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--success)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2}}><CheckCircle weight="fill" size={18} /></div><small style={{display:'block',color:'var(--slate)'}}>القبول</small></div>
-                    <div className="intern-step active" style={{flex:1, textAlign:'center', position:'relative'}}><div className="sc" style={{width:34,height:34,borderRadius:'50%',background:'var(--gold)',color:'#2A2005',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px',position:'relative',zIndex:2, boxShadow:'0 0 0 5px rgba(201,162,39,.18)'}}>4</div><small style={{display:'block',color:'var(--slate)'}}>بدء التدريب</small></div>
+                <div className="card" style={{ marginBottom: 18, padding: 24 }}>
+                  <div className="intern-stepper" style={{ display: 'flex', alignItems: 'center' }}>
+                    <div className="intern-step done" style={{ flex: 1, textAlign: 'center', position: 'relative' }}><div className="sc" style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', position: 'relative', zIndex: 2 }}><CheckCircle weight="fill" size={18} /></div><small style={{ display: 'block', color: 'var(--slate)' }}>الإرسال</small></div>
+                    <div className="intern-step done" style={{ flex: 1, textAlign: 'center', position: 'relative' }}><div className="sc" style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', position: 'relative', zIndex: 2 }}><CheckCircle weight="fill" size={18} /></div><small style={{ display: 'block', color: 'var(--slate)' }}>المراجعة</small></div>
+                    <div className="intern-step done" style={{ flex: 1, textAlign: 'center', position: 'relative' }}><div className="sc" style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', position: 'relative', zIndex: 2 }}><CheckCircle weight="fill" size={18} /></div><small style={{ display: 'block', color: 'var(--slate)' }}>القبول</small></div>
+                    <div className="intern-step active" style={{ flex: 1, textAlign: 'center', position: 'relative' }}><div className="sc" style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--gold)', color: '#2A2005', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', position: 'relative', zIndex: 2, boxShadow: '0 0 0 5px rgba(201,162,39,.18)' }}>4</div><small style={{ display: 'block', color: 'var(--slate)' }}>بدء التدريب</small></div>
                   </div>
                 </div>
 
-                <div className="grid-2" style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16}}>
-                  <div className="card mini-card" style={{padding:'18px 20px'}}>
-                    <div className="mc-top" style={{marginBottom:10, display:'flex'}}><div className="mi" style={{width:36,height:36,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--success-bg)',color:'var(--success)'}}><svg className="icon" viewBox="0 0 24 24" style={{width:18,height:18}}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div></div>
-                    <b style={{fontSize:13.5, display:'block'}}>تاريخ الانطلاق</b><span style={{fontSize:12, color:'var(--slate)'}}>{formatDate(internData?.start_date)}</span>
+                <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div className="card mini-card" style={{ padding: '18px 20px' }}>
+                    <div className="mc-top" style={{ marginBottom: 10, display: 'flex' }}><div className="mi" style={{ width: 36, height: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--success-bg)', color: 'var(--success)' }}><svg className="icon" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg></div></div>
+                    <b style={{ fontSize: 13.5, display: 'block' }}>تاريخ الانطلاق</b><span style={{ fontSize: 12, color: 'var(--slate)' }}>{formatDate(internData?.start_date)}</span>
                   </div>
-                  <div className="card mini-card" style={{padding:'18px 20px'}}>
-                    <div className="mc-top" style={{marginBottom:10, display:'flex'}}><div className="mi" style={{width:36,height:36,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',background:'#EAF0FF',color:'#2A4FCB'}}><svg className="icon" viewBox="0 0 24 24" style={{width:18,height:18}}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></div></div>
-                    <b style={{fontSize:13.5, display:'block'}}>المشرف المباشر</b><span style={{fontSize:12, color:'var(--slate)'}}>{internData?.encadrant || 'لم يتم التعيين بعد'}</span>
+                  <div className="card mini-card" style={{ padding: '18px 20px' }}>
+                    <div className="mc-top" style={{ marginBottom: 10, display: 'flex' }}><div className="mi" style={{ width: 36, height: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#EAF0FF', color: '#2A4FCB' }}><svg className="icon" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg></div></div>
+                    <b style={{ fontSize: 13.5, display: 'block' }}>المشرف المباشر</b><span style={{ fontSize: 12, color: 'var(--slate)' }}>{internData?.encadrant || 'لم يتم التعيين بعد'}</span>
                   </div>
                 </div>
               </div>
@@ -366,19 +367,19 @@ export function InternPortal() {
             {/* REJECTED STATE */}
             {internData?.status === 'مرفوض' && (
               <div className="state-block on">
-                <div className="hero-reject" style={{borderRadius:16, padding:'30px 28px', marginBottom:20, background:'var(--ink)', color:'#fff', position:'relative', overflow:'hidden'}}>
-                  <div className="hcontent" style={{position:'relative'}}>
-                    <div className="htag" style={{display:'inline-flex', alignItems:'center', gap:6, background:'rgba(255,255,255,.1)', padding:'5px 12px', borderRadius:20, fontSize:11.5, fontWeight:700, marginBottom:14, color:'#C9D2E3'}}>نتيجة الطلب</div>
-                    <h2 style={{fontSize:21, margin:'0 0 8px'}}>نشكرك على اهتمامك ببرنامج التدريب لدينا</h2>
-                    <p style={{margin:0, fontSize:13.5, color:'#B7C0D6', maxWidth:540, lineHeight:1.9}}>بعد دراسة متأنية لملفك، نأسف لإبلاغك بأننا لن نتمكن من المضي قدمًا في طلبك لهذه الدورة التدريبية. هذا لا يعكس بالضرورة مؤهلاتك، وإنما محدودية الشواغر المتاحة في هذه الفترة.</p>
+                <div className="hero-reject" style={{ borderRadius: 16, padding: '30px 28px', marginBottom: 20, background: 'var(--ink)', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+                  <div className="hcontent" style={{ position: 'relative' }}>
+                    <div className="htag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.1)', padding: '5px 12px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, marginBottom: 14, color: '#C9D2E3' }}>نتيجة الطلب</div>
+                    <h2 style={{ fontSize: 21, margin: '0 0 8px' }}>نشكرك على اهتمامك ببرنامج التدريب لدينا</h2>
+                    <p style={{ margin: 0, fontSize: 13.5, color: '#B7C0D6', maxWidth: 540, lineHeight: 1.9 }}>بعد دراسة متأنية لملفك، نأسف لإبلاغك بأننا لن نتمكن من المضي قدمًا في طلبك لهذه الدورة التدريبية. هذا لا يعكس بالضرورة مؤهلاتك، وإنما محدودية الشواغر المتاحة في هذه الفترة.</p>
                   </div>
                 </div>
 
-                <div className="card" style={{marginBottom:16, padding:24}}>
+                <div className="card" style={{ marginBottom: 16, padding: 24 }}>
                   <div className="section-title"><h3>تفاصيل القرار</h3></div>
-                  <div style={{borderRight:'3px solid var(--slate-light)', paddingRight:14, marginBottom:18}}>
-                    <div style={{fontSize:11.5, color:'var(--slate-light)', marginBottom:4}}>السبب المُشار إليه من قِبل اللجنة</div>
-                    <div style={{fontSize:13.5, lineHeight:1.8}}>اكتمال العدد المتاح من المقاعد في القسم المطلوب لهذه الدورة. نشجعك على التقديم مجددًا في الدورة القادمة.</div>
+                  <div style={{ borderRight: '3px solid var(--slate-light)', paddingRight: 14, marginBottom: 18 }}>
+                    <div style={{ fontSize: 11.5, color: 'var(--slate-light)', marginBottom: 4 }}>السبب المُشار إليه من قِبل اللجنة</div>
+                    <div style={{ fontSize: 13.5, lineHeight: 1.8 }}>اكتمال العدد المتاح من المقاعد في القسم المطلوب لهذه الدورة. نشجعك على التقديم مجددًا في الدورة القادمة.</div>
                   </div>
                 </div>
               </div>
@@ -388,293 +389,252 @@ export function InternPortal() {
           {/* DOCUMENTS — unified view */}
           <div className={`view ${activeTab === 'documents' ? 'on' : ''} p-wrap`}>
             {internData?.status === 'مرفوض' ? (
-              <div className="card" style={{padding: 24, textAlign: 'center', color: 'var(--slate)', fontSize: 14}}>
+              <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--slate)', fontSize: 14 }}>
                 المستندات غير متاحة حاليًا. تم رفض طلبك.
               </div>
             ) : (<>
-            <div className="section-title"><h2 style={{fontSize:19, margin:0}}>المستندات والوثائق</h2></div>
-            <p style={{color:'var(--slate)', fontSize:13.5, margin:'0 0 20px'}}>الوثائق الصادرة من الإدارة والمستندات المطلوب منك رفعها</p>
-
-  {/* Pending actions summary bar */}
-  {signFillCount > 0 && (
-    <div style={{marginBottom:18, padding:'14px 18px', borderRadius:12, background:REQ_BG, border:`1px solid ${REQ_BORDER}`, display:'flex', alignItems:'center', gap:10, fontSize:13, fontWeight:600, color:REQ_FG}}>
-      <Warning size={20} color={REQ_FG} weight="fill" style={{flexShrink:0}} />
-      <span>لديك <strong>{signFillCount}</strong> مستند{signFillCount > 1 ? 'ات' : ''} تتطلب توقيعك أو تعبئتك — توجه إلى قسم "وثائق من الإدارة" أدناه</span>
-    </div>
-  )}
-
-  {/* Required documents list */}
-  <div className="card" style={{padding:24, marginBottom:18, borderTop:'3px solid var(--brand, #9B8B6B)'}}>
-    <div style={{marginBottom:12}}>
-      <h3 style={{fontSize:15, margin:0, color:'var(--brand, #9B8B6B)'}}>الوثائق المطلوبة</h3>
-      <p style={{fontSize:12.5, color:'var(--slate)', margin:'2px 0 0'}}>يرجى تجهيز المستندات التالية لاستكمال إجراءات التسجيل</p>
-    </div>
-    <div style={{fontSize:13, lineHeight:2.2, paddingRight:4}}>
-      <div style={{display:'flex', justifyContent:'space-between'}}>
-        <span style={{fontWeight:700}}>- طلب من المؤسسة (حامل توقيع وصفة المسؤول)</span>
-        <span style={{fontWeight:600, color:'var(--slate)'}}>Demande de Stage (Ecole) -</span>
-      </div>
-      <div style={{display:'flex', justifyContent:'space-between'}}>
-        <span style={{fontWeight:700}}>- نسخة من الشهادة أو الدبلوم المحصل عليه</span>
-        <span style={{fontWeight:600, color:'var(--slate)'}}>Copie de l'Attestation du Diplôme obtenu -</span>
-      </div>
-      <div style={{display:'flex', justifyContent:'space-between'}}>
-        <span style={{fontWeight:700}}>- طلب خطي (تحديد فترة التدريب)</span>
-        <span style={{fontWeight:600, color:'var(--slate)'}}>Demande Manuscrite -</span>
-      </div>
-      <div style={{display:'flex', justifyContent:'space-between'}}>
-        <span style={{fontWeight:700}}>- السيرة الذاتية</span>
-        <span style={{fontWeight:600, color:'var(--slate)'}}>Curriculum Vitae (C. V.) -</span>
-      </div>
-      <div style={{display:'flex', justifyContent:'space-between'}}>
-        <span style={{fontWeight:700}}>- شهادة التأمين على الأخطار</span>
-        <span style={{fontWeight:600, color:'var(--slate)'}}>Attestation d'Assurance -</span>
-      </div>
-      <div style={{display:'flex', justifyContent:'space-between'}}>
-        <span style={{fontWeight:700}}>- نسخة من البطاقة الوطنية للتعريف / الإقامة</span>
-        <span style={{fontWeight:600, color:'var(--slate)'}}>Copie de N.I.C / Séjour -</span>
-      </div>
-    </div>
-  </div>
-
-  {/* Card 1: الوثائق من الإدارة */}
-  <div className="card" style={{padding:24, marginBottom: 18, borderTop:'3px solid var(--success)'}}>
-    <div className="section-title" style={{marginBottom:16}}>
-      <h3 style={{fontSize:15, margin:0, color:'var(--success)'}}>وثائق من الإدارة</h3>
-    </div>
-    {(() => {
-      const adminSigned = lifecycleDocs.filter(d => d.is_visible_to_intern === true && d.status === 'APPROVED_AND_SIGNED' && d.uploaded_by === 'ADMIN' && !d.requires_return);
-      const returnDocs = lifecycleDocs.filter(d => d.requires_return === true);
-      const hasAny = adminSigned.length > 0 || returnDocs.length > 0;
-      if (!hasAny) {
-        return <div style={{textAlign:'center', padding:'20px', color:'var(--slate-light)', fontSize:13}}>لا توجد وثائق من الإدارة بعد</div>;
-      }
-      return <>
-        {returnDocs.map(d => (
-          <div key={d.id} className="doc-item">
-            <FileText weight="fill" style={{color:'var(--gold-dark)', width:20, height:20, flexShrink:0}} />
-            <div style={{flex:1, minWidth:0}}>
-              <div className="dn" style={{fontSize:13.5, fontWeight:700, marginBottom:4}}>{sanitizeTitle(d.label)}</div>
-              <span style={{display:'inline-flex', alignItems:'center', gap:4, background: d.returned_file_path ? '#E7F8EE' : '#FEF3C7', color: d.returned_file_path ? '#15803D' : '#B45309', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
-                <ArrowsClockwise size={12} weight="bold" />
-                {d.returned_file_path
-                  ? 'تم إرجاع النسخة'
-                  : d.action_type === 'sign' ? 'يتطلب التوقيع'
-                  : d.action_type === 'sign_fill' ? 'يتطلب التوقيع والتعبئة والإرجاع'
-                  : 'يتطلب التعبئة والإرجاع'}
-              </span>
-            </div>
-            <div style={{display:'flex', gap:6, alignItems:'center', flexShrink:0}}>
-              {d.file_path && !d.returned_file_path && (
-                <a href={api.downloadDocument(d.id)} download className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                  <DownloadSimple size={14} /> تحميل النموذج
-                </a>
-              )}
-              {!d.returned_file_path ? (
-                <>
-                  <input type="file" id={`return-upload-${d.id}`} style={{display:'none'}} accept=".pdf" onChange={e => {
-                    if (!e.target.files?.[0]) return;
-                    const formData = new FormData();
-                    formData.append('file', e.target.files[0]);
-                    api.post(`/interns/${internData?.id}/documents/${d.id}/return-upload`, formData).then(() => {
-                      showToast('تم استلام النسخة المعبأة', 'success');
-                      fetchLifecycleDocs();
-                    }).catch(() => showToast('فشل رفع النسخة المعبأة', 'error'));
-                  }} />
-                  <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}} onClick={() => document.getElementById(`return-upload-${d.id}`)?.click()}>
-                    <UploadSimple size={14} /> رفع النسخة المعبأة
+              <div className="card" style={{ padding: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 17 }}><FileText weight="bold" style={{ display: 'inline', marginLeft: 6 }} /> مركز المستندات</h3>
+                  <button className="btn btn-gold sm" onClick={() => { setInternUploadTitle(''); setInternUploadFile(null); setShowInternUploadModal(true); }} style={{ fontSize: 12, padding: '8px 16px' }}>
+                    <UploadSimple size={14} /> إضافة ملف
                   </button>
-                </>
-              ) : (
-                <a href={api.downloadDocument(d.id) + '&returned=1'} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                  <Eye size={14} /> معاينة
-                </a>
-              )}
-            </div>
-          </div>
-        ))}
-        {adminSigned.map(d => (
-          <div key={d.id} className="doc-item">
-            <CheckCircle weight="fill" style={{color:'var(--success)', width:20, height:20, flexShrink:0}} />
-            <div style={{flex:1, minWidth:0}}>
-              <div className="dn" style={{fontSize:13.5, fontWeight:700, marginBottom:4}}>{sanitizeTitle(d.label)}</div>
-              <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
-                تم التوقيع — {formatDate(d.updated_at)}
-              </span>
-            </div>
-            <div style={{display:'flex', gap:6, alignItems:'center', flexShrink:0}}>
-              {d.file_path && (
-                <>
-                  <a href={api.downloadDocument(d.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                    <Eye size={14} /> معاينة
-                  </a>
-                  <a href={api.downloadDocument(d.id)} download className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                    <DownloadSimple size={14} /> تحميل
-                  </a>
-                </>
-              )}
-            </div>
-          </div>
-        ))}
-      </>;
-    })()}
-  </div>
+                </div>
 
-            {/* Unified Documents List */}
-            <div className="card" style={{padding:24, borderTop:'3px solid var(--gold-dark)'}}>
-              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16}}>
-                <h3 style={{fontSize:15, margin:0, color:'var(--gold-dark)'}}>المستندات</h3>
-                <button className="btn btn-gold sm" onClick={() => { setInternUploadTitle(''); setInternUploadFile(null); setShowInternUploadModal(true); }} style={{fontSize:11, padding:'6px 12px'}}>
-                  <UploadSimple size={14} /> إضافة ملف
-                </button>
-              </div>
-              
-              {(() => {
-                const reqDocs = lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason);
-                if (reqDocs.length === 0) return null;
-                return (
-                  <div style={{background:'#FFF6E5', border:'1.5px solid #F2D49B', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:12.5, color:'#9A6B00', fontWeight:600}}>
-                    {reqDocs.map(d => (
-                      <div key={d.id} style={{marginTop:d.rejection_reason ? 6 : 0}}>
-                        <Warning size={14} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة: {d.label} — {d.rejection_reason}
+                {/* Required docs list */}
+                <div style={{ marginBottom: 16, padding: '12px 14px', background: 'var(--paper)', borderRadius: 8, border: '1px solid var(--line)', fontSize: 12.5, lineHeight: 2 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>الوثائق المطلوبة</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600 }}>- طلب من المؤسسة (حامل توقيع وصفة المسؤول)</span>
+                    <span style={{ color: 'var(--slate)' }}>Demande de Stage (Ecole) -</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600 }}>- نسخة من الشهادة أو الدبلوم المحصل عليه</span>
+                    <span style={{ color: 'var(--slate)' }}>Copie de l'Attestation du Diplôme obtenu -</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600 }}>- طلب خطي (تحديد فترة التدريب)</span>
+                    <span style={{ color: 'var(--slate)' }}>Demande Manuscrite -</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600 }}>- السيرة الذاتية</span>
+                    <span style={{ color: 'var(--slate)' }}>Curriculum Vitae (C. V.) -</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600 }}>- شهادة التأمين على الأخطار</span>
+                    <span style={{ color: 'var(--slate)' }}>Attestation d'Assurance -</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600 }}>- نسخة من البطاقة الوطنية للتعريف / الإقامة</span>
+                    <span style={{ color: 'var(--slate)' }}>Copie de N.I.C / Séjour -</span>
+                  </div>
+                </div>
+
+                {/* Filter tabs */}
+                {(() => {
+                  const allDocs = lifecycleDocs;
+                  const pendingDocs = lifecycleDocs.filter(d => d.status !== 'APPROVED_AND_SIGNED');
+                  const completedDocs = lifecycleDocs.filter(d => d.status === 'APPROVED_AND_SIGNED');
+                  const counts = { all: allDocs.length, pending: pendingDocs.length, completed: completedDocs.length };
+                  const tabs = ['all', 'pending', 'completed'] as const;
+                  const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل' };
+                  const filtered = lifecycleDocs.filter(d => {
+                    if (docFilter === 'pending') return d.status !== 'APPROVED_AND_SIGNED';
+                    if (docFilter === 'completed') return d.status === 'APPROVED_AND_SIGNED';
+                    return true;
+                  });
+                  return (
+                    <>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                        {tabs.map(tab => (
+                          <button key={tab} onClick={() => setDocFilter(tab)} style={{
+                            padding: '6px 14px', borderRadius: 20, border: '1px solid var(--line)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                            background: docFilter === tab ? 'var(--ink)' : 'transparent',
+                            color: docFilter === tab ? '#fff' : 'var(--slate)',
+                            display: 'flex', alignItems: 'center', gap: 6
+                          }}>
+                            {labels[tab]}
+                            {counts[tab] > 0 && <span style={{ fontSize: 10, background: docFilter === tab ? 'rgba(255,255,255,.2)' : 'var(--paper)', borderRadius: 10, padding: '1px 7px' }}>{counts[tab]}</span>}
+                          </button>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                );
-              })()}
 
-              {/* Sign / Fill Section */}
-              {(() => {
-                const signFillDocs = lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill') && d.file_path);
-                if (signFillDocs.length === 0) return null;
-                return (
-                  <div style={{marginBottom:16}}>
-                    <div className="section-title" style={{marginBottom:8, display:'flex', alignItems:'center', gap:6}}>
-                      <ArrowsClockwise size={14} weight="bold" style={{color:'var(--gold-dark)'}} />
-                      <h4 style={{fontSize:13, fontWeight:700, margin:0, color:'var(--gold-dark)'}}>مستندات تتطلب {signFillDocs.some(d => d.action_type === 'sign') ? 'توقيع' : ''}{signFillDocs.some(d => d.action_type === 'sign') && signFillDocs.some(d => d.action_type === 'fill') ? ' / ' : ''}{signFillDocs.some(d => d.action_type === 'fill') ? 'تعبئة' : ''}</h4>
-                    </div>
-                    <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
-                      <thead>
-                        <tr style={{borderBottom:'1px solid var(--line)'}}>
-                          <th style={{textAlign:'right', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
-                          <th style={{textAlign:'center', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>المطلوب</th>
-                          <th style={{textAlign:'center', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
-                          <th style={{textAlign:'left', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {signFillDocs.map(doc => {
-                          const isReturned = !!doc.returned_file_path;
-                          const actionLabel = doc.action_type === 'sign' ? 'توقيع' : 'تعبئة';
-                          return (
-                            <tr key={doc.id} style={{borderBottom:'1px solid var(--line)'}}>
-                              <td style={{padding:'10px 4px', fontWeight:600}}>
-                                {doc.custom_title || doc.doc_type}
-                              </td>
-                              <td style={{textAlign:'center', padding:'10px 4px', color:'var(--slate)', fontSize:11}}>{actionLabel}</td>
-                              <td style={{textAlign:'center', padding:'10px 4px'}}>
-                                {isReturned ? (
-                                  <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
-                                    <CheckCircle size={11} weight="fill" /> تم الإرجاع
-                                  </span>
-                                ) : (
-                                  <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#FEF3C7', color:'#B45309', fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999}}>
-                                    في انتظار الرد
-                                  </span>
-                                )}
-                              </td>
-                              <td style={{textAlign:'left', padding:'10px 4px'}}>
-                                <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                                  {doc.file_path && (
-                                    <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="تحميل" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                                      <DownloadSimple size={14} /> تحميل
-                                    </a>
-                                  )}
-                                  {!isReturned && (
-                                    <>
-                                      <input type="file" id={`sign-upload-${doc.id}`} style={{display:'none'}} accept=".pdf" onChange={e => { if (e.target.files?.[0]) handleSignFillUpload(doc.id, e.target.files[0]); }} />
-                                      <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={async () => {
-                                        const input = document.getElementById(`sign-upload-${doc.id}`) as HTMLInputElement;
-                                        input?.click();
-                                      }} disabled={uploading === doc.id}>
-                                        <UploadSimple size={14} /> {uploading === doc.id ? 'جاري...' : 'إعادة الرفع'}
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
+                      {/* Pending actions banner */}
+                      {signFillCount > 0 && (
+                        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: REQ_BG, border: `1px solid ${REQ_BORDER}`, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, fontWeight: 600, color: REQ_FG }}>
+                          <Warning size={18} color={REQ_FG} weight="fill" style={{ flexShrink: 0 }} />
+                          <span>لديك <strong>{signFillCount}</strong> مستند{signFillCount > 1 ? 'ات' : ''} تتطلب توقيعك أو تعبئتك</span>
+                        </div>
+                      )}
+
+                      {/* Unified table */}
+                      {filtered.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '16px', color: 'var(--slate-light)', fontSize: 13, background: 'var(--paper)', borderRadius: 8 }}>
+                          {docFilter === 'pending' ? 'لا توجد مستندات قيد الإجراء' : docFilter === 'completed' ? 'لا توجد مستندات مكتملة' : 'لا توجد مستندات'}
+                        </div>
+                      ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                              <th style={{ textAlign: 'right', padding: '8px 8px', color: 'var(--slate-light)', fontWeight: 600 }}>المستند</th>
+                              <th style={{ textAlign: 'center', padding: '8px 8px', color: 'var(--slate-light)', fontWeight: 600 }}>الحالة</th>
+                              <th style={{ textAlign: 'center', padding: '8px 8px', color: 'var(--slate-light)', fontWeight: 600 }}>تاريخ</th>
+                              <th style={{ textAlign: 'left', padding: '8px 8px', color: 'var(--slate-light)', fontWeight: 600 }}>إجراء</th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })()}
-
-              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
-                <thead>
-                  <tr style={{borderBottom:'1px solid var(--line)'}}>
-                    <th style={{textAlign:'right', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
-                    <th style={{textAlign:'center', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>النوع</th>
-                    <th style={{textAlign:'center', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
-                    <th style={{textAlign:'left', padding:'8px 4px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lifecycleDocs.length === 0 ? (
-                    <tr><td colSpan={4} style={{textAlign:'center', padding:'20px', color:'var(--slate-light)'}}>لا توجد مستندات بعد</td></tr>
-                  ) : lifecycleDocs.map((doc: any) => {
-                    const req = requests.find(r => r.document_type === doc.doc_type);
-                    let status = doc.status === 'APPROVED_AND_SIGNED' ? 'approved' : doc.status === 'REVISION_REQUESTED' ? 'rejected' : doc.file_path ? 'pending' : 'missing';
-                    const statusColor = status === 'approved' ? 'var(--success)' : status === 'rejected' ? 'var(--danger)' : status === 'pending' ? 'var(--gold)' : 'var(--slate-light)';
-                    const docTitle = doc.custom_title || doc.doc_type;
-                    const acceptExts = doc.file_type === 'pdf' ? '.pdf' : doc.file_type === 'word' ? '.doc,.docx' : doc.file_type === 'excel' ? '.xls,.xlsx' : doc.file_type === 'image' ? '.png,.jpg,.jpeg,.gif,.bmp,.webp' : undefined;
-                    return (
-                      <tr key={doc.id} style={{borderBottom:'1px solid var(--line)'}}>
-                        <td style={{padding:'10px 4px', fontWeight:600}}>
-                          {docTitle}
-                          {doc.rejection_reason && status === 'rejected' && (
-                            <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
-                              <span style={{fontWeight:600}}><Warning size={12} weight="fill" style={{marginLeft:4}} /> ملاحظة الإدارة:</span> {doc.rejection_reason}
-                            </div>
-                          )}
-                        </td>
-                        <td style={{textAlign:'center', padding:'10px 4px', color:'var(--slate)', fontSize:11}}>{doc.file_type || 'pdf'}</td>
-                        <td style={{textAlign:'center', padding:'10px 4px', color: statusColor, fontWeight:600, fontSize:12}}>
-                          {status === 'approved' ? <>مقبول <CheckCircle size={12} weight="fill" style={{display:'inline'}} /></> : status === 'rejected' ? 'مطلوب إعادة الرفع' : status === 'pending' ? 'قيد المراجعة' : 'غير مرفوع'}
-                        </td>
-                        <td style={{textAlign:'left', padding:'10px 4px'}}>
-                          <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                            {doc.file_path && (
-                              <a href={api.downloadDocument(doc.id)} target="_blank" rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{padding:'4px 10px', fontSize:11, display:'flex', alignItems:'center', gap:4}}>
-                                <Eye size={14} /> معاينة
-                              </a>
-                            )}
-                            {(status === 'missing' || status === 'rejected') && (
-                              <>
-                                <input type="file" id={`doc-upload-${doc.id}`} style={{display:'none'}} accept={acceptExts} onChange={e => { if (e.target.files?.[0]) handleProactiveUpload(doc.id, doc.doc_type, e.target.files[0]); }} />
-                                <button className="btn btn-ink sm" style={{padding:'4px 10px', fontSize:11}} onClick={() => document.getElementById(`doc-upload-${doc.id}`)?.click()} disabled={uploading === doc.id}>
-                                  <UploadSimple size={14} /> {uploading === doc.id ? 'جاري...' : 'رفع'}
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>)}
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const rows: any[] = [];
+                              const grouped = new Map<string, any[]>();
+                              filtered.forEach(d => {
+                                const base = (d.custom_title || d.doc_type || '').replace(/\s*\(.*?\)\s*$/, '');
+                                if (!grouped.has(base)) grouped.set(base, []);
+                                grouped.get(base)!.push(d);
+                              });
+                              for (const [base, docs] of grouped) {
+                                const sign = docs.find(d => d.action_type === 'sign');
+                                const fill = docs.find(d => d.action_type === 'fill');
+                                const both = docs.find(d => d.action_type === 'sign_fill');
+                                if (sign && fill) {
+                                  rows.push({ id: `combined-${base}`, isCombined: true, sign, fill, base });
+                                } else {
+                                  docs.forEach(d => rows.push(d));
+                                }
+                              }
+                              return rows.map(row => {
+                                if (row.isCombined) {
+                                  const d = row.sign;
+                                  const fillDoc = row.fill;
+                                  const bothReturned = d.returned_file_path && fillDoc.returned_file_path;
+                                  const anyReturned = d.returned_file_path || fillDoc.returned_file_path;
+                                  const combinedStatus = bothReturned ? 'completed' : anyReturned ? 'partial' : 'pending';
+                                  const inputId = `return-upload-${d.id}`;
+                                  return (
+                                    <tr key={row.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                                      <td style={{ padding: '10px 8px' }}>
+                                        <div style={{ fontWeight: 600, color: 'var(--ink)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.base}>
+                                          {row.base}
+                                          <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>(توقيع) و (تعبئة وإرجاع)</span>
+                                        </div>
+                                      </td>
+                                      <td style={{ textAlign: 'center', padding: '10px 8px' }}>
+                                        {bothReturned ? <span className="badge badge-success" style={{ fontSize: 11 }}>مكتمل</span> :
+                                          anyReturned ? <span className="badge badge-warning" style={{ fontSize: 11 }}>قيد الإجراء</span> :
+                                            <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>بانتظار الرفع</span>}
+                                      </td>
+                                      <td style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--slate)', fontSize: 11 }}>
+                                        {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                                      </td>
+                                      <td style={{ textAlign: 'left', padding: '10px 8px' }}>
+                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                          <a href={d.file_path ? api.downloadDocument(d.id) : '#'} target={d.file_path ? '_blank' : undefined} rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3, pointerEvents: d.file_path ? 'auto' : 'none', cursor: d.file_path ? 'pointer' : 'default' }}>
+                                            <Eye size={14} />
+                                          </a>
+                                          <a href={d.file_path ? api.downloadDocument(d.id) : '#'} download={d.file_path ? '' : undefined} className="btn btn-ghost sm" title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3, pointerEvents: d.file_path ? 'auto' : 'none', cursor: d.file_path ? 'pointer' : 'default' }}>
+                                            <DownloadSimple size={14} />
+                                          </a>
+                                          {!bothReturned && (
+                                            <>
+                                              <input type="file" id={inputId} style={{ display: 'none' }} accept=".pdf" onChange={e => {
+                                                if (!e.target.files?.[0]) return;
+                                                const file = e.target.files[0];
+                                                [d, fillDoc].forEach(doc => {
+                                                  const fd = new FormData();
+                                                  fd.append('file', file);
+                                                  api.post(`/interns/${internData?.id}/documents/${doc.id}/return-upload`, fd);
+                                                });
+                                                showToast('تم استلام النسخة المعبأة', 'success');
+                                                fetchLifecycleDocs();
+                                              }} />
+                                              <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => document.getElementById(inputId)?.click()}>
+                                                <UploadSimple size={14} /> رفع
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+                                const d = row;
+                                const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
+                                const isView = d.action_type === 'view';
+                                const isReturned = !!d.returned_file_path;
+                                const inputId2 = `doc-upload-${d.id}`;
+                                const statusLabel = d.status === 'AWAITING_RETURN' ? 'بانتظار التوقيع' :
+                                  d.status === 'RETURNED' ? 'بانتظار المراجعة' :
+                                    d.status === 'MISSING' && !d.file_path ? 'بانتظار الرفع' :
+                                      d.status === 'PENDING_REVIEW' ? 'قيد المراجعة' :
+                                        d.status === 'APPROVED_AND_SIGNED' ? 'مقبول' :
+                                          d.status === 'REVISION_REQUESTED' ? 'مطلوب إعادة' : d.status || '—';
+                                const statusClass = d.status === 'APPROVED_AND_SIGNED' ? 'badge-success' :
+                                  d.status === 'RETURNED' ? 'badge-warning' :
+                                    d.status === 'PENDING_REVIEW' ? 'badge-warning' :
+                                      d.status === 'REVISION_REQUESTED' ? 'badge-danger' : '';
+                                return (
+                                  <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                                    <td style={{ padding: '10px 8px' }}>
+                                      <div style={{ fontWeight: 600, color: 'var(--ink)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.custom_title || d.doc_type}>
+                                        {d.custom_title || d.doc_type}
+                                        {isSignFill && <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>({d.action_type === 'sign' ? 'توقيع' : d.action_type === 'fill' ? 'تعبئة وإرجاع' : d.action_type === 'sign_fill' ? 'توقيع وتعبئة' : ''})</span>}
+                                      </div>
+                                      {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
+                                        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2, background: '#FFF0EE', padding: '3px 6px', borderRadius: 4 }}>
+                                          <Warning size={12} weight="fill" style={{ marginLeft: 4 }} /> {d.rejection_reason}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ textAlign: 'center', padding: '10px 8px' }}>
+                                      <span className={`badge ${statusClass}`} style={{ fontSize: 11, background: !statusClass && d.status !== 'APPROVED_AND_SIGNED' ? 'var(--paper)' : undefined, color: !statusClass && d.status !== 'APPROVED_AND_SIGNED' ? 'var(--slate)' : undefined }}>{statusLabel}</span>
+                                    </td>
+                                    <td style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--slate)', fontSize: 11 }}>
+                                      {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                                    </td>
+                                    <td style={{ textAlign: 'left', padding: '10px 8px' }}>
+                                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                        <a href={d.file_path ? api.downloadDocument(d.id) : '#'} target={d.file_path ? '_blank' : undefined} rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3, pointerEvents: d.file_path ? 'auto' : 'none', cursor: d.file_path ? 'pointer' : 'default' }}>
+                                          <Eye size={14} />
+                                        </a>
+                                        <a href={d.file_path ? api.downloadDocument(d.id) : '#'} download={d.file_path ? '' : undefined} className="btn btn-ghost sm" title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3, pointerEvents: d.file_path ? 'auto' : 'none', cursor: d.file_path ? 'pointer' : 'default' }}>
+                                          <DownloadSimple size={14} />
+                                        </a>
+                                        {!isView && !isReturned && (
+                                          <>
+                                            <input type="file" id={inputId2} style={{ display: 'none' }} accept=".pdf" onChange={e => {
+                                              if (!e.target.files?.[0]) return;
+                                              const file = e.target.files[0];
+                                              if (isSignFill) {
+                                                handleSignFillUpload(d.id, file);
+                                              } else {
+                                                handleProactiveUpload(d.id, d.doc_type, file);
+                                              }
+                                            }} />
+                                            <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => document.getElementById(inputId2)?.click()}>
+                                              <UploadSimple size={14} /> رفع
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                            })()}
+                          </tbody>
+                        </table>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </>)}
           </div>
 
           {/* PROFILE */}
           <div className={`view ${activeTab === 'profile' ? 'on' : ''} p-wrap`}>
             <div className="profile-head">
               <div className="profile-photo-wrap">
-                {internData?.photo_path ? <img src={internData.photo_path} alt="avatar" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'100%', height:'100%', padding:'15%', color:'var(--slate)'}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
+                {internData?.photo_path ? <img src={internData.photo_path} alt="avatar" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '100%', height: '100%', padding: '15%', color: 'var(--slate)' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>}
               </div>
               <div><div className="profile-id">{internData?.name || user?.name}</div><div className="profile-sub">{internData?.email || user?.email}</div></div>
             </div>
@@ -692,64 +652,64 @@ export function InternPortal() {
             </div>
 
             {internData?.evaluation?.criteria && (
-            <div className="card" style={{ padding: '20px 24px', marginTop: 16, borderTop: '3px solid var(--success)' }}>
-              <div className="section-title"><h3>بطاقة تقييم المتدرب</h3></div>
-              <div style={{marginBottom:14, fontSize:13}}>
-                <b>الفترة:</b> من {formatDate(internData.evaluation.period_from || internData.start_date)} إلى {formatDate(internData.evaluation.period_to || internData.end_date)}
+              <div className="card" style={{ padding: '20px 24px', marginTop: 16, borderTop: '3px solid var(--success)' }}>
+                <div className="section-title"><h3>بطاقة تقييم المتدرب</h3></div>
+                <div style={{ marginBottom: 14, fontSize: 13 }}>
+                  <b>الفترة:</b> من {formatDate(internData.evaluation.period_from || internData.start_date)} إلى {formatDate(internData.evaluation.period_to || internData.end_date)}
+                </div>
+                {internData.evaluation.rotations?.length > 0 && (
+                  <div style={{ marginBottom: 14, fontSize: 12.5 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>فترات التدريب:</div>
+                    {internData.evaluation.rotations.map((r: any, i: number) => (
+                      <div key={i} style={{ background: 'var(--paper)', padding: '6px 10px', borderRadius: 6, marginBottom: 4, border: '1px solid var(--line)' }}>
+                        <b>{r.label || ('الفترة ' + (i + 1))}</b> — {r.supervisor} | {r.department} | من {formatDate(r.from)} إلى {formatDate(r.to)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, marginBottom: 12 }}>
+                  <thead><tr style={{ borderBottom: '1px solid var(--line)' }}>
+                    <th style={{ textAlign: 'right', padding: '6px 4px', width: 200 }}>المعيار</th>
+                    <th style={{ textAlign: 'center', padding: '6px 4px', width: 60 }}>نعم</th>
+                    <th style={{ textAlign: 'center', padding: '6px 4px', width: 60 }}>لا</th>
+                    <th style={{ width: 'auto' }}></th>
+                  </tr></thead>
+                  <tbody>
+                    {(window as any).EVAL_CRITERIA ? (window as any).EVAL_CRITERIA.map((c: any) => {
+                      const val = internData.evaluation.criteria?.[c.key] || { yes: false, no: false };
+                      return (
+                        <tr key={c.key} style={{ borderBottom: '1px solid var(--line)' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 600 }}>{c.label}</td>
+                          <td style={{ textAlign: 'center', padding: '8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)' }}>{val.yes ? '✓' : '—'}</td>
+                          <td style={{ textAlign: 'center', padding: '8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)' }}>{val.no ? '✓' : '—'}</td>
+                          <td></td>
+                        </tr>
+                      );
+                    }) : Object.keys(internData.evaluation.criteria || {}).length > 0 && (
+                      Object.entries(internData.evaluation.criteria).map(([key, val]: [string, any]) => (
+                        <tr key={key} style={{ borderBottom: '1px solid var(--line)' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 600 }}>{key}</td>
+                          <td style={{ textAlign: 'center', padding: '8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)' }}>{val.yes ? '✓' : '—'}</td>
+                          <td style={{ textAlign: 'center', padding: '8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)' }}>{val.no ? '✓' : '—'}</td>
+                          <td></td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+                {internData.evaluation.comments && (
+                  <div style={{ background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', marginBottom: 12, fontSize: 13 }}>
+                    <span style={{ fontWeight: 700, display: 'block', marginBottom: 4 }}>ملاحظات:</span>
+                    {internData.evaluation.comments}
+                  </div>
+                )}
+                {internData.evaluation.signed_file_path && (
+                  <a href={internData.evaluation.signed_file_path} target="_blank" rel="noreferrer" className="btn btn-ink sm" style={{ padding: '6px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Eye size={14} /> معاينة البطاقة الموقعة
+                  </a>
+                )}
+                <div style={{ fontSize: 11.5, color: 'var(--slate)', marginTop: 8 }}>بتقييم من: {internData.evaluation.evaluator} · {formatDate(internData.evaluation.date)}</div>
               </div>
-              {internData.evaluation.rotations?.length > 0 && (
-                <div style={{marginBottom:14, fontSize:12.5}}>
-                  <div style={{fontWeight:700, marginBottom:6}}>فترات التدريب:</div>
-                  {internData.evaluation.rotations.map((r: any, i: number) => (
-                    <div key={i} style={{background:'var(--paper)', padding:'6px 10px', borderRadius:6, marginBottom:4, border:'1px solid var(--line)'}}>
-                      <b>{r.label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {formatDate(r.from)} إلى {formatDate(r.to)}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5, marginBottom:12}}>
-                <thead><tr style={{borderBottom:'1px solid var(--line)'}}>
-                  <th style={{textAlign:'right', padding:'6px 4px', width: 200}}>المعيار</th>
-                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>نعم</th>
-                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
-                  <th style={{width: 'auto'}}></th>
-                </tr></thead>
-                <tbody>
-                  {(window as any).EVAL_CRITERIA ? (window as any).EVAL_CRITERIA.map((c: any) => {
-                    const val = internData.evaluation.criteria?.[c.key] || {yes:false, no:false};
-                    return (
-                      <tr key={c.key} style={{borderBottom:'1px solid var(--line)'}}>
-                        <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
-                        <td></td>
-                      </tr>
-                    );
-                  }) : Object.keys(internData.evaluation.criteria || {}).length > 0 && (
-                    Object.entries(internData.evaluation.criteria).map(([key, val]: [string, any]) => (
-                      <tr key={key} style={{borderBottom:'1px solid var(--line)'}}>
-                        <td style={{padding:'8px 4px', fontWeight:600}}>{key}</td>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
-                        <td></td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-              {internData.evaluation.comments && (
-                <div style={{ background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', marginBottom:12, fontSize:13 }}>
-                  <span style={{ fontWeight:700, display:'block', marginBottom:4 }}>ملاحظات:</span>
-                  {internData.evaluation.comments}
-                </div>
-              )}
-              {internData.evaluation.signed_file_path && (
-                <a href={internData.evaluation.signed_file_path} target="_blank" rel="noreferrer" className="btn btn-ink sm" style={{padding:'6px 14px', fontSize:12, display:'inline-flex', alignItems:'center', gap:6}}>
-                  <Eye size={14} /> معاينة البطاقة الموقعة
-                </a>
-              )}
-              <div style={{fontSize:11.5, color:'var(--slate)', marginTop:8}}>بتقييم من: {internData.evaluation.evaluator} · {formatDate(internData.evaluation.date)}</div>
-            </div>
             )}
           </div>
 
@@ -758,26 +718,26 @@ export function InternPortal() {
         {/* MOBILE BOTTOM NAV */}
         <div className="bottom-nav">
           <div className={`bn-item ${activeTab === 'status' ? 'active' : ''}`} onClick={() => setActiveTab('status')}>
-            <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>الحالة
+            <svg className="icon" viewBox="0 0 24 24" style={{ width: 20, height: 20 }}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>الحالة
           </div>
           {internData?.status !== 'مرفوض' && (
-          <div className={`bn-item ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => setActiveTab('documents')}>
-            {pendingCount > 0 && <span className="bn-dot" style={{ background: REQ_DOT, borderColor: REQ_DOT }}></span>}
-            <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>المستندات
-          </div>
+            <div className={`bn-item ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => setActiveTab('documents')}>
+              {pendingCount > 0 && <span className="bn-dot" style={{ background: REQ_DOT, borderColor: REQ_DOT }}></span>}
+              <svg className="icon" viewBox="0 0 24 24" style={{ width: 20, height: 20 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>المستندات
+            </div>
           )}
           <div className={`bn-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
-            <svg className="icon" viewBox="0 0 24 24" style={{width:20, height:20}}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>ملفي
+            <svg className="icon" viewBox="0 0 24 24" style={{ width: 20, height: 20 }}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg>ملفي
           </div>
         </div>
-        </div>
+      </div>
 
       {showInternUploadModal && (
-        <div className="overlay on" style={{display:'flex'}}>
-          <div className="modal" style={{maxWidth:460}}>
+        <div className="overlay on" style={{ display: 'flex' }}>
+          <div className="modal" style={{ maxWidth: 460 }}>
             <div className="modal-head">
               <h3>إضافة ملف</h3>
-              <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={() => setShowInternUploadModal(false)}><X size={14} /></button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowInternUploadModal(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -788,13 +748,13 @@ export function InternPortal() {
                 <label>الملف</label>
                 <input type="file" className="input" onChange={e => setInternUploadFile(e.target.files?.[0] || null)} />
                 {internUploadFile && (
-                  <div style={{marginTop:6, padding:'6px 10px', background:'#EFF6FF', borderRadius:6, border:'1px solid #BFDBFE', fontSize:12, display:'flex', alignItems:'center', gap:6}}>
+                  <div style={{ marginTop: 6, padding: '6px 10px', background: '#EFF6FF', borderRadius: 6, border: '1px solid #BFDBFE', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <FileText size={14} color="#2563EB" />
-                    <span style={{fontWeight:600}}>{internUploadFile.name}</span>
-                    <button className="btn btn-ghost sm" onClick={() => setInternUploadFile(null)} style={{marginRight:'auto', padding:2}}><X size={14} /></button>
+                    <span style={{ fontWeight: 600 }}>{internUploadFile.name}</span>
+                    <button className="btn btn-ghost sm" onClick={() => setInternUploadFile(null)} style={{ marginRight: 'auto', padding: 2 }}><X size={14} /></button>
                   </div>
                 )}
-                <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>سيتم رفع الملف وإرساله للإدارة للمراجعة</small>
+                <small style={{ color: 'var(--slate-light)', display: 'block', marginTop: 4 }}>سيتم رفع الملف وإرساله للإدارة للمراجعة</small>
               </div>
             </div>
             <div className="modal-foot">
@@ -807,9 +767,9 @@ export function InternPortal() {
                   setInternUploadFile(null);
                   setInternUploadTitle('');
                   fetchLifecycleDocs();
-                  setToastMsg({msg:'تم رفع الملف بنجاح', type:'success'});
+                  setToastMsg({ msg: 'تم رفع الملف بنجاح', type: 'success' });
                 } catch {
-                  setToastMsg({msg:'فشل رفع الملف', type:'error'});
+                  setToastMsg({ msg: 'فشل رفع الملف', type: 'error' });
                 }
               }}>
                 <UploadSimple size={14} /> رفع الملف

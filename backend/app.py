@@ -115,6 +115,7 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(50), nullable=False)
     permissions = db.Column(db.Text, nullable=True)
+    can_manage_documents = db.Column(db.Boolean, default=False)
 
 class Intern(db.Model):
     __tablename__ = 'interns'
@@ -393,6 +394,18 @@ def init_db():
         except Exception as e:
             db.session.rollback()
             print(f"Form migration: {e}")
+
+        # Migrate: add can_manage_documents column to users table
+        try:
+            user_cols = [c['name'] for c in db.inspect(db.engine).get_columns('users')]
+            if 'can_manage_documents' not in user_cols:
+                with db.engine.connect() as conn:
+                    conn.execute(sql_text("ALTER TABLE users ADD COLUMN can_manage_documents BOOLEAN DEFAULT 0"))
+                    conn.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"User migration failed: {e}")
+
         # Create default Admin user if none exists
         admin = User.query.filter_by(username='admin').first()
         if not admin:
@@ -470,7 +483,53 @@ def init_db():
         except Exception as e:
             db.session.rollback()
 
+        # Migrate legacy sign/fill lifecycle docs to requires_return=True
+        try:
+            fixed = DocumentLifecycle.query.filter(
+                DocumentLifecycle.action_type.in_(['sign', 'fill', 'sign_fill']),
+                DocumentLifecycle.requires_return == False
+            ).update(
+                {'requires_return': True},
+                synchronize_session='fetch'
+            )
+            db.session.commit()
+            if fixed:
+                print(f"Fixed {fixed} legacy sign/fill lifecycle docs (requires_return=True)")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Legacy sign/fill migration failed: {e}")
 
+        # Migrate legacy sign/fill request slots to be visible to intern
+        try:
+            fixed2 = DocumentLifecycle.query.filter(
+                DocumentLifecycle.action_type.in_(['sign', 'fill', 'sign_fill']),
+                DocumentLifecycle.is_visible_to_intern == False
+            ).update(
+                {'is_visible_to_intern': True, 'requires_return': True},
+                synchronize_session='fetch'
+            )
+            db.session.commit()
+            if fixed2:
+                print(f"Fixed {fixed2} legacy sign/fill lifecycle docs (is_visible_to_intern=True)")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Legacy sign/fill visibility migration failed: {e}")
+
+        # Set legacy sign/fill MISSING docs to AWAITING_RETURN
+        try:
+            fixed3 = DocumentLifecycle.query.filter(
+                DocumentLifecycle.action_type.in_(['sign', 'fill', 'sign_fill']),
+                DocumentLifecycle.status == 'MISSING'
+            ).update(
+                {'status': 'AWAITING_RETURN'},
+                synchronize_session='fetch'
+            )
+            db.session.commit()
+            if fixed3:
+                print(f"Fixed {fixed3} legacy sign/fill docs (MISSING to AWAITING_RETURN)")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Status migration failed: {e}")
 
 
 # --- AUTHENTICATION ROUTES ---
@@ -488,13 +547,14 @@ def login():
             additional_claims={
                 'name': user.name, 
                 'role': user.role, 
-                'permissions': user.permissions
+                'permissions': user.permissions,
+                'can_manage_documents': user.can_manage_documents
             }
         )
         log_action(user.name, "قام بتسجيل الدخول إلى النظام")
         return jsonify(
             access_token=access_token, 
-            user={'id': user.id, 'name': user.name, 'role': user.role, 'permissions': user.permissions}
+            user={'id': user.id, 'name': user.name, 'role': user.role, 'permissions': user.permissions, 'can_manage_documents': user.can_manage_documents}
         ), 200
         
     return jsonify({"msg": "اسم المستخدم أو كلمة المرور غير صحيحة"}), 401
@@ -509,7 +569,7 @@ def get_users():
         return jsonify({"msg": "Unauthorized"}), 403
         
     users = User.query.all()
-    return jsonify([{"id": u.id, "name": u.name, "username": u.username, "email": u.email, "role": u.role, "permissions": u.permissions} for u in users])
+    return jsonify([{"id": u.id, "name": u.name, "username": u.username, "email": u.email, "role": u.role, "permissions": u.permissions, "can_manage_documents": u.can_manage_documents} for u in users])
 
 @app.route('/api/users', methods=['POST'])
 @jwt_required()
@@ -531,7 +591,8 @@ def add_user():
         email=data.get('email', ''), 
         password=hashed_pw, 
         role=data.get('role'), 
-        permissions=data.get('permissions', '')
+        permissions=data.get('permissions', ''),
+        can_manage_documents=data.get('can_manage_documents', False) if data.get('role') == 'Manager' else False
     )
     
     db.session.add(new_user)
@@ -557,6 +618,8 @@ def update_user(user_id):
     user.username = data.get('username', user.username)
     user.email = data.get('email', user.email)
     user.role = data.get('role', user.role)
+    if 'can_manage_documents' in data and user.role == 'Manager':
+        user.can_manage_documents = data.get('can_manage_documents')
     if 'permissions' in data:
         import json
         user.permissions = data.get('permissions')
@@ -1232,6 +1295,9 @@ def attach_vault_to_intern(intern_id):
     current_user = get_jwt()
     if current_user.get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
+    if current_user.get('role') == 'Manager':
+        if not current_user.get('can_manage_documents', False):
+            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
@@ -1257,7 +1323,7 @@ def attach_vault_to_intern(intern_id):
     label = custom_title or f'{vault_name} ({action_label})'
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
-        uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
+        uploaded_by='ADMIN', status='AWAITING_RETURN' if requires_return else 'APPROVED_AND_SIGNED',
         is_visible_to_intern=True, custom_title=label,
         requires_return=requires_return, action_type=action_type,
         created_at=now, updated_at=now
@@ -1446,6 +1512,9 @@ def create_intern_document_lifecycle(intern_id):
     current_user = get_jwt()
     if current_user.get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
+    if current_user.get('role') == 'Manager':
+        if not current_user.get('can_manage_documents', False):
+            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
@@ -1455,8 +1524,8 @@ def create_intern_document_lifecycle(intern_id):
     action_type = data.get('action_type', 'view')
     now = datetime.now(timezone.utc)
     record = DocumentLifecycle(
-        intern_id=intern.id, doc_type=doc_type, status='MISSING',
-        uploaded_by='ADMIN', is_visible_to_intern=action_type == 'view',
+        intern_id=intern.id, doc_type=doc_type, status='AWAITING_RETURN' if action_type in ('sign', 'fill', 'sign_fill') else 'MISSING',
+        uploaded_by='ADMIN', is_visible_to_intern=True,
         custom_title=custom_title, action_type=action_type,
         created_at=now, updated_at=now
     )
@@ -1773,7 +1842,7 @@ def list_notifications():
             return jsonify([])
         notifs = Notification.query.filter_by(intern_id=intern.id).order_by(Notification.created_at.desc()).limit(50).all()
     elif current_user.get('role') in ('Admin', 'Manager'):
-        notifs = Notification.query.filter(Notification.type == 'GENERIC').order_by(Notification.created_at.desc()).limit(50).all()
+        notifs = Notification.query.filter(Notification.type.in_(['GENERIC', 'DOCUMENT_RETURNED'])).order_by(Notification.created_at.desc()).limit(50).all()
     else:
         return jsonify({"msg": "Unauthorized"}), 403
     return jsonify([{
@@ -1817,6 +1886,9 @@ def reject_document(intern_id, doc_id):
     current_user = get_jwt()
     if current_user.get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
+    if current_user.get('role') == 'Manager':
+        if not current_user.get('can_manage_documents', False):
+            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
         
     data = request.json or {}
     reason = data.get('reason') or data.get('rejection_reason')
@@ -2452,6 +2524,9 @@ def approve_document(intern_id, doc_id):
     current_user = get_jwt()
     if current_user.get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
+    if current_user.get('role') == 'Manager':
+        if not current_user.get('can_manage_documents', False):
+            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
@@ -2474,6 +2549,9 @@ def upload_signed_document(intern_id):
     current_user = get_jwt()
     if current_user.get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
+    if current_user.get('role') == 'Manager':
+        if not current_user.get('can_manage_documents', False):
+            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
@@ -2529,7 +2607,7 @@ def upload_signed_document(intern_id):
 
     if existing:
         existing.file_path = file_url
-        existing.status = 'APPROVED_AND_SIGNED'
+        existing.status = 'AWAITING_RETURN' if (existing.action_type in ('sign', 'fill', 'sign_fill')) else 'APPROVED_AND_SIGNED'
         existing.uploaded_by = 'ADMIN'
         existing.is_visible_to_intern = True
         if custom_title:
@@ -2543,7 +2621,7 @@ def upload_signed_document(intern_id):
 
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
-        uploaded_by='ADMIN', status='APPROVED_AND_SIGNED',
+        uploaded_by='ADMIN', status='AWAITING_RETURN' if (action_type in ('sign', 'fill', 'sign_fill')) else 'APPROVED_AND_SIGNED',
         is_visible_to_intern=True, custom_title=custom_title,
         file_type=file_type or 'pdf',
         action_type=action_type or 'view',
@@ -2594,10 +2672,21 @@ def upload_returned_document(intern_id, doc_id):
     file_url = f"/api/uploads/{filename}"
 
     doc.returned_file_path = file_url
+    doc.status = 'RETURNED'
     doc.updated_at = datetime.now(timezone.utc)
+
+    # Notify Admin and Manager about the return
+    doc_title = doc.custom_title or doc.doc_type
+    notif = Notification(
+        intern_id=intern_id, type='DOCUMENT_RETURNED',
+        title=f'إعادة مستند من {intern.name if intern else "متدرب"}',
+        body=f'تم إرجاع "{doc_title}" من قبل المتدرب وهو قيد المراجعة.',
+        related_doc_id=doc.id
+    )
+    db.session.add(notif)
     db.session.commit()
 
-    return jsonify({"msg": "تم استلام النسخة المعبأة", "doc_id": doc.id}), 200
+    return jsonify({"msg": "تم استلام النسخة المعبأة", "status": doc.status, "doc_id": doc.id}), 200
 
 
 @app.route('/api/intern-documents/<int:doc_id>/download', methods=['GET'])
@@ -3237,7 +3326,7 @@ if __name__ == '__main__':
             rec.updated_at = datetime.now(timezone.utc)
         if fixed:
             db.session.commit()
-            print(f"Fixed {len(fixed)} document lifecycle records (MISSING→PENDING_REVIEW)")
+            print(f"Fixed {len(fixed)} document lifecycle records (MISSING to PENDING_REVIEW)")
 
         # Fix: mark notifications as read for already-approved/rejected docs
         from sqlalchemy import text as sql_text

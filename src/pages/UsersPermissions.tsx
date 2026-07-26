@@ -20,7 +20,8 @@ export function UsersPermissions() {
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [newUser, setNewUser] = useState({ 
     name: '', email: '', role: '', password: 'password123',
-    permissions: JSON.stringify(defaultPermissions) 
+    permissions: JSON.stringify(defaultPermissions),
+    can_manage_documents: false
   });
 
   const fetchUsers = async () => {
@@ -59,7 +60,8 @@ export function UsersPermissions() {
       email: user.email,
       role: user.role,
       password: '',
-      permissions: user.permissions || JSON.stringify(defaultPermissions)
+      permissions: user.permissions || JSON.stringify(defaultPermissions),
+      can_manage_documents: user.can_manage_documents || false
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -161,6 +163,15 @@ export function UsersPermissions() {
               </select>
             </div>
           </div>
+
+          {newUser.role === 'Manager' && (
+            <div style={{marginBottom:16}}>
+              <label style={{display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:13, fontWeight:600}}>
+                <input type="checkbox" checked={newUser.can_manage_documents} onChange={e => setNewUser({...newUser, can_manage_documents: e.target.checked})} style={{width:16,height:16}} />
+                التحكم في المستندات — يمكنه إنشاء طلبات للمستندات وعرض/قبول/رفض مستندات المتدربين
+              </label>
+            </div>
+          )}
 
           {newUser.role && newUser.role !== 'Intern' && (
           <div style={{ marginTop: '32px', marginBottom: '24px' }}>
