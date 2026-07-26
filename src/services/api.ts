@@ -42,7 +42,18 @@ export const api = {
         sessionStorage.removeItem('user');
         window.dispatchEvent(new Event('storage'));
       }
-      throw new Error(`API Error: ${errMsg}`);
+      if (response.status === 403 || response.status === 404) {
+        const user = sessionStorage.getItem('user');
+        if (user && JSON.parse(user).role === 'Intern') {
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
+          window.dispatchEvent(new Event('storage'));
+          window.location.href = '/';
+        }
+      }
+      const err = new Error(`API Error: ${errMsg}`) as any;
+      err.status = response.status;
+      throw err;
     }
     return response.json();
   },
@@ -56,6 +67,15 @@ export const api = {
     });
     const resData = await safeJson(response);
     if (!response.ok) {
+      if (response.status === 403 || response.status === 404) {
+        const user = sessionStorage.getItem('user');
+        if (user && JSON.parse(user).role === 'Intern') {
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
+          window.dispatchEvent(new Event('storage'));
+          window.location.href = '/';
+        }
+      }
       throw new Error(typeof resData === 'object' && resData?.msg ? resData.msg : 'حدث خطأ أثناء العملية');
     }
     return resData;
@@ -70,6 +90,15 @@ export const api = {
     });
     const resData = await safeJson(response);
     if (!response.ok) {
+      if (response.status === 403 || response.status === 404) {
+        const user = sessionStorage.getItem('user');
+        if (user && JSON.parse(user).role === 'Intern') {
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
+          window.dispatchEvent(new Event('storage'));
+          window.location.href = '/';
+        }
+      }
       throw new Error(typeof resData === 'object' && resData?.msg ? resData.msg : 'حدث خطأ أثناء العملية');
     }
     return resData;
@@ -91,6 +120,15 @@ export const api = {
     });
     const resData = await response.json();
     if (!response.ok) {
+      if (response.status === 403 || response.status === 404) {
+        const user = sessionStorage.getItem('user');
+        if (user && JSON.parse(user).role === 'Intern') {
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
+          window.dispatchEvent(new Event('storage'));
+          window.location.href = '/';
+        }
+      }
       throw new Error(resData.msg || 'Upload failed');
     }
     return resData;

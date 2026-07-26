@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise, ClipboardText } from '@phosphor-icons/react';
 import { api, API_BASE } from '../services/api';
+import { handleViewFile, handleDownloadFile } from '../utils/documentUtils';
 import { InternSidebar } from '../components/InternSidebar';
 import { Header } from '../components/Header';
 import '../InternPortal.css';
@@ -63,12 +64,18 @@ export function InternPortal() {
     }
   };
 
+  const handleLogoutAndRedirect = () => {
+    sessionStorage.clear();
+    window.location.href = '/';
+  };
+
   const fetchProfile = async () => {
     try {
       const data = await api.get('/intern/profile');
       setInternData(data);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      if (err?.status === 404 || err?.status === 403) handleLogoutAndRedirect();
+      else console.error(err);
     }
   };
 
@@ -509,6 +516,9 @@ export function InternPortal() {
                                   const anyReturned = d.returned_file_path || fillDoc.returned_file_path;
                                   const combinedStatus = bothReturned ? 'completed' : anyReturned ? 'partial' : 'pending';
                                   const inputId = `return-upload-${d.id}`;
+                                  // Use whichever doc has a file_path for view/download
+                                  const fileDoc = d.file_path ? d : fillDoc.file_path ? fillDoc : null;
+                                  const fileLabel = (d.custom_title || d.doc_type || row.base);
                                   return (
                                     <tr key={row.id} style={{ borderBottom: '1px solid var(--line)' }}>
                                       <td style={{ padding: '10px 8px' }}>
@@ -523,16 +533,28 @@ export function InternPortal() {
                                             <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>بانتظار الرفع</span>}
                                       </td>
                                       <td style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--slate)', fontSize: 11 }}>
-                                        {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                                        {fileDoc ? formatDate(fileDoc.updated_at || fileDoc.created_at) : '—'}
                                       </td>
                                       <td style={{ textAlign: 'left', padding: '10px 8px' }}>
-                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                                          <a href={d.file_path ? api.downloadDocument(d.id) : '#'} target={d.file_path ? '_blank' : undefined} rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3, pointerEvents: d.file_path ? 'auto' : 'none', cursor: d.file_path ? 'pointer' : 'default' }}>
+                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                          {/* View original file */}
+                                          <button className="btn btn-ghost sm" title="معاينة الأصل" disabled={!fileDoc} onClick={() => fileDoc && handleViewFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
                                             <Eye size={14} />
-                                          </a>
-                                          <a href={d.file_path ? api.downloadDocument(d.id) : '#'} download={d.file_path ? '' : undefined} className="btn btn-ghost sm" title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3, pointerEvents: d.file_path ? 'auto' : 'none', cursor: d.file_path ? 'pointer' : 'default' }}>
+                                          </button>
+                                          {/* Download original file */}
+                                          <button className="btn btn-ghost sm" title="تحميل الأصل" disabled={!fileDoc} onClick={() => fileDoc && handleDownloadFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
                                             <DownloadSimple size={14} />
-                                          </a>
+                                          </button>
+                                          {/* View returned file if exists */}
+                                          {anyReturned && (
+                                            <button className="btn btn-ghost sm" title="معاينة النسخة المعادة" onClick={() => {
+                                              const retDoc = d.returned_file_path ? d : fillDoc;
+                                              handleViewFile(api.downloadDocument(retDoc.id) + '&returned=1', fileLabel + '_returned.pdf');
+                                            }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
+                                              <Eye size={14} />
+                                            </button>
+                                          )}
+                                          {/* Upload return if not both returned */}
                                           {!bothReturned && (
                                             <>
                                               <input type="file" id={inputId} style={{ display: 'none' }} accept=".pdf" onChange={e => {
@@ -544,7 +566,7 @@ export function InternPortal() {
                                                   api.post(`/interns/${internData?.id}/documents/${doc.id}/return-upload`, fd);
                                                 });
                                                 showToast('تم استلام النسخة المعبأة', 'success');
-                                                fetchLifecycleDocs();
+                                                setTimeout(() => fetchLifecycleDocs(), 500);
                                               }} />
                                               <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => document.getElementById(inputId)?.click()}>
                                                 <UploadSimple size={14} /> رفع
@@ -561,21 +583,25 @@ export function InternPortal() {
                                 const isView = d.action_type === 'view';
                                 const isReturned = !!d.returned_file_path;
                                 const inputId2 = `doc-upload-${d.id}`;
-                                const statusLabel = d.status === 'AWAITING_RETURN' ? 'بانتظار التوقيع' :
-                                  d.status === 'RETURNED' ? 'بانتظار المراجعة' :
+                                const fileLabel = d.custom_title || d.doc_type || 'document';
+                                const statusLabel = d.status === 'AWAITING_RETURN' ? (d.action_type === 'sign' ? 'بانتظار التوقيع' : d.action_type === 'fill' ? 'بانتظار التعبئة' : 'بانتظار التوقيع والتعبئة') :
+                                  d.status === 'RETURNED' ? 'تم الإرجاع' :
                                     d.status === 'MISSING' && !d.file_path ? 'بانتظار الرفع' :
                                       d.status === 'PENDING_REVIEW' ? 'قيد المراجعة' :
                                         d.status === 'APPROVED_AND_SIGNED' ? 'مقبول' :
                                           d.status === 'REVISION_REQUESTED' ? 'مطلوب إعادة' : d.status || '—';
                                 const statusClass = d.status === 'APPROVED_AND_SIGNED' ? 'badge-success' :
-                                  d.status === 'RETURNED' ? 'badge-warning' :
+                                  d.status === 'RETURNED' ? 'badge-success' :
                                     d.status === 'PENDING_REVIEW' ? 'badge-warning' :
-                                      d.status === 'REVISION_REQUESTED' ? 'badge-danger' : '';
+                                      d.status === 'AWAITING_RETURN' ? 'badge-warning' :
+                                        d.status === 'REVISION_REQUESTED' ? 'badge-danger' : '';
+                                // Can upload if: MISSING with no file, sign/fill not returned, or revision requested
+                                const canUpload = (!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path);
                                 return (
                                   <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
                                     <td style={{ padding: '10px 8px' }}>
-                                      <div style={{ fontWeight: 600, color: 'var(--ink)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.custom_title || d.doc_type}>
-                                        {d.custom_title || d.doc_type}
+                                      <div style={{ fontWeight: 600, color: 'var(--ink)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fileLabel}>
+                                        {fileLabel}
                                         {isSignFill && <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>({d.action_type === 'sign' ? 'توقيع' : d.action_type === 'fill' ? 'تعبئة وإرجاع' : d.action_type === 'sign_fill' ? 'توقيع وتعبئة' : ''})</span>}
                                       </div>
                                       {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
@@ -588,17 +614,26 @@ export function InternPortal() {
                                       <span className={`badge ${statusClass}`} style={{ fontSize: 11, background: !statusClass && d.status !== 'APPROVED_AND_SIGNED' ? 'var(--paper)' : undefined, color: !statusClass && d.status !== 'APPROVED_AND_SIGNED' ? 'var(--slate)' : undefined }}>{statusLabel}</span>
                                     </td>
                                     <td style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--slate)', fontSize: 11 }}>
-                                      {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                                      {d.file_path || d.returned_file_path ? formatDate(d.updated_at || d.created_at) : '—'}
                                     </td>
                                     <td style={{ textAlign: 'left', padding: '10px 8px' }}>
-                                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                                        <a href={d.file_path ? api.downloadDocument(d.id) : '#'} target={d.file_path ? '_blank' : undefined} rel="noreferrer" className="btn btn-ghost sm" title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3, pointerEvents: d.file_path ? 'auto' : 'none', cursor: d.file_path ? 'pointer' : 'default' }}>
+                                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                        {/* 1️⃣ View original file (admin-uploaded or intern-uploaded) */}
+                                        <button className="btn btn-ghost sm" title="معاينة" disabled={!d.file_path} onClick={() => d.file_path && handleViewFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3 }}>
                                           <Eye size={14} />
-                                        </a>
-                                        <a href={d.file_path ? api.downloadDocument(d.id) : '#'} download={d.file_path ? '' : undefined} className="btn btn-ghost sm" title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3, pointerEvents: d.file_path ? 'auto' : 'none', cursor: d.file_path ? 'pointer' : 'default' }}>
+                                        </button>
+                                        {/* 2️⃣ Download original file */}
+                                        <button className="btn btn-ghost sm" title="تحميل" disabled={!d.file_path} onClick={() => d.file_path && handleDownloadFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3 }}>
                                           <DownloadSimple size={14} />
-                                        </a>
-                                        {!isView && !isReturned && (
+                                        </button>
+                                        {/* 3️⃣ View returned file (for sign/fill docs) */}
+                                        {isReturned && (
+                                          <button className="btn btn-ghost sm" title="معاينة النسخة المعادة" onClick={() => handleViewFile(api.downloadDocument(d.id) + '&returned=1', fileLabel + '_returned.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
+                                            <Eye size={14} />
+                                          </button>
+                                        )}
+                                        {/* 4️⃣ Upload / re-upload button */}
+                                        {canUpload && (
                                           <>
                                             <input type="file" id={inputId2} style={{ display: 'none' }} accept=".pdf" onChange={e => {
                                               if (!e.target.files?.[0]) return;
@@ -610,7 +645,7 @@ export function InternPortal() {
                                               }
                                             }} />
                                             <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => document.getElementById(inputId2)?.click()}>
-                                              <UploadSimple size={14} /> رفع
+                                              <UploadSimple size={14} /> {d.status === 'REVISION_REQUESTED' ? 'إعادة رفع' : 'رفع'}
                                             </button>
                                           </>
                                         )}
