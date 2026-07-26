@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, ClipboardText, CalendarBlank, FileDoc } from '@phosphor-icons/react';
+import { ArrowRight, PencilSimple, Trash, FileText, CheckCircle, DownloadSimple, Certificate, MicrosoftExcelLogo, FilePdf, Eye, UploadSimple, X, ArrowsClockwise, Package, ClipboardText, CalendarBlank, FileDoc, Folder } from '@phosphor-icons/react';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
@@ -106,6 +106,8 @@ export function Profile() {
   const [selectedVaultDocName, setSelectedVaultDocName] = useState('');
   const [requestTitle, setRequestTitle] = useState('');
   const [requestActionTypes, setRequestActionTypes] = useState<Set<string>>(new Set(['view']));
+  const [selectedVaultDocs, setSelectedVaultDocs] = useState<string[]>([]);
+  const [showVaultModal, setShowVaultModal] = useState(false);
   const [requestFiles, setRequestFiles] = useState<File[]>([]);
 
 
@@ -900,7 +902,7 @@ export function Profile() {
         <div className="card info-card">
           <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, marginBottom:16}}>
             <h3 style={{margin:0}}><FileText weight="bold" className="icon" /> مركز المستندات</h3>
-            <button className="btn btn-gold sm" onClick={async () => { setRequestTitle(''); setRequestActionTypes(new Set(['view'])); setRequestFiles([]); try { setVaultDocs(await api.get('/vault')); } catch {} setShowRequestModal(true); }} style={{fontSize:12, padding:'8px 16px'}}>
+            <button className="btn btn-gold sm" onClick={async () => { setRequestTitle(''); setRequestActionTypes(new Set(['view'])); setRequestFiles([]); setSelectedVaultDocs([]); try { setVaultDocs(await api.get('/vault')); } catch {} setShowRequestModal(true); }} style={{fontSize:12, padding:'8px 16px'}}>
               + طلب مستند / إضافة ملف
             </button>
           </div>
@@ -1485,59 +1487,50 @@ export function Profile() {
               <div className="form-group">
                 <label>اسم المستند</label>
                 <input type="text" className="input" value={requestTitle} onChange={e => setRequestTitle(e.target.value)} placeholder="اتفاقية التدريب المعدلة 2026" />
-                {requestFiles.length === 0 && <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>إذا لم تختر ملفًا، سيتم إنشاء طلب للمتدرب لرفع المستند</small>}
+                {requestFiles.length === 0 && selectedVaultDocs.length === 0 && <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>إذا لم تختر ملفًا، سيتم إنشاء طلب للمتدرب لرفع المستند</small>}
               </div>
 
               <div className="form-group">
                 <label>الملف</label>
-                <input type="file" className="input" id="file-upload-input" multiple accept=".pdf,.doc,.docx" onChange={e => {
-                  if (e.target.files) {
-                    const files = Array.from(e.target.files);
-                    setRequestFiles(files);
-                    if (!requestTitle.trim() && files.length > 0) {
-                      setRequestTitle(files[0].name.replace(/\.\w+$/, ''));
-                    }
-                  }
-                }} style={{display:'none'}} />
-                <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('file-upload-input')?.click()} style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:13, border:'1.5px dashed var(--line)', borderRadius:8}}>
-                  <UploadSimple size={16} /> {requestFiles.length > 0 ? 'تغيير الملفات' : 'اختيار ملف من الجهاز'}
-                </button>
-                {requestFiles.map((f, i) => (
-                  <div key={i} style={{marginTop:6, padding:'6px 10px', background:'#EFF6FF', borderRadius:6, border:'1px solid #BFDBFE', fontSize:12, display:'flex', alignItems:'center', gap:6}}>
-                    <FileText size={14} color="#2563EB" />
-                    <span style={{fontWeight:600}}>{f.name}</span>
-                    <button className="btn btn-ghost sm" onClick={() => setRequestFiles(prev => prev.filter((_, j) => j !== i))} style={{marginRight:'auto', padding:2}}><X size={14} /></button>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{marginBottom:12}}>
-                <h4 style={{margin:'0 0 4px 0',fontSize:14,fontWeight:700,color:'var(--gold-dark)'}}>أو اختر من الخزنة</h4>
-                <p style={{margin:0,fontSize:12,color:'var(--slate-light)'}}>{vaultDocs.length} مستند متاح</p>
-              </div>
-              {vaultDocs.length === 0 && (
-                <div style={{textAlign:'center',padding:'24px 20px',color:'var(--slate-light)',fontSize:13}}>
-                  <FileText size={36} style={{marginBottom:10,opacity:0.4}} />
-                  <div>لا توجد مستندات في الخزنة</div>
-                </div>
-              )}
-              <div style={{display:'grid',gridTemplateColumns:'1fr',gap:8}}>
-                {vaultDocs.map((vd: any) => (
-                  <button key={vd.name} type="button" className="btn btn-ghost" onClick={() => { setSelectedVaultDocName(vd.name); setShowVaultActionModal(true); }} style={{width:'100%', justifyContent:'space-between', padding:'10px 14px', fontSize:13, textAlign:'right', direction:'rtl'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8,overflow:'hidden'}}>
-                      <FileText size={18} color="var(--gold-dark)" weight="fill" />
-                      <span style={{fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{vd.name}</span>
+                <div style={{display:'flex', gap:8, alignItems:'flex-start'}}>
+                    <div style={{flex:1}}>
+                        <input type="file" className="input" id="file-upload-input" multiple accept=".pdf,.doc,.docx" onChange={e => {
+                          if (e.target.files) {
+                            const files = Array.from(e.target.files);
+                            setRequestFiles(files);
+                            if (!requestTitle.trim() && files.length > 0) {
+                              setRequestTitle(files[0].name.replace(/\.\w+$/, ''));
+                            }
+                          }
+                        }} style={{display:'none'}} />
+                        <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('file-upload-input')?.click()} style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:13, border:'1.5px dashed var(--line)', borderRadius:8}}>
+                          <UploadSimple size={16} /> {requestFiles.length > 0 ? 'تغيير الملفات' : 'اختيار ملف من الجهاز'}
+                        </button>
+                        {requestFiles.map((f, i) => (
+                          <div key={i} style={{marginTop:6, padding:'6px 10px', background:'#EFF6FF', borderRadius:6, border:'1px solid #BFDBFE', fontSize:12, display:'flex', alignItems:'center', gap:6}}>
+                            <FileText size={14} color="#2563EB" />
+                            <span style={{fontWeight:600}}>{f.name}</span>
+                            <button className="btn btn-ghost sm" onClick={() => setRequestFiles(prev => prev.filter((_, j) => j !== i))} style={{marginRight:'auto', padding:2}}><X size={14} /></button>
+                          </div>
+                        ))}
+                        {selectedVaultDocs.map((vd, i) => (
+                          <div key={'vd'+i} style={{marginTop:6, padding:'6px 10px', background:'#F5F3EE', borderRadius:6, border:'1px solid #E5DDD0', fontSize:12, display:'flex', alignItems:'center', gap:6}}>
+                            <FileText size={14} color="#9B8B6B" weight="fill" />
+                            <span style={{fontWeight:600}}>{vd}</span>
+                            <button className="btn btn-ghost sm" onClick={() => setSelectedVaultDocs(prev => prev.filter(v => v !== vd))} style={{marginRight:'auto', padding:2}}><X size={14} /></button>
+                          </div>
+                        ))}
                     </div>
-                    <span style={{fontSize:11.5,color:'var(--slate-light)',flexShrink:0}}>رفع من الخزنة ←</span>
-                  </button>
-                ))}
+                    <button type="button" className="btn btn-gold" onClick={() => setShowVaultModal(true)} style={{padding:'10px 14px', fontSize:13, borderRadius:8, flexShrink:0, display:'flex', alignItems:'center', gap:6}}>
+                      <Folder size={16} /> إضافة من الخزنة
+                    </button>
+                </div>
               </div>
 
-              {requestFiles.length > 0 && (
-                <div className="form-group" style={{marginTop:16}}>
-                  <label>نوع الطلب للملفات المرفوعة</label>
-                  <div style={{display:'flex', flexDirection:'column', gap:8, padding:'8px 12px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
-                    {(['view','sign','fill'] as const).map(type => {
+              <div className="form-group" style={{marginTop:16}}>
+                <label>نوع الطلب للملفات المرفوعة</label>
+                <div style={{display:'flex', flexDirection:'column', gap:8, padding:'8px 12px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
+                   {(['view','sign','fill'] as const).map(type => {
                       const viewLocked = type === 'view' && (requestActionTypes.has('sign') || requestActionTypes.has('fill'));
                       return (
                       <label key={type} style={{display:'flex', alignItems:'center', gap:10, cursor: viewLocked ? 'not-allowed' : 'pointer', fontSize:13, padding:'4px 0', opacity: viewLocked ? 0.5 : 1}}>
@@ -1547,7 +1540,7 @@ export function Profile() {
                           e.target.checked ? next.add(type) : next.delete(type);
                           if (next.size === 0) next.add('view');
                           setRequestActionTypes(next);
-                        }} style={{width:18,height:18,cursor: viewLocked ? 'not-allowed' : 'pointer'}} />
+                        }} style={{width:18,height:18,cursor: viewLocked ? 'not-allowed' : 'pointer', accentColor:'var(--gold-dark)'}} />
                         <span style={{fontWeight: requestActionTypes.has(type) ? 600 : 400}}>
                           {type === 'view' ? 'عرض فقط — المتدرب يرى ويحمل المستند' : ''}
                           {type === 'sign' ? 'توقيع — المتدرب يوقع ويعيد النسخة' : ''}
@@ -1555,10 +1548,9 @@ export function Profile() {
                         </span>
                       </label>
                       );
-                    })}
-                  </div>
+                   })}
                 </div>
-              )}
+              </div>
             </div>
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={() => setShowRequestModal(false)}>إلغاء</button>
@@ -1566,36 +1558,120 @@ export function Profile() {
                 !requestTitle.trim() && requestFiles.length === 0
               } onClick={async () => {
                 try {
-                  const types = Array.from(requestActionTypes);
                   let total = 0;
+                  const type = requestActionType;
 
                   if (requestFiles.length > 0) {
                     for (const file of requestFiles) {
                       const title = requestTitle.trim() || file.name.replace(/\.\w+$/, '') || 'مستند';
-                      await api.uploadSignedDocument(Number(id), 'OTHER', file, title, types[0]);
-                      for (let i = 1; i < types.length; i++) {
-                        await api.post(`/interns/${id}/document-lifecycle`, { document_type: 'OTHER', custom_title: title, action_type: types[i] });
-                      }
+                      await api.uploadSignedDocument(Number(id), 'OTHER', file, title, type);
                     }
                     total += requestFiles.length;
-                  } else if (requestTitle.trim()) {
-                    const title = requestTitle.trim();
-                    for (const t of types) {
-                      await api.post(`/interns/${id}/document-lifecycle`, { document_type: 'OTHER', custom_title: title, action_type: t });
-                    }
+                  }
+
+                  if (selectedVaultDocs.length > 0) {
+                     for (const vd of selectedVaultDocs) {
+                       const title = requestTitle.trim() || vd || 'مستند';
+                       await api.post(`/interns/${id}/vault-attach`, {
+                         vault_name: vd, doc_type: 'OTHER', custom_title: title, action_type: type
+                       });
+                     }
+                     total += selectedVaultDocs.length;
+                  }
+
+                  if (requestFiles.length === 0 && selectedVaultDocs.length === 0 && requestTitle.trim()) {
+                    await api.post(`/interns/${id}/document-lifecycle`, { document_type: 'OTHER', custom_title: requestTitle.trim(), action_type: type });
                     total += 1;
                   }
 
                   if (total > 0) toast.success(`تم إرسال ${total} مستند${total > 1 ? 'ات' : ''} بنجاح`);
                   setShowRequestModal(false);
                   setRequestFiles([]);
+                  setSelectedVaultDocs([]);
                   setRequestActionTypes(new Set(['view']));
                   fetchDocsLifecycle();
                 } catch (err) {
                   toast.error('فشل إرسال الطلب');
                 }
               }}>
-                إرسال{requestFiles.length > 1 || requestActionTypes.size > 1 ? ` (${requestFiles.length || 1})` : ''}
+                إرسال{(requestFiles.length + selectedVaultDocs.length) > 1 ? ` (${requestFiles.length + selectedVaultDocs.length})` : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vault Multiple Selection Modal */}
+      {showVaultModal && (
+        <div className="overlay on" style={{display:'flex', zIndex:50}}>
+          <div className="modal" style={{maxWidth:'800px', width:'90%'}}>
+            <div className="modal-head" style={{borderBottom:'1px solid #E5E7EB', padding:'16px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#fff', borderRadius:'16px 16px 0 0'}}>
+              <div>
+                <h3 style={{margin:0, fontSize:'16px', fontWeight:'bold', color:'#111827'}}>اختيار مستندات من الخزنة</h3>
+              </div>
+              <button className="btn-close" onClick={() => setShowVaultModal(false)} style={{background:'#F3F4F6', border:'none', width:'32px', height:'32px', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#4B5563'}}>
+                <X size={16} weight="bold" />
+              </button>
+            </div>
+            <div className="modal-body" style={{padding:'24px', maxHeight:'65vh', overflowY:'auto', background:'#F9FAFB'}}>
+              {vaultDocs.length === 0 ? (
+                <div style={{textAlign:'center',padding:'24px 20px',color:'var(--slate-light)',fontSize:13}}>لا توجد مستندات في الخزنة</div>
+              ) : (
+                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:16}}>
+                  {vaultDocs.map((vd: any) => {
+                    const isSelected = selectedVaultDocs.includes(vd.name);
+                    const isPdf = vd.name.toLowerCase().endsWith('.pdf');
+                    const sizeStr = vd.size ? (vd.size / 1024).toFixed(1) + ' KB' : 'مستند من الخزنة';
+                    return (
+                      <div key={vd.name} onClick={() => {
+                          if (isSelected) setSelectedVaultDocs(prev => prev.filter(v => v !== vd.name));
+                          else setSelectedVaultDocs(prev => [...prev, vd.name]);
+                        }} style={{
+                        display:'flex', flexDirection:'column', alignItems:'center', padding:'24px 20px', 
+                        border: isSelected ? '2px solid var(--gold-dark)' : '1px solid #E5E7EB',
+                        borderRadius:16, background: '#fff', cursor:'pointer', transition:'all 0.15s',
+                        position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                      }}>
+                        {/* Checkbox at top-right for RTL */}
+                        <div style={{position:'absolute', top:16, right:16}}>
+                          <input type="checkbox" checked={isSelected} onChange={() => {}} style={{width:18, height:18, cursor:'pointer', accentColor:'var(--gold-dark)'}} />
+                        </div>
+                        
+                        {/* File Icon */}
+                        <div style={{
+                          width:72, height:72, borderRadius:20, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                          background: isPdf ? '#FCE8E8' : '#E0F2FE', color: isPdf ? '#DC2626' : '#0284C7', marginBottom:20
+                        }}>
+                          {isPdf ? <FilePdf size={32} weight="fill" /> : <FileDoc size={32} weight="fill" />}
+                          <span style={{fontSize:12, fontWeight:800, marginTop:4}}>{isPdf ? 'PDF' : 'DOC'}</span>
+                        </div>
+
+                        {/* Text */}
+                        <h4 style={{margin:'0 0 8px 0', fontSize:15, fontWeight:700, color:'#111827', textAlign:'center', width:'100%', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}} title={vd.name}>
+                          {vd.name.includes('.') ? vd.name.split('.').slice(0, -1).join('.') : vd.name}
+                        </h4>
+                        <div style={{fontSize:12, color:'#6B7280', marginBottom:20}}>
+                          {sizeStr}
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{display:'flex', gap:8, width:'100%', marginTop:'auto'}} onClick={e => e.stopPropagation()}>
+                          <button className="btn" style={{flex:1, padding:'8px 0', background:'#1F2937', color:'#fff', border:'none', borderRadius:8, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', gap:6}} onClick={() => window.open(API_BASE + '/vault/' + encodeURIComponent(vd.name))}>
+                            <DownloadSimple size={16} /> تحميل
+                          </button>
+                          <button className="btn" style={{flex:1, padding:'8px 0', background:'#fff', color:'#111827', border:'1px solid #E5E7EB', borderRadius:8, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', gap:6}} onClick={() => window.open(API_BASE + '/vault/' + encodeURIComponent(vd.name), '_blank')}>
+                            <Eye size={16} /> عرض
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="modal-foot" style={{background:'#F9FAFB', borderTop:'1px solid #E5E7EB', padding:'16px 24px', borderRadius:'0 0 16px 16px'}}>
+              <button className="btn btn-gold" style={{width:'100%'}} onClick={() => setShowVaultModal(false)}>
+                تأكيد الاختيار {selectedVaultDocs.length > 0 ? '(' + selectedVaultDocs.length + ')' : ''}
               </button>
             </div>
           </div>
