@@ -539,14 +539,14 @@ export function InternPortal() {
                                       </td>
                                       <td style={{ textAlign: 'left', padding: '10px 8px' }}>
                                         <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                                          {/* View original file */}
-                                          <button className="btn btn-ghost sm" title="معاينة الأصل" disabled={!fileDoc} onClick={() => fileDoc && handleViewFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
-                                            <Eye size={14} />
-                                          </button>
-                                          {/* Download original file */}
-                                          <button className="btn btn-ghost sm" title="تحميل الأصل" disabled={!fileDoc} onClick={() => fileDoc && handleDownloadFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
-                                            <DownloadSimple size={14} />
-                                          </button>
+{/* View original file */}
+                                           <button className="btn btn-ghost sm" title={fileDoc ? "معاينة الأصل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleViewFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
+                                             <Eye size={14} />
+                                           </button>
+                                           {/* Download original file */}
+                                           <button className="btn btn-ghost sm" title={fileDoc ? "تحميل الأصل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleDownloadFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
+                                             <DownloadSimple size={14} />
+                                           </button>
                                           {/* View returned file if exists */}
                                           {anyReturned && (
                                             <button className="btn btn-ghost sm" title="معاينة النسخة المعادة" onClick={() => {
@@ -630,11 +630,11 @@ export function InternPortal() {
                                     <td style={{ textAlign: 'left', padding: '10px 8px' }}>
                                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                                         {/* 1️⃣ View original file (admin-uploaded or intern-uploaded) */}
-                                        <button className="btn btn-ghost sm" title="معاينة" disabled={!d.file_path} onClick={() => d.file_path && handleViewFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3 }}>
+                                        <button className="btn btn-ghost sm" title={d.file_path ? "معاينة" : "لا يوجد ملف مرفق من الإدارة"} disabled={!d.file_path} onClick={() => d.file_path && handleViewFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3 }}>
                                           <Eye size={14} />
                                         </button>
                                         {/* 2️⃣ Download original file */}
-                                        <button className="btn btn-ghost sm" title="تحميل" disabled={!d.file_path} onClick={() => d.file_path && handleDownloadFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3 }}>
+                                        <button className="btn btn-ghost sm" title={d.file_path ? "تحميل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!d.file_path} onClick={() => d.file_path && handleDownloadFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: d.file_path ? 1 : 0.3 }}>
                                           <DownloadSimple size={14} />
                                         </button>
                                         {/* 3️⃣ View returned file (for sign/fill docs) */}
