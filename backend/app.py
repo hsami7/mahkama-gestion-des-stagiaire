@@ -2613,7 +2613,7 @@ def upload_signed_document(intern_id):
 
     if existing:
         existing.file_path = file_url
-        existing.status = 'AWAITING_RETURN' if (existing.action_type in ('sign', 'fill', 'sign_fill')) else 'APPROVED_AND_SIGNED'
+        existing.status = 'AWAITING_RETURN' if (existing.action_type in ('sign', 'fill', 'sign_fill')) else 'PENDING_REVIEW'
         existing.uploaded_by = 'ADMIN'
         existing.is_visible_to_intern = True
         if custom_title:
@@ -2627,7 +2627,7 @@ def upload_signed_document(intern_id):
 
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
-        uploaded_by='ADMIN', status='AWAITING_RETURN' if (action_type in ('sign', 'fill', 'sign_fill')) else 'APPROVED_AND_SIGNED',
+        uploaded_by='ADMIN', status='AWAITING_RETURN' if (action_type in ('sign', 'fill', 'sign_fill')) else 'PENDING_REVIEW',
         is_visible_to_intern=True, custom_title=custom_title,
         file_type=file_type or 'pdf',
         action_type=action_type or 'view',

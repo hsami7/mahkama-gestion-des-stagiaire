@@ -532,10 +532,25 @@ for (const [base, docs] of grouped) {
                                   const fileDoc = d.file_path ? d : fillDoc.file_path ? fillDoc : null;
                                   const fileLabel = (d.custom_title || d.doc_type || row.base);
                                   const isSignFillRow = !!row.isSignFill;
-                                  const statusLabel = bothReturned ? 'مكتمل' : anyReturned ? 'قيد الإجراء' : 
-                                    (isSignFillRow ? 'بانتظار التوقيع والتعبئة' : 
-                                     (d.status === 'AWAITING_RETURN' && fillDoc.status === 'AWAITING_RETURN') ? 'بانتظار التوقيع والتعبئة' : 'بانتظار الرفع');
-                                  const statusClass = bothReturned ? 'badge-success' : anyReturned ? 'badge-warning' : 'badge-warning';
+                                  // Determine status based on document statuses
+                                  let statusLabel = 'بانتظار الرفع';
+                                  let statusClass = 'badge-warning';
+                                  if (d.status === 'APPROVED_AND_SIGNED' && fillDoc.status === 'APPROVED_AND_SIGNED') {
+                                    statusLabel = 'مكتمل';
+                                    statusClass = 'badge-success';
+                                  } else if (d.status === 'RETURNED' || fillDoc.status === 'RETURNED') {
+                                    statusLabel = 'بانتظار المراجعة';
+                                    statusClass = 'badge-warning';
+                                  } else if (d.status === 'AWAITING_RETURN' && fillDoc.status === 'AWAITING_RETURN') {
+                                    statusLabel = 'بانتظار التوقيع والتعبئة';
+                                    statusClass = 'badge-warning';
+                                  } else if (d.status === 'AWAITING_RETURN' || fillDoc.status === 'AWAITING_RETURN') {
+                                    statusLabel = 'بانتظار الإجراء';
+                                    statusClass = 'badge-warning';
+                                  } else if (d.status === 'PENDING_REVIEW' || fillDoc.status === 'PENDING_REVIEW') {
+                                    statusLabel = 'قيد المراجعة';
+                                    statusClass = 'badge-warning';
+                                  }
                                   return (
                                     <tr key={row.id} style={{ borderBottom: '1px solid var(--line)' }}>
                                       <td style={{ padding: '10px 8px' }}>
@@ -611,22 +626,9 @@ for (const [base, docs] of grouped) {
                                     if (d.action_type === 'fill') return 'بانتظار التعبئة';
                                     return 'بانتظار التوقيع والتعبئة';
                                   }
-                                  if (isView) {
-                                    if (d.status === 'MISSING' && !d.file_path) return 'بانتظار الرفع';
-                                    if (d.file_path) return 'مقبول';
+                                  if (d.status === 'MISSING') {
+                                    if (d.file_path) return 'قيد المراجعة';
                                     return 'بانتظار الرفع';
-                                  }
-                                  if (d.action_type === 'sign') {
-                                    if (d.status === 'MISSING' && !d.file_path) return 'بانتظار الرفع';
-                                    return 'بانتظار التوقيع';
-                                  }
-                                  if (d.action_type === 'fill') {
-                                    if (d.status === 'MISSING' && !d.file_path) return 'بانتظار الرفع';
-                                    return 'بانتظار التعبئة';
-                                  }
-                                  if (d.action_type === 'sign_fill') {
-                                    if (d.status === 'MISSING' && !d.file_path) return 'بانتظار الرفع';
-                                    return 'بانتظار التوقيع والتعبئة';
                                   }
                                   return d.status || '—';
                                 };

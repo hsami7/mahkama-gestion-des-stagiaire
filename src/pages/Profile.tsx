@@ -1009,8 +1009,9 @@ return rows.map(row => {
 <td style={{textAlign:'center', padding:'10px 8px'}}>
                         {bothReturned ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
                          anyReturned ? <span className="badge badge-warning" style={{fontSize:11}}>قيد الإجراء</span> :
-                         isSignFillRow ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار التوقيع والتعبئة</span> :
-                         (d.status === 'AWAITING_RETURN' && fillDoc.status === 'AWAITING_RETURN') ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار التوقيع والتعبئة</span> :
+                         (d.status === 'APPROVED_AND_SIGNED' && fillDoc.status === 'APPROVED_AND_SIGNED') ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
+                         (d.status === 'PENDING_REVIEW' || fillDoc.status === 'PENDING_REVIEW') ? <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span> :
+                         (d.status === 'AWAITING_RETURN' || fillDoc.status === 'AWAITING_RETURN') ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار التوقيع والتعبئة</span> :
                          <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>}
                       </td>
                       <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
@@ -1054,32 +1055,21 @@ return rows.map(row => {
                   const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
                   const isView = d.action_type === 'view';
                   
-                  // Determine status label based on action_type and status
+// Determine status label based on action_type and status
                   const getStatusBadge = () => {
                     if (d.status === 'APPROVED_AND_SIGNED') return <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>;
                     if (d.status === 'REVISION_REQUESTED') return <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span>;
                     if (d.status === 'RETURNED') return <span className="badge badge-warning" style={{fontSize:11}}>بانتظار المراجعة</span>;
                     if (d.status === 'PENDING_REVIEW') return <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span>;
-                    
+
                     // For MISSING and AWAITING_RETURN, label depends on action_type
-                    if (isView) {
-                      // View-only: just waiting for file or approved
-                      if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                      if (d.file_path) return <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>;
+                    if (d.status === 'MISSING') {
+                      if (d.file_path) return <span className="badge badge-warning" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>قيد المراجعة</span>;
                       return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
                     }
-                    if (d.action_type === 'sign') {
-                      if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                      return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع</span>;
-                    }
-                    if (d.action_type === 'fill') {
-                      if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                      return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التعبئة</span>;
-                    }
-                    if (d.action_type === 'sign_fill') {
-                      if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                      return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع والتعبئة</span>;
-                    }
+                    if (d.action_type === 'sign') return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع</span>;
+                    if (d.action_type === 'fill') return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التعبئة</span>;
+                    if (d.action_type === 'sign_fill') return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع والتعبئة</span>;
                     return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>{d.status}</span>;
                   };
                   
