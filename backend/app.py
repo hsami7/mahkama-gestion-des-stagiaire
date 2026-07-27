@@ -1956,6 +1956,26 @@ def reject_document(intern_id, doc_id):
     db.session.commit()
     return jsonify({"success": True})
 
+@app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>', methods=['DELETE'])
+@jwt_required()
+def delete_intern_document(intern_id, doc_id):
+    current_user = get_jwt()
+    if current_user.get('role') not in ('Admin', 'Manager'):
+        return jsonify({"msg": "Unauthorized"}), 403
+    if current_user.get('role') == 'Manager':
+        if not current_user.get('can_manage_documents', False):
+            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
+
+    doc = db.session.get(DocumentLifecycle, doc_id)
+    if not doc or doc.intern_id != intern_id:
+        return jsonify({"msg": "Document not found"}), 404
+
+    intern = db.session.get(Intern, intern_id)
+    db.session.delete(doc)
+    db.session.commit()
+    log_action(current_user.get('name'), f"حذف مستند ({doc.custom_title or doc.doc_type}) للمتدرب {intern.name if intern else ''}")
+    return jsonify({"success": True}), 200
+
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/assign', methods=['POST'])
 @jwt_required()
 def assign_document(intern_id, doc_id):

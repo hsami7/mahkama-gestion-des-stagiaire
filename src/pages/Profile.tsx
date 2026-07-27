@@ -1141,6 +1141,20 @@ return rows.map(row => {
                             <ArrowsClockwise size={14} />
                           </button>
                         )}
+                        {canManageDocs && (
+                          <button className="btn btn-ghost sm" onClick={async () => {
+                            if (!confirm('هل أنت متأكد من حذف هذا المستند؟')) return;
+                            try {
+                              await api.delete(`/interns/${id}/documents/${d.id}`);
+                              toast.success('تم حذف المستند');
+                              fetchDocsLifecycle();
+                            } catch (err) {
+                              toast.error('فشل حذف المستند');
+                            }
+                          }} title="حذف" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
+                            <Trash size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
