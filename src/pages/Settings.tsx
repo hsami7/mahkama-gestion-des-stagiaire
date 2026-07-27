@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
+import { Eye, PencilSimple, Trash } from '@phosphor-icons/react';
 
 export function Settings() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -358,7 +359,11 @@ export function Settings() {
 function DocumentTemplatesManager() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [label, setLabel] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [editModal, setEditModal] = useState<any | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [editFile, setEditFile] = useState<File | null>(null);
   const toast = useToast();
 
   useEffect(() => { fetchTemplates(); }, []);
@@ -370,16 +375,44 @@ function DocumentTemplatesManager() {
     } catch { /* ignore */ }
   };
 
+  const API_BASE = (window as any).API_BASE || 'http://localhost:5055';
+  const token = sessionStorage.getItem('token');
+  const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
+
   const addTemplate = async () => {
     if (!label.trim()) return toast.warning('الرجاء إدخال اسم المستند');
     setLoading(true);
     try {
-      await api.post('/admin/document-templates', { label: label.trim() });
+      const fd = new FormData();
+      fd.append('label', label.trim());
+      if (file) fd.append('file', file);
+      const res = await fetch(`${API_BASE}/admin/document-templates`, {
+        method: 'POST', headers: authHeaders, body: fd
+      });
+      if (!res.ok) throw new Error((await res.json()).msg || 'فشل الإضافة');
       toast.success('تمت الإضافة');
       setLabel('');
+      setFile(null);
       fetchTemplates();
     } catch (e: any) { toast.error(e.message); }
     finally { setLoading(false); }
+  };
+
+  const saveEdit = async () => {
+    if (!editModal || !editLabel.trim()) return;
+    try {
+      const fd = new FormData();
+      fd.append('label', editLabel.trim());
+      if (editFile) fd.append('file', editFile);
+      const res = await fetch(`${API_BASE}/admin/document-templates/${editModal.id}`, {
+        method: 'PUT', headers: authHeaders, body: fd
+      });
+      if (!res.ok) throw new Error((await res.json()).msg || 'فشل التحديث');
+      toast.success('تم التحديث');
+      setEditModal(null);
+      setEditFile(null);
+      fetchTemplates();
+    } catch (e: any) { toast.error(e.message); }
   };
 
   const toggleActive = async (t: any) => {
@@ -404,12 +437,18 @@ function DocumentTemplatesManager() {
         المستندات المدرجة هنا تُنشأ تلقائياً لكل متدرب عند إضافته أو عند تفعيل حالته.
       </p>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           placeholder="اسم المستند (مثال: عقد التدريب)"
           value={label}
           onChange={e => setLabel(e.target.value)}
           style={{ flex: 1, minWidth: 200, padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 6 }}
+        />
+        <input
+          type="file"
+          accept=".pdf,.doc,.docx,.jpg,.png"
+          onChange={e => setFile(e.target.files?.[0] || null)}
+          style={{ flex: 1, minWidth: 150, padding: '6px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 12 }}
         />
         <button className="btn btn-gold" onClick={addTemplate} disabled={loading}>
           {loading ? '...' : 'إضافة'}
@@ -423,6 +462,7 @@ function DocumentTemplatesManager() {
           <thead>
             <tr style={{ borderBottom: '1px solid var(--gold-light)' }}>
               <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>الاسم</th>
+              <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>الملف</th>
               <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>الحالة</th>
               <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>إجراء</th>
             </tr>
@@ -431,6 +471,9 @@ function DocumentTemplatesManager() {
             {templates.map(t => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--paper)' }}>
                 <td style={{ padding: '10px 8px', fontWeight: 'bold' }}>{t.label}</td>
+                <td style={{ padding: '10px 8px', fontSize: 12, color: 'var(--slate)' }}>
+                  {t.file_path ? <span style={{ color: 'var(--success)' }}>✓ ملف مرفوع</span> : '—'}
+                </td>
                 <td style={{ padding: '10px 8px' }}>
                   <span
                     onClick={() => toggleActive(t)}
@@ -444,18 +487,54 @@ function DocumentTemplatesManager() {
                   </span>
                 </td>
                 <td style={{ padding: '10px 8px' }}>
-                  <button
-                    className="btn btn-ghost"
-                    style={{ color: 'var(--danger)', fontSize: '12px', padding: '4px 10px' }}
-                    onClick={() => removeTemplate(t.id)}
-                  >
-                    حذف
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {t.file_path && (
+                      <button className="btn btn-ghost sm" title="عرض الملف" onClick={() => window.open(`${API_BASE}${t.file_path}`, '_blank')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Eye size={14} />
+                      </button>
+                    )}
+                    <button className="btn btn-ghost sm" title="تعديل" onClick={() => { setEditModal(t); setEditLabel(t.label); setEditFile(null); }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                      <PencilSimple size={14} />
+                    </button>
+                    <button className="btn btn-ghost sm" title="حذف" onClick={() => removeTemplate(t.id)} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)' }}>
+                      <Trash size={14} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {editModal && (
+        <div className="overlay on" style={{ display: 'flex' }}>
+          <div className="modal" style={{ maxWidth: 450 }}>
+            <div className="modal-head">
+              <h3>تعديل القالب</h3>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setEditModal(null)}><span style={{fontSize:18}}>×</span></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>اسم المستند</label>
+                <input value={editLabel} onChange={e => setEditLabel(e.target.value)} style={{ width:'100%', padding:'8px 12px', border:'1px solid var(--line)', borderRadius:6 }} />
+              </div>
+              <div className="form-group" style={{ marginTop: 12 }}>
+                <label>الملف (اختياري)</label>
+                {editModal.file_path && (
+                  <div style={{ fontSize:12, color:'var(--success)', marginBottom:6 }}>
+                    ✓ الملف الحالي: <a href={`${API_BASE}${editModal.file_path}`} target="_blank" rel="noreferrer" style={{color:'var(--gold-dark)'}}>عرض</a>
+                  </div>
+                )}
+                <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={e => setEditFile(e.target.files?.[0] || null)} style={{ width:'100%', padding:'6px', border:'1px solid var(--line)', borderRadius:6, fontSize:12 }} />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-ghost" onClick={() => setEditModal(null)}>إلغاء</button>
+              <button className="btn btn-gold" onClick={saveEdit}>حفظ</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

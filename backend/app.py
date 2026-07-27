@@ -276,6 +276,7 @@ class DocumentTemplate(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     label = db.Column(db.String(150), nullable=False)
     file_type = db.Column(db.String(20), default='pdf')
+    file_path = db.Column(db.String(255), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -495,6 +496,7 @@ def init_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     label VARCHAR(150) NOT NULL,
                     file_type VARCHAR(20) DEFAULT 'pdf',
+                    file_path VARCHAR(255),
                     is_active BOOLEAN DEFAULT 1,
                     created_at DATETIME
                 )
@@ -503,6 +505,16 @@ def init_db():
         except Exception as e:
             db.session.rollback()
             print(f"DocumentTemplate migration: {e}")
+        # Add file_path to existing document_templates if missing
+        try:
+            dt_cols = [c['name'] for c in db.inspect(db.engine).get_columns('document_templates')]
+            with db.engine.connect() as conn:
+                if 'file_path' not in dt_cols:
+                    conn.execute(sql_text("ALTER TABLE document_templates ADD COLUMN file_path VARCHAR(255)"))
+                    conn.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"document_templates file_path migration: {e}")
 
         # Date string to DATE migrations
         try:
@@ -2418,7 +2430,8 @@ def get_document_templates():
     templates = DocumentTemplate.query.order_by(DocumentTemplate.id).all()
     return jsonify([{
         "id": t.id, "label": t.label,
-        "file_type": t.file_type, "is_active": t.is_active,
+        "file_type": t.file_type, "file_path": t.file_path,
+        "is_active": t.is_active,
         "created_at": t.created_at
     } for t in templates])
 
@@ -2427,13 +2440,26 @@ def get_document_templates():
 def create_document_template():
     if get_jwt().get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
-    data = request.json
-    if not data or not data.get('label'):
+    label = (request.form.get('label') or (request.json or {}).get('label') or '').strip()
+    if not label:
         return jsonify({"msg": "Label is required"}), 400
-    t = DocumentTemplate(label=data['label'], file_type=data.get('file_type', 'pdf'), is_active=data.get('is_active', True))
+    file_type = request.form.get('file_type') or (request.json or {}).get('file_type') or 'pdf'
+    file_path = None
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename:
+            import re, random, string
+            ext = ('.' + file.filename.rsplit('.', 1)[1].lower()) if '.' in file.filename else '.pdf'
+            ts = datetime.now().strftime('%Y%m%d%H%M%S')
+            rand = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+            safe = re.sub(r'[^\w\s-]', '', label).strip().replace(' ', '-')[:30].lower() or 'doc'
+            filename = f"template-{ts}-{rand}-{safe}{ext}"
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            file_path = f"/api/uploads/{filename}"
+    t = DocumentTemplate(label=label, file_type=file_type, file_path=file_path, is_active=True)
     db.session.add(t)
     db.session.commit()
-    return jsonify({"id": t.id, "msg": "Template created"}), 201
+    return jsonify({"id": t.id, "file_path": file_path, "msg": "Template created"}), 201
 
 @app.route('/api/admin/document-templates/<int:tid>', methods=['PUT'])
 @jwt_required()
@@ -2442,12 +2468,25 @@ def update_document_template(tid):
         return jsonify({"msg": "Unauthorized"}), 403
     t = db.session.get(DocumentTemplate, tid)
     if not t: return jsonify({"msg": "Not found"}), 404
-    data = request.json
-    if 'label' in data: t.label = data['label']
-    if 'file_type' in data: t.file_type = data['file_type']
-    if 'is_active' in data: t.is_active = data['is_active']
+    label = request.form.get('label') or (request.json or {}).get('label')
+    if label: t.label = label.strip()
+    if 'file_type' in (request.form or request.json or {}):
+        t.file_type = request.form.get('file_type') or (request.json or {}).get('file_type') or t.file_type
+    if 'is_active' in (request.form or request.json or {}):
+        t.is_active = request.form.get('is_active', type=int) if request.form else (request.json or {}).get('is_active', t.is_active)
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename:
+            import re, random, string
+            ext = ('.' + file.filename.rsplit('.', 1)[1].lower()) if '.' in file.filename else '.pdf'
+            ts = datetime.now().strftime('%Y%m%d%H%M%S')
+            rand = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+            safe = re.sub(r'[^\w\s-]', '', t.label).strip().replace(' ', '-')[:30].lower() or 'doc'
+            filename = f"template-{ts}-{rand}-{safe}{ext}"
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            t.file_path = f"/api/uploads/{filename}"
     db.session.commit()
-    return jsonify({"msg": "Updated"})
+    return jsonify({"msg": "Updated", "file_path": t.file_path})
 
 @app.route('/api/admin/document-templates/<int:tid>', methods=['DELETE'])
 @jwt_required()
