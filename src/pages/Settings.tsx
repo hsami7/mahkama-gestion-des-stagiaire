@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
-import { Eye, PencilSimple, Trash } from '@phosphor-icons/react';
+import { PencilSimple, Trash } from '@phosphor-icons/react';
 
 export function Settings() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -462,7 +462,6 @@ function DocumentTemplatesManager() {
           <thead>
             <tr style={{ borderBottom: '1px solid var(--gold-light)' }}>
               <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>الاسم</th>
-              <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>الملف</th>
               <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>الحالة</th>
               <th style={{ padding: '10px 8px', color: 'var(--slate)', fontWeight: 'normal' }}>إجراء</th>
             </tr>
@@ -471,9 +470,6 @@ function DocumentTemplatesManager() {
             {templates.map(t => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--paper)' }}>
                 <td style={{ padding: '10px 8px', fontWeight: 'bold' }}>{t.label}</td>
-                <td style={{ padding: '10px 8px', fontSize: 12, color: 'var(--slate)' }}>
-                  {t.file_path ? <span style={{ color: 'var(--success)' }}>✓ ملف مرفوع</span> : '—'}
-                </td>
                 <td style={{ padding: '10px 8px' }}>
                   <span
                     onClick={() => toggleActive(t)}
@@ -488,11 +484,6 @@ function DocumentTemplatesManager() {
                 </td>
                 <td style={{ padding: '10px 8px' }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    {t.file_path && (
-                      <button className="btn btn-ghost sm" title="عرض الملف" onClick={() => window.open(`${API_BASE}${t.file_path}`, '_blank')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Eye size={14} />
-                      </button>
-                    )}
                     <button className="btn btn-ghost sm" title="تعديل" onClick={() => { setEditModal(t); setEditLabel(t.label); setEditFile(null); }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
                       <PencilSimple size={14} />
                     </button>
