@@ -1051,6 +1051,8 @@ return rows.map(row => {
                   
                   const d = row;
                   const isTemplate = d.source === 'TEMPLATE_VIEW';
+                  const isTemplateAdminPending = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'ADMIN';
+                  const isTemplateInternPending = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'INTERN';
                   const actionLabelMap: any = { 'view': 'عرض فقط', 'sign': 'توقيع', 'fill': 'تعبئة وإرجاع', 'sign_fill': 'توقيع وتعبئة' };
                   const actionLabel = isTemplate ? 'مستند مطلوب' : (actionLabelMap[d.action_type] || 'رفع');
                   const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
@@ -1074,10 +1076,10 @@ return rows.map(row => {
                     return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>{d.status}</span>;
                   };
                   
-                  const showViewDownload = !!d.file_path && !(isTemplate && d.status === 'PENDING_REVIEW');
+                  const showViewDownload = !!d.file_path && !isTemplateAdminPending;
                   const showReturnedView = !!d.returned_file_path;
-                  const showApprove = canManageDocs && (d.status === 'RETURNED' || (d.status === 'PENDING_REVIEW' && !(isTemplate && d.uploaded_by === 'ADMIN')));
-                  const showRevisionRequest = canManageDocs && isSignFill && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED';
+                  const showApprove = canManageDocs && (d.status === 'RETURNED' || (d.status === 'PENDING_REVIEW' && !isTemplateAdminPending));
+                  const showRevisionRequest = canManageDocs && (isSignFill || isTemplateInternPending) && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED';
 
                   return (
                     <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>

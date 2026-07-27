@@ -642,8 +642,11 @@ for (const [base, docs] of grouped) {
                                         d.status === 'AWAITING_RETURN' ? 'badge-warning' : '';
                                 
                                 const isTemplate = d.source === 'TEMPLATE_VIEW';
-                                const showViewDownload = !!d.file_path && !(isTemplate && d.status === 'PENDING_REVIEW');
-                                const canUpload = (!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || (isTemplate && d.status === 'PENDING_REVIEW');
+                                const isTemplatePendingAdmin = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'ADMIN';
+                                const isTemplatePendingIntern = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'INTERN';
+                                const showViewDownload = !!d.file_path && !isTemplatePendingAdmin;
+                                const canUpload = (!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin;
+                                const isUploadDisabled = isTemplatePendingIntern;
                                 return (
                                   <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
                                     <td style={{ padding: '10px 8px' }}>
@@ -710,6 +713,12 @@ for (const [base, docs] of grouped) {
                                               <UploadSimple size={14} /> {d.status === 'REVISION_REQUESTED' ? 'إعادة رفع' : 'رفع'}
                                             </button>
                                           </>
+                                        )}
+                                        {/* 5️⃣ Disabled upload (template doc, intern already uploaded, waiting for approval) */}
+                                        {isUploadDisabled && (
+                                          <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11, opacity: 0.4, cursor: 'not-allowed' }} disabled>
+                                            <UploadSimple size={14} /> رفع
+                                          </button>
                                         )}
                                       </div>
                                     </td>
