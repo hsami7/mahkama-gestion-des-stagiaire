@@ -1571,7 +1571,7 @@ def create_intern_document_lifecycle(intern_id):
     action_type = data.get('action_type', 'view')
     now = datetime.now(timezone.utc)
     record = DocumentLifecycle(
-        intern_id=intern.id, doc_type=doc_type, status='AWAITING_RETURN' if action_type in ('sign', 'fill', 'sign_fill') else 'MISSING',
+        intern_id=intern.id, doc_type=doc_type, status='MISSING',
         uploaded_by='ADMIN', is_visible_to_intern=True, requires_return=action_type in ('sign', 'fill', 'sign_fill'),
         custom_title=custom_title, action_type=action_type,
         created_at=now, updated_at=now

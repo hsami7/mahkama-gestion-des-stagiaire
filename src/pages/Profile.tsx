@@ -1719,8 +1719,12 @@ return rows.map(row => {
             </div>
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={() => setShowRequestModal(false)}>إلغاء</button>
+              {Array.from(requestActionTypes).some(t => t === 'sign' || t === 'fill') && requestFiles.length === 0 && (
+                <div style={{color:'#DC2626', fontSize:12, marginBottom:8}}>يجب رفع ملف للمستندات التي تتطلب توقيع أو تعبئة</div>
+              )}
               <button className="btn btn-gold" disabled={
-                !requestTitle.trim() && requestFiles.length === 0
+                (!requestTitle.trim() && requestFiles.length === 0) ||
+                (Array.from(requestActionTypes).some(t => t === 'sign' || t === 'fill') && requestFiles.length === 0)
               } onClick={async () => {
                 try {
                   let total = 0;
