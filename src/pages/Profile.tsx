@@ -1047,7 +1047,7 @@ return rows.map(row => {
                               <CheckCircle size={14} />
                             </button>
                           )}
-                          {canManageDocs && isSignFillRow && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && (
+                          {canManageDocs && isSignFillRow && d.file_path && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && (
                             <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
                               <ArrowsClockwise size={14} />
                             </button>
@@ -1103,7 +1103,7 @@ return rows.map(row => {
                   const showViewDownload = !!d.file_path && !isTemplateAdminPending;
                   const showReturnedView = !!d.returned_file_path;
                   const showApprove = canManageDocs && (d.status === 'RETURNED' || (d.status === 'PENDING_REVIEW' && !isTemplateAdminPending));
-                  const showRevisionRequest = canManageDocs && (isSignFill || isTemplateInternPending) && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED';
+                  const showRevisionRequest = canManageDocs && (isSignFill || isTemplateInternPending) && d.file_path && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED';
 
                   return (
                     <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
