@@ -603,6 +603,12 @@ for (const [base, docs] of grouped) {
                                               </button>
                                             </>
                                           )}
+                                          {/* Greyed upload if already returned */}
+                                          {bothReturned && (
+                                            <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11, opacity: 0.4, cursor: 'not-allowed' }} disabled>
+                                              <UploadSimple size={14} /> رفع
+                                            </button>
+                                          )}
                                         </div>
                                       </td>
                                     </tr>

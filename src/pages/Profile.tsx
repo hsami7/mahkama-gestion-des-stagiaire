@@ -1042,6 +1042,16 @@ return rows.map(row => {
                               </button>
                             );
                           })()}
+                          {canManageDocs && (d.status === 'RETURNED' || d.status === 'PENDING_REVIEW') && (
+                            <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                              <CheckCircle size={14} />
+                            </button>
+                          )}
+                          {canManageDocs && isSignFillRow && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && (
+                            <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                              <ArrowsClockwise size={14} />
+                            </button>
+                          )}
                           {canManageDocs && (
                             <button className="btn btn-ghost sm" onClick={async () => {
                               const docsToDelete = isSignFillRow ? [d] : [d, fillDoc];
