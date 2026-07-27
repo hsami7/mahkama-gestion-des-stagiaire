@@ -711,13 +711,13 @@ for (const [base, docs] of grouped) {
                                   </tr>
 );
                               });
-                            })}
+})()}
                           </tbody>
                           </table>
                         )}
                       </>
                     );
-                  })}
+                  })()}
               </div>
             </>)}
           </div>
