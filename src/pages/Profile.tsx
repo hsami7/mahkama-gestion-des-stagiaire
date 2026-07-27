@@ -1047,7 +1047,7 @@ return rows.map(row => {
                               <CheckCircle size={14} />
                             </button>
                           )}
-                          {canManageDocs && isSignFillRow && d.file_path && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && (
+                          {canManageDocs && isSignFillRow && d.file_path && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && d.status !== 'AWAITING_RETURN' && (
                             <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
                               <ArrowsClockwise size={14} />
                             </button>
