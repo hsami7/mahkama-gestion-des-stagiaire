@@ -1050,8 +1050,9 @@ return rows.map(row => {
                   }
                   
                   const d = row;
+                  const isTemplate = d.source === 'TEMPLATE_VIEW';
                   const actionLabelMap: any = { 'view': 'عرض فقط', 'sign': 'توقيع', 'fill': 'تعبئة وإرجاع', 'sign_fill': 'توقيع وتعبئة' };
-                  const actionLabel = actionLabelMap[d.action_type] || 'رفع';
+                  const actionLabel = isTemplate ? 'مستند مطلوب' : (actionLabelMap[d.action_type] || 'رفع');
                   const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
                   const isView = d.action_type === 'view';
                   

@@ -649,6 +649,8 @@ for (const [base, docs] of grouped) {
                                       <div style={{ fontWeight: 600, color: 'var(--ink)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fileLabel}>
                                         {fileLabel}
                                         {(() => {
+                                          const isTemplate = d.source === 'TEMPLATE_VIEW';
+                                          if (isTemplate) return <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>(مستند مطلوب)</span>;
                                           const badgeMap: any = {
                                             'view': 'عرض فقط',
                                             'sign': 'توقيع',

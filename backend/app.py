@@ -265,6 +265,7 @@ class DocumentLifecycle(db.Model):
     file_type = db.Column(db.String(20), default='pdf')
     action_type = db.Column(db.String(20), default='view')
     requested_by = db.Column(db.String(20), default='ADMIN')
+    source = db.Column(db.String(20), default='ADMIN')
 
     intern = db.relationship('Intern', foreign_keys=[intern_id], backref='documents_lifecycle')
     assigned_to = db.relationship('Intern', foreign_keys=[assigned_to_intern_id])
@@ -454,6 +455,38 @@ def init_db():
         except Exception as e:
             db.session.rollback()
             print(f"DocumentLifecycle migration failed: {e}")
+
+        # Add source column to document_lifecycle + backfill TEMPLATE_VIEW
+        try:
+            dl_cols = [c['name'] for c in db.inspect(db.engine).get_columns('document_lifecycle')]
+            with db.engine.connect() as conn:
+                from sqlalchemy import text as sql_text
+                if 'source' not in dl_cols:
+                    conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN source VARCHAR(20) DEFAULT 'ADMIN'"))
+                conn.commit()
+            # Backfill old template-created rows — action_type='view', custom_title matches
+            # an active template label. Stamp them as TEMPLATE_VIEW (regardless of file_path).
+            with app.app_context():
+                active_titles = set()
+                try:
+                    for t in DocumentTemplate.query.filter_by(is_active=True).all():
+                        active_titles.add(t.label)
+                except Exception:
+                    active_titles = set()
+                if active_titles:
+                    rows = DocumentLifecycle.query.filter(
+                        DocumentLifecycle.action_type == 'view',
+                        DocumentLifecycle.custom_title.in_(active_titles),
+                        (DocumentLifecycle.source == 'ADMIN') | (DocumentLifecycle.source.is_(None))
+                    ).all()
+                    for r in rows:
+                        r.source = 'TEMPLATE_VIEW'
+                    if rows:
+                        db.session.commit()
+                        print(f"Backfilled {len(rows)} template-created docs with source=TEMPLATE_VIEW")
+        except Exception as e:
+            db.session.rollback()
+            print(f"source column migration/backfill failed: {e}")
 
         # Create DocumentTemplate table
         try:
@@ -800,7 +833,8 @@ def add_intern():
             intern_id=new_intern.id, doc_type='OTHER', status='MISSING',
             uploaded_by='ADMIN', is_visible_to_intern=True,
             custom_title=t.label, action_type='view',
-            created_at=now, updated_at=now
+            created_at=now, updated_at=now,
+            source='TEMPLATE_VIEW'
         )
         db.session.add(record)
     if templates:
@@ -809,7 +843,7 @@ def add_intern():
     current_user = get_jwt()
     user_name = current_user.get('name') if current_user else 'Unknown'
     log_action(user_name, f"قام بإضافة متدرب جديد: {new_intern.name}")
-    
+
     return jsonify({"success": True, "id": new_intern.id})
 
 @app.route('/api/interns/<int:intern_id>', methods=['PUT'])
@@ -837,7 +871,8 @@ def update_intern(intern_id):
                         intern_id=intern.id, doc_type='OTHER', status='MISSING',
                         uploaded_by='ADMIN', is_visible_to_intern=True,
                         custom_title=t.label, action_type='view',
-                        created_at=now, updated_at=now
+                        created_at=now, updated_at=now,
+                        source='TEMPLATE_VIEW'
                     )
                     db.session.add(record)
             if templates:
@@ -2346,6 +2381,7 @@ def list_intern_documents(intern_id):
             "file_type": d.file_type or 'pdf',
             "action_type": d.action_type or 'view',
             "requested_by": d.requested_by or ('INTERN' if (d.uploaded_by or '') == 'INTERN' else 'ADMIN'),
+            "source": d.source or 'ADMIN',
         })
     return jsonify(result), 200
 
@@ -2773,6 +2809,7 @@ def list_my_documents():
             "file_type": d.file_type or 'pdf',
             "action_type": d.action_type or 'view',
             "requested_by": d.requested_by or ('INTERN' if (d.uploaded_by or '') == 'INTERN' else 'ADMIN'),
+            "source": d.source or 'ADMIN',
         }
         result.append(entry)
     return jsonify(result), 200
@@ -3065,7 +3102,8 @@ def _process_submission_to_intern(submission):
             intern_id=new_intern.id, doc_type='OTHER', status='MISSING',
             uploaded_by='ADMIN', is_visible_to_intern=True,
             custom_title=t.label, action_type='view',
-            created_at=now, updated_at=now
+            created_at=now, updated_at=now,
+            source='TEMPLATE_VIEW'
         )
         db.session.add(record)
 
