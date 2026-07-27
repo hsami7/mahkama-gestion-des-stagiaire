@@ -2515,6 +2515,7 @@ def upload_intern_document(intern_id):
         db.session.flush()
     else:
         record.status = 'PENDING_REVIEW'
+        record.uploaded_by = 'INTERN'
         record.updated_at = now
 
     safe_label = re.sub(r'[^\w\s-]', '', label_for_name).strip().replace(' ', '-')[:40].lower() or 'doc'

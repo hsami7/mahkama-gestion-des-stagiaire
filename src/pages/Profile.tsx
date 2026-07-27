@@ -1074,9 +1074,9 @@ return rows.map(row => {
                     return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>{d.status}</span>;
                   };
                   
-                  const showViewDownload = !!d.file_path;
+                  const showViewDownload = !!d.file_path && !(isTemplate && d.status === 'PENDING_REVIEW');
                   const showReturnedView = !!d.returned_file_path;
-                  const showApprove = canManageDocs && (d.status === 'RETURNED' || d.status === 'PENDING_REVIEW');
+                  const showApprove = canManageDocs && (d.status === 'RETURNED' || (d.status === 'PENDING_REVIEW' && !(isTemplate && d.uploaded_by === 'ADMIN')));
                   const showRevisionRequest = canManageDocs && isSignFill && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED';
 
                   return (

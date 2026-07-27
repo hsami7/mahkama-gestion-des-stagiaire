@@ -641,8 +641,9 @@ for (const [base, docs] of grouped) {
                                       d.status === 'REVISION_REQUESTED' ? 'badge-danger' :
                                         d.status === 'AWAITING_RETURN' ? 'badge-warning' : '';
                                 
-                                const showViewDownload = !!d.file_path;
-                                const canUpload = (!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path);
+                                const isTemplate = d.source === 'TEMPLATE_VIEW';
+                                const showViewDownload = !!d.file_path && !(isTemplate && d.status === 'PENDING_REVIEW');
+                                const canUpload = (!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || (isTemplate && d.status === 'PENDING_REVIEW');
                                 return (
                                   <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
                                     <td style={{ padding: '10px 8px' }}>
