@@ -993,7 +993,7 @@ return rows.map(row => {
                     return (
                     <tr key={row.id} style={{borderBottom:'1px solid var(--line)'}}>
                       <td style={{padding:'10px 8px'}}>
-                        <div style={{fontWeight:600, color:'var(--ink)'}}>
+                        <div style={{fontWeight:600, color:'var(--ink)', maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={row.base}>
                           {row.base}
                           <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>{isSignFillRow ? '(توقيع وتعبئة)' : '(توقيع) و (تعبئة وإرجاع)'}</span>
                         </div>
@@ -1084,7 +1084,7 @@ return rows.map(row => {
                   return (
                     <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
                       <td style={{padding:'10px 8px'}}>
-                        <div style={{fontWeight:600, color:'var(--ink)'}}>
+                        <div style={{fontWeight:600, color:'var(--ink)', maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={d.custom_title || d.doc_type}>
                           {d.custom_title || d.doc_type}
                           {actionLabel && <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>({actionLabel})</span>}
                         </div>
