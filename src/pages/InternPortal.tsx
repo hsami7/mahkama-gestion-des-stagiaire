@@ -506,9 +506,17 @@ for (const [base, docs] of grouped) {
                                 const both = docs.find(d => d.action_type === 'sign_fill');
                                 if (sign && fill) {
                                   rows.push({ id: `combined-${base}`, isCombined: true, sign, fill, base });
+                                  // Also include any other docs in this group (e.g., view-only)
+                                  docs.forEach(d => {
+                                    if (d !== sign && d !== fill) rows.push(d);
+                                  });
                                 } else if (both) {
                                   // sign_fill is a single combined action - treat as combined row
                                   rows.push({ id: `combined-${base}`, isCombined: true, sign: both, fill: both, base, isSignFill: true });
+                                  // Also include any other docs in this group (e.g., view-only, standalone sign/fill)
+                                  docs.forEach(d => {
+                                    if (d !== both) rows.push(d);
+                                  });
                                 } else {
                                   docs.forEach(d => rows.push(d));
                                 }
@@ -523,8 +531,10 @@ for (const [base, docs] of grouped) {
                                   // Use whichever doc has a file_path for view/download
                                   const fileDoc = d.file_path ? d : fillDoc.file_path ? fillDoc : null;
                                   const fileLabel = (d.custom_title || d.doc_type || row.base);
+                                  const isSignFillRow = !!row.isSignFill;
                                   const statusLabel = bothReturned ? 'مكتمل' : anyReturned ? 'قيد الإجراء' : 
-                                    (row.isSignFill ? 'بانتظار التوقيع والتعبئة' : 'بانتظار الرفع');
+                                    (isSignFillRow ? 'بانتظار التوقيع والتعبئة' : 
+                                     (d.status === 'AWAITING_RETURN' && fillDoc.status === 'AWAITING_RETURN') ? 'بانتظار التوقيع والتعبئة' : 'بانتظار الرفع');
                                   const statusClass = bothReturned ? 'badge-success' : anyReturned ? 'badge-warning' : 'badge-warning';
                                   return (
                                     <tr key={row.id} style={{ borderBottom: '1px solid var(--line)' }}>
@@ -699,35 +709,15 @@ for (const [base, docs] of grouped) {
                                       </div>
                                     </td>
                                   </tr>
-                                );
-                                        {canUpload && (
-                                          <>
-                                            <input type="file" id={inputId2} style={{ display: 'none' }} accept=".pdf" onChange={e => {
-                                              if (!e.target.files?.[0]) return;
-                                              const file = e.target.files[0];
-                                              if (isSignFill) {
-                                                handleSignFillUpload(d.id, file);
-                                              } else {
-                                                handleProactiveUpload(d.id, d.doc_type, file);
-                                              }
-                                            }} />
-                                            <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => document.getElementById(inputId2)?.click()}>
-                                              <UploadSimple size={14} /> {d.status === 'REVISION_REQUESTED' ? 'إعادة رفع' : 'رفع'}
-                                            </button>
-                                          </>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
+);
                               });
-                            })()}
+                            })}
                           </tbody>
-                        </table>
-                      )}
-                    </>
-                  );
-                })()}
+                          </table>
+                        )}
+                      </>
+                    );
+                  })}
               </div>
             </>)}
           </div>

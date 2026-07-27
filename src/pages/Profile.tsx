@@ -946,209 +946,213 @@ export function Profile() {
             return (
             <div style={{marginBottom:20}}>
               {filtered.length === 0 ? (
-                <div style={{textAlign:'center', padding:'16px', color:'var(--slate-light)', fontSize:13, background:'var(--paper)', borderRadius:8}}>
-                  {docFilter === 'pending' ? 'لا توجد مستندات قيد الإجراء' : docFilter === 'completed' ? 'لا توجد مستندات مكتملة' : 'لا توجد مستندات'}
+                <div className="empty-state" style={{padding:'32px 20px', border:'1px solid var(--line)', borderRadius:12}}>
+                  <div className="empty-icon"><FileText size={24} /></div>
+                  <h4>لا توجد مستندات</h4>
+                  <p>لم يتم رفع أي مستندات بعد.</p>
                 </div>
               ) : (
-              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
+              <table className="table" style={{background:'white'}}>
                 <thead>
-                  <tr style={{borderBottom:'1px solid var(--line)'}}>
-                    <th style={{textAlign:'right', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>المستند</th>
-                    <th style={{textAlign:'center', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>الحالة</th>
-                    <th style={{textAlign:'center', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>تاريخ</th>
-                    <th style={{textAlign:'left', padding:'8px 8px', color:'var(--slate-light)', fontWeight:600}}>إجراء</th>
+                  <tr>
+                    <th style={{textAlign:'right'}}>المستند</th>
+                    <th style={{textAlign:'center', width:120}}>الحالة</th>
+                    <th style={{textAlign:'center', width:120}}>تاريخ التحديث</th>
+                    <th style={{textAlign:'left', width:180}}>إجراء</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(() => {
-                    const rows: any[] = [];
-                    const grouped = new Map<string, any[]>();
-                    filtered.forEach(d => {
-                      const base = (d.custom_title || d.doc_type || '').replace(/\s*\(.*?\)\s*$/, '');
-                      if (!grouped.has(base)) grouped.set(base, []);
-                      grouped.get(base)!.push(d);
-                    });
-                    for (const [base, docs] of grouped) {
-                      const sign = docs.find(d => d.action_type === 'sign');
-                      const fill = docs.find(d => d.action_type === 'fill');
-                      const both = docs.find(d => d.action_type === 'sign_fill');
-                      if (sign && fill) {
-                        rows.push({ id: `combined-${base}`, isCombined: true, sign, fill, base });
-                      } else {
-                        docs.forEach(d => rows.push(d));
-                      }
-                    }
+              {(() => {
+                const rows: any[] = [];
+                const grouped = new Map<string, any[]>();
+                filtered.forEach(d => {
+                  const base = (d.custom_title || d.doc_type || '').replace(/\s*\(.*?\)\s*$/, '');
+                  if (!grouped.has(base)) grouped.set(base, []);
+                  grouped.get(base)!.push(d);
+                });
+for (const [base, docs] of grouped) {
+                  const sign = docs.find(d => d.action_type === 'sign');
+                  const fill = docs.find(d => d.action_type === 'fill');
+                  const both = docs.find(d => d.action_type === 'sign_fill');
+                  if (sign && fill) {
+                    rows.push({ id: `combined-${base}`, isCombined: true, sign, fill, base });
+                  } else if (both) {
+                    // sign_fill is a single combined action - treat as combined row
+                    rows.push({ id: `combined-${base}`, isCombined: true, sign: both, fill: both, base, isSignFill: true });
+                  } else {
+                    docs.forEach(d => rows.push(d));
+                  }
+                }
 return rows.map(row => {
-                      if (row.isCombined) {
-                        const d = row.sign;
-                        const fillDoc = row.fill;
-                        const bothReturned = d.returned_file_path && fillDoc.returned_file_path;
-                        const anyReturned = d.returned_file_path || fillDoc.returned_file_path;
-                        return (
-                        <tr key={row.id} style={{borderBottom:'1px solid var(--line)'}}>
-                          <td style={{padding:'10px 8px'}}>
-                            <div style={{fontWeight:600, color:'var(--ink)'}}>
-                              {row.base}
-                              <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>(توقيع) و (تعبئة وإرجاع)</span>
-                            </div>
-                            {anyReturned && (
-                              <div style={{marginTop:4}}>
-                                <span style={{display:'inline-flex', alignItems:'center', gap:4, background: bothReturned ? '#E7F8EE' : '#FFF6E5', color: bothReturned ? '#15803D' : '#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
-                                  {bothReturned ? <CheckCircle size={10} weight="fill" /> : <ArrowsClockwise size={10} weight="bold" />}
-                                  {bothReturned ? 'تمت الإعادة (توقيع وتعبئة)' : 'جاري الإعادة'}
-                                </span>
-                              </div>
-                            )}
-                          </td>
-                          <td style={{textAlign:'center', padding:'10px 8px'}}>
-                            {bothReturned ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
-                             anyReturned ? <span className="badge badge-warning" style={{fontSize:11}}>قيد الإجراء</span> :
-                             <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>}
-                          </td>
-                          <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
-                            {(d.file_path || fillDoc.file_path) ? formatDate((d.file_path ? d : fillDoc).updated_at || (d.file_path ? d : fillDoc).created_at) : '—'}
-                          </td>
-                          <td style={{textAlign:'left', padding:'10px 8px'}}>
-                            <div style={{display:'flex', gap:4, justifyContent:'flex-end', flexWrap:'wrap'}}>
-                              {/* View/download original */}
-                              {(d.file_path || fillDoc.file_path) && (() => {
-                                const fileDoc = d.file_path ? d : fillDoc;
-                                return (
-                                  <>
-                                    <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(fileDoc.id), '_blank')} title="معاينة الأصل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                      <Eye size={14} />
-                                    </button>
-                                    <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(fileDoc.id); a.download = ''; a.click(); }} title="تحميل الأصل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                      <DownloadSimple size={14} />
-                                    </button>
-                                  </>
-                                );
-                              })()}
-                              {/* View returned file */}
-                              {anyReturned && (() => {
-                                const retDoc = d.returned_file_path ? d : fillDoc;
-                                return (
-                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(retDoc.id) + '&returned=1', '_blank')} title="معاينة النسخة المعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                                    <Eye size={14} />
-                                  </button>
-                                );
-                              })()}
-                              {canManageDocs && !bothReturned && (
-                                <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                                  <ArrowsClockwise size={14} />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                        );
-                      }
-                      const d = row;
-                      const actionLabelMap: any = { 'view': 'عرض فقط', 'sign': 'توقيع', 'fill': 'تعبئة وإرجاع', 'sign_fill': 'توقيع وتعبئة' };
-                      const actionLabel = actionLabelMap[d.action_type] || 'رفع';
-                      const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
-                      const isView = d.action_type === 'view';
-                      
-                      // Determine status label based on action_type and status
-                      const getStatusBadge = () => {
-                        if (d.status === 'APPROVED_AND_SIGNED') return <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>;
-                        if (d.status === 'REVISION_REQUESTED') return <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span>;
-                        if (d.status === 'RETURNED') return <span className="badge badge-warning" style={{fontSize:11}}>بانتظار المراجعة</span>;
-                        if (d.status === 'PENDING_REVIEW') return <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span>;
-                        
-                        // For MISSING and AWAITING_RETURN, label depends on action_type
-                        if (isView) {
-                          // View-only: just waiting for file or approved
-                          if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                          if (d.file_path) return <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>;
-                          return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                        }
-                        if (d.action_type === 'sign') {
-                          if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                          return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع</span>;
-                        }
-                        if (d.action_type === 'fill') {
-                          if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                          return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التعبئة</span>;
-                        }
-                        if (d.action_type === 'sign_fill') {
-                          if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                          return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع والتعبئة</span>;
-                        }
-                        return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>{d.status}</span>;
-                      };
-                      
-                      const showViewDownload = !!d.file_path;
-                      const showReturnedView = !!d.returned_file_path;
-                      const showApprove = canManageDocs && (d.status === 'RETURNED' || d.status === 'PENDING_REVIEW');
-                      const showRevisionRequest = canManageDocs && isSignFill && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED';
-                      
-                      return (
-                      <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
-                        <td style={{padding:'10px 8px'}}>
-                          <div style={{fontWeight:600, color:'var(--ink)'}>
-                            {d.custom_title || d.doc_type}
-                            {actionLabel && <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>({actionLabel})</span>}
+                  if (row.isCombined) {
+                    const d = row.sign;
+                    const fillDoc = row.fill;
+                    const bothReturned = d.returned_file_path && fillDoc.returned_file_path;
+                    const anyReturned = d.returned_file_path || fillDoc.returned_file_path;
+                    const isSignFillRow = !!row.isSignFill;
+                    return (
+                    <tr key={row.id} style={{borderBottom:'1px solid var(--line)'}}>
+                      <td style={{padding:'10px 8px'}}>
+                        <div style={{fontWeight:600, color:'var(--ink)'}}>
+                          {row.base}
+                          <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>{isSignFillRow ? '(توقيع وتعبئة)' : '(توقيع) و (تعبئة وإرجاع)'}</span>
+                        </div>
+                        {anyReturned && (
+                          <div style={{marginTop:4}}>
+                            <span style={{display:'inline-flex', alignItems:'center', gap:4, background: bothReturned ? '#E7F8EE' : '#FFF6E5', color: bothReturned ? '#15803D' : '#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
+                              {bothReturned ? <CheckCircle size={10} weight="fill" /> : <ArrowsClockwise size={10} weight="bold" />}
+                              {bothReturned ? 'تمت الإعادة (توقيع وتعبئة)' : 'جاري الإعادة'}
+                            </span>
                           </div>
-                          {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
-                            <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
-                              <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
-                            </div>
-                          )}
-                          {isSignFill && d.file_path && !d.returned_file_path && (
-                            <div style={{marginTop:4}}>
-                              <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#FEF3C7', color:'#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
-                                في انتظار الرد من المتدرب
-                              </span>
-                            </div>
-                          )}
-                          {isSignFill && d.returned_file_path && (
-                            <div style={{marginTop:4}}>
-                              <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
-                                <CheckCircle size={10} weight="fill" /> تمت الإعادة
-                              </span>
-                            </div>
-                          )}
-                        </td>
-                        <td style={{textAlign:'center', padding:'10px 8px'}}>
-                          {getStatusBadge()}
-                        </td>
-                        <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
-                          {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
-                        </td>
-                        <td style={{textAlign:'left', padding:'10px 8px'}}>
-                          <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                            {showViewDownload && (
+                        )}
+                      </td>
+<td style={{textAlign:'center', padding:'10px 8px'}}>
+                        {bothReturned ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
+                         anyReturned ? <span className="badge badge-warning" style={{fontSize:11}}>قيد الإجراء</span> :
+                         isSignFillRow ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار التوقيع والتعبئة</span> :
+                         (d.status === 'AWAITING_RETURN' && fillDoc.status === 'AWAITING_RETURN') ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار التوقيع والتعبئة</span> :
+                         <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>}
+                      </td>
+                      <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
+                        {(d.file_path || fillDoc.file_path) ? formatDate((d.file_path ? d : fillDoc).updated_at || (d.file_path ? d : fillDoc).created_at) : '—'}
+                      </td>
+                      <td style={{textAlign:'left', padding:'10px 8px'}}>
+                        <div style={{display:'flex', gap:4, justifyContent:'flex-end', flexWrap:'wrap'}}>
+                          {/* View/download original */}
+                          {(d.file_path || fillDoc.file_path) && (() => {
+                            const fileDoc = d.file_path ? d : fillDoc;
+                            return (
                               <>
-                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(fileDoc.id), '_blank')} title="معاينة الأصل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                   <Eye size={14} />
                                 </button>
-                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(fileDoc.id); a.download = ''; a.click(); }} title="تحميل الأصل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                   <DownloadSimple size={14} />
                                 </button>
                               </>
-                            )}
-                            {showReturnedView && (
-                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} title="معاينة النسخة المعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                            );
+                          })()}
+                          {/* View returned file */}
+                          {anyReturned && (() => {
+                            const retDoc = d.returned_file_path ? d : fillDoc;
+                            return (
+                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(retDoc.id) + '&returned=1', '_blank')} title="معاينة النسخة المعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                                 <Eye size={14} />
                               </button>
-                            )}
-                            {showApprove && (
-                              <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                                <CheckCircle size={14} />
-                              </button>
-                            )}
-                            {showRevisionRequest && (
-                              <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                                <ArrowsClockwise size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                            );
+                          })()}
+                          {/* Admin approve revision requests for combined doc logic doesn't fully apply here currently but kept structure */}
+                        </div>
+                      </td>
+                    </tr>
                     );
-                  });
-                })()}
+                  }
+                  
+                  const d = row;
+                  const actionLabelMap: any = { 'view': 'عرض فقط', 'sign': 'توقيع', 'fill': 'تعبئة وإرجاع', 'sign_fill': 'توقيع وتعبئة' };
+                  const actionLabel = actionLabelMap[d.action_type] || 'رفع';
+                  const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
+                  const isView = d.action_type === 'view';
+                  
+                  // Determine status label based on action_type and status
+                  const getStatusBadge = () => {
+                    if (d.status === 'APPROVED_AND_SIGNED') return <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>;
+                    if (d.status === 'REVISION_REQUESTED') return <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span>;
+                    if (d.status === 'RETURNED') return <span className="badge badge-warning" style={{fontSize:11}}>بانتظار المراجعة</span>;
+                    if (d.status === 'PENDING_REVIEW') return <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span>;
+                    
+                    // For MISSING and AWAITING_RETURN, label depends on action_type
+                    if (isView) {
+                      // View-only: just waiting for file or approved
+                      if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
+                      if (d.file_path) return <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>;
+                      return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
+                    }
+                    if (d.action_type === 'sign') {
+                      if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
+                      return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع</span>;
+                    }
+                    if (d.action_type === 'fill') {
+                      if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
+                      return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التعبئة</span>;
+                    }
+                    if (d.action_type === 'sign_fill') {
+                      if (d.status === 'MISSING' && !d.file_path) return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
+                      return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع والتعبئة</span>;
+                    }
+                    return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>{d.status}</span>;
+                  };
+                  
+                  const showViewDownload = !!d.file_path;
+                  const showReturnedView = !!d.returned_file_path;
+                  const showApprove = canManageDocs && (d.status === 'RETURNED' || d.status === 'PENDING_REVIEW');
+                  const showRevisionRequest = canManageDocs && isSignFill && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED';
+
+                  return (
+                    <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
+                      <td style={{padding:'10px 8px'}}>
+                        <div style={{fontWeight:600, color:'var(--ink)'}}>
+                          {d.custom_title || d.doc_type}
+                          {actionLabel && <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>({actionLabel})</span>}
+                        </div>
+                      {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
+                        <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
+                          <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
+                        </div>
+                      )}
+                      {isSignFill && d.file_path && !d.returned_file_path && (
+                        <div style={{marginTop:4}}>
+                          <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#FEF3C7', color:'#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
+                            في انتظار الرد من المتدرب
+                          </span>
+                        </div>
+                      )}
+                      {isSignFill && d.returned_file_path && (
+                        <div style={{marginTop:4}}>
+                          <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
+                            <CheckCircle size={10} weight="fill" /> تمت الإعادة
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td style={{textAlign:'center', padding:'10px 8px'}}>
+                      {getStatusBadge()}
+                    </td>
+                    <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
+                      {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                    </td>
+                    <td style={{textAlign:'left', padding:'10px 8px'}}>
+                      <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                        {showViewDownload && (
+                          <>
+                            <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <Eye size={14} />
+                            </button>
+                            <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <DownloadSimple size={14} />
+                            </button>
+                          </>
+                        )}
+                        {showReturnedView && (
+                          <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} title="معاينة النسخة المعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                            <Eye size={14} />
+                          </button>
+                        )}
+                        {showApprove && (
+                          <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                            <CheckCircle size={14} />
+                          </button>
+                        )}
+                        {showRevisionRequest && (
+                          <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                            <ArrowsClockwise size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  );
+                });
               })()}
                 </tbody>
               </table>
@@ -1157,9 +1161,9 @@ return rows.map(row => {
             );
           })()}
 
-          {/* ZIP archive */}
-          <div style={{borderTop:'1px solid var(--line)', paddingTop:16}}>
-            <button className="btn btn-ghost" style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:12.5, border:'1.5px dashed var(--line)', borderRadius:8, color:'var(--slate)'}} onClick={async () => {
+            {/* ZIP archive */}
+            <div style={{borderTop:'1px solid var(--line)', paddingTop:16}}>
+              <button className="btn btn-ghost" style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:12.5, border:'1.5px dashed var(--line)', borderRadius:8, color:'var(--slate)'}} onClick={async () => {
               if (!id) return;
               try {
                 const res = await fetch(`${API_BASE}/interns/${id}/export-zip?token=${sessionStorage.getItem('token')}`);
