@@ -1042,7 +1042,21 @@ return rows.map(row => {
                               </button>
                             );
                           })()}
-                          {/* Admin approve revision requests for combined doc logic doesn't fully apply here currently but kept structure */}
+                          {canManageDocs && (
+                            <button className="btn btn-ghost sm" onClick={async () => {
+                              const docsToDelete = isSignFillRow ? [d] : [d, fillDoc];
+                              if (!confirm(`هل أنت متأكد من حذف ${docsToDelete.length > 1 ? 'هذه المستندات' : 'هذا المستند'}؟`)) return;
+                              try {
+                                await Promise.all(docsToDelete.map(doc => api.delete(`/interns/${id}/documents/${doc.id}`)));
+                                toast.success('تم حذف المستندات');
+                                fetchDocsLifecycle();
+                              } catch (err) {
+                                toast.error('فشل حذف المستندات');
+                              }
+                            }} title="حذف" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
+                              <Trash size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
