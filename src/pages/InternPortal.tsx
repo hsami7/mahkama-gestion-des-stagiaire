@@ -210,6 +210,17 @@ export function InternPortal() {
   // Count of revision-requested docs (for main page alert)
   const revisionCount = useMemo(() => lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length, [lifecycleDocs]);
 
+  const missingTemplateDocs = useMemo(() => lifecycleDocs.filter(d => d.status === 'MISSING' && d.action_type === 'view' && d.source === 'TEMPLATE_VIEW'), [lifecycleDocs]);
+
+  const virtualNotifications = useMemo(() => {
+    const virtual: any[] = missingTemplateDocs.map(d => ({
+      id: -d.id, title: 'مستند مطلوب',
+      body: `يرجى رفع "${d.custom_title || d.label}"`,
+      is_read: false, created_at: null, type: 'TEMPLATE'
+    }));
+    return [...virtual, ...notifications];
+  }, [missingTemplateDocs, notifications]);
+
   // Orange/yellow palette for request notifications
   const REQ_BG = '#FFF6E5';
   const REQ_FG = '#9A6B00';
@@ -238,7 +249,7 @@ export function InternPortal() {
         onLogout={handleLogout}
       />
       <div className="main">
-        <Header title={getPageTitle(activeTab)} missingCount={missingCount} notifications={notifications} onReadNotification={async (id) => {
+        <Header title={getPageTitle(activeTab)} missingCount={missingCount} notifications={virtualNotifications} onReadNotification={async (id) => {
           try {
             await api.post(`/notifications/${id}/read`, {});
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
