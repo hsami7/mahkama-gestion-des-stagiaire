@@ -35,6 +35,7 @@ export function InternPortal() {
   const [showInternUploadModal, setShowInternUploadModal] = useState(false);
   const [internUploadTitle, setInternUploadTitle] = useState('');
   const [internUploadFile, setInternUploadFile] = useState<File | null>(null);
+  const [internUploadActionTypes, setInternUploadActionTypes] = useState<Set<string>>(new Set(['view']));
   const [docFilter, setDocFilter] = useState('all');
 
   const userStr = sessionStorage.getItem('user');
@@ -480,7 +481,7 @@ export function InternPortal() {
                           </button>
                         ))}
                         </div>
-                        <button className="btn btn-gold sm" onClick={() => { setInternUploadTitle(''); setInternUploadFile(null); setShowInternUploadModal(true); }} style={{ fontSize: 12, padding: '8px 16px' }}>
+                        <button className="btn btn-gold sm" onClick={() => { setInternUploadTitle(''); setInternUploadFile(null); setInternUploadActionTypes(new Set(['view'])); setShowInternUploadModal(true); }} style={{ fontSize: 12, padding: '8px 16px' }}>
                           <UploadSimple size={14} /> إضافة ملف
                         </button>
                       </div>
@@ -848,42 +849,95 @@ for (const [base, docs] of grouped) {
 
       {showInternUploadModal && (
         <div className="overlay on" style={{ display: 'flex' }}>
-          <div className="modal" style={{ maxWidth: 460 }}>
+          <div className="modal" style={{ maxWidth: 600 }}>
             <div className="modal-head">
-              <h3>إضافة ملف</h3>
+              <h3>طلب مستند / إضافة ملف</h3>
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowInternUploadModal(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-group">
                 <label>اسم المستند</label>
-                <input type="text" className="input" value={internUploadTitle} onChange={e => setInternUploadTitle(e.target.value)} placeholder="شهادة خبرة، تقرير ..." />
+                <input type="text" className="input" value={internUploadTitle} onChange={e => setInternUploadTitle(e.target.value)} placeholder="اتفاقية التدريب المعدلة 2026" />
+                {!internUploadFile && <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>إذا لم تختر ملفًا، سيتم إنشاء طلب للمتدرب لرفع المستند</small>}
               </div>
+
               <div className="form-group">
                 <label>الملف</label>
-                <input type="file" className="input" onChange={e => setInternUploadFile(e.target.files?.[0] || null)} />
-                {internUploadFile && (
-                  <div style={{ marginTop: 6, padding: '6px 10px', background: '#EFF6FF', borderRadius: 6, border: '1px solid #BFDBFE', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <FileText size={14} color="#2563EB" />
-                    <span style={{ fontWeight: 600 }}>{internUploadFile.name}</span>
-                    <button className="btn btn-ghost sm" onClick={() => setInternUploadFile(null)} style={{ marginRight: 'auto', padding: 2 }}><X size={14} /></button>
+                <div style={{display:'flex', gap:8, alignItems:'flex-start'}}>
+                  <div style={{flex:1}}>
+                    <input type="file" className="input" id="intern-file-upload" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => {
+                      const file = e.target.files?.[0] || null;
+                      setInternUploadFile(file);
+                      if (file && !internUploadTitle.trim()) {
+                        setInternUploadTitle(file.name.replace(/\.\w+$/, ''));
+                      }
+                    }} style={{display:'none'}} />
+                    <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('intern-file-upload')?.click()} style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:13, border:'1.5px dashed var(--line)', borderRadius:8}}>
+                      <UploadSimple size={16} /> {internUploadFile ? 'تغيير الملف' : 'اختيار ملف من الجهاز'}
+                    </button>
+                    {internUploadFile && (
+                      <div style={{marginTop:6, padding:'6px 10px', background:'#EFF6FF', borderRadius:6, border:'1px solid #BFDBFE', fontSize:12, display:'flex', alignItems:'center', gap:6}}>
+                        <FileText size={14} color="#2563EB" />
+                        <span style={{fontWeight:600}}>{internUploadFile.name}</span>
+                        <button className="btn btn-ghost sm" onClick={() => setInternUploadFile(null)} style={{marginRight:'auto', padding:2}}><X size={14} /></button>
+                      </div>
+                    )}
                   </div>
-                )}
-                <small style={{ color: 'var(--slate-light)', display: 'block', marginTop: 4 }}>سيتم رفع الملف وإرساله للإدارة للمراجعة</small>
+                </div>
+              <div className="form-group" style={{marginTop:16}}>
+                <label>نوع الطلب للملفات المرفوعة</label>
+                <div style={{display:'flex', flexDirection:'column', gap:8, padding:'8px 12px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
+                  {(['view','sign','fill'] as const).map(type => {
+                    const viewLocked = type === 'view' && (internUploadActionTypes.has('sign') || internUploadActionTypes.has('fill'));
+                    return (
+                    <label key={type} style={{display:'flex', alignItems:'center', gap:10, cursor: viewLocked ? 'not-allowed' : 'pointer', fontSize:13, padding:'4px 0', opacity: viewLocked ? 0.5 : 1}}>
+                      <input type="checkbox" checked={internUploadActionTypes.has(type)} disabled={viewLocked} onChange={e => {
+                        const next = new Set(internUploadActionTypes);
+                        if (type === 'sign' || type === 'fill') next.delete('view');
+                        e.target.checked ? next.add(type) : next.delete(type);
+                        if (next.size === 0) next.add('view');
+                        setInternUploadActionTypes(next);
+                      }} style={{width:18,height:18,cursor: viewLocked ? 'not-allowed' : 'pointer', accentColor:'var(--gold-dark)'}} />
+                      <span style={{fontWeight: internUploadActionTypes.has(type) ? 600 : 400}}>
+                        {type === 'view' ? 'عرض فقط — المتدرب يرى ويحمل المستند' : ''}
+                        {type === 'sign' ? 'توقيع — المتدرب يوقع ويعيد النسخة' : ''}
+                        {type === 'fill' ? 'تعبئة وإرجاع — المتدرب يعبي النموذج ويعيده' : ''}
+                      </span>
+                    </label>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={() => setShowInternUploadModal(false)}>إلغاء</button>
-              <button className="btn btn-gold" disabled={!internUploadFile} onClick={async () => {
+              <button className="btn btn-ghost" onClick={() => { setShowInternUploadModal(false); setInternUploadActionTypes(new Set(['view'])); }}>إلغاء</button>
+              {Array.from(internUploadActionTypes).some(t => t === 'sign' || t === 'fill') && !internUploadFile && (
+                <div style={{color:'#DC2626', fontSize:12, marginBottom:8}}>يجب رفع ملف للمستندات التي تتطلب توقيع أو تعبئة</div>
+              )}
+              <button className="btn btn-gold" disabled={
+                (!internUploadTitle.trim() && !internUploadFile) ||
+                (Array.from(internUploadActionTypes).some(t => t === 'sign' || t === 'fill') && !internUploadFile)
+              } onClick={async () => {
                 const title = internUploadTitle.trim() || internUploadFile?.name.replace(/\.\w+$/, '') || 'مستند';
+                let types = Array.from(internUploadActionTypes);
+                if (types.includes('sign') && types.includes('fill')) types = ['sign_fill'];
+                const primaryType = types[0] || 'view';
                 try {
-                  await api.uploadInternDocument(internData?.id, 'OTHER', internUploadFile, undefined, title);
+                  if (internUploadFile) {
+                    await api.uploadInternDocument(internData?.id, 'OTHER', internUploadFile, undefined, title);
+                  } else {
+                    await api.post(`/interns/${internData?.id}/document-lifecycle`, {
+                      document_type: 'OTHER', custom_title: title, action_type: primaryType
+                    });
+                  }
                   setShowInternUploadModal(false);
                   setInternUploadFile(null);
                   setInternUploadTitle('');
+                  setInternUploadActionTypes(new Set(['view']));
                   fetchLifecycleDocs();
-                  setToastMsg({ msg: 'تم رفع الملف بنجاح', type: 'success' });
+                  setToastMsg({ msg: 'تم إرسال الطلب بنجاح', type: 'success' });
                 } catch {
-                  setToastMsg({ msg: 'فشل رفع الملف', type: 'error' });
+                  setToastMsg({ msg: 'فشل إرسال الطلب', type: 'error' });
                 }
               }}>
                 <UploadSimple size={14} /> رفع الملف
