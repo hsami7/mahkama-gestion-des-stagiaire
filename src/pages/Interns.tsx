@@ -502,7 +502,8 @@ const filteredInterns = useMemo(() => {
                 const isActive = intern.status === 'نشط';
                 const endingSoon = isActive && rem !== null && rem <= 30;
                 return (
-                  <div key={intern.id} className="dossier" onClick={() => navigate(`/interns/${intern.id}`)}>
+                  <div key={intern.id} className="dossier" onClick={() => navigate(`/interns/${intern.id}`)} style={{position:'relative'}}>
+                    {intern.has_pending_activity && <span style={{position:'absolute', top:12, right:12, width:10, height:10, borderRadius:'50%', background:'#DC2626', border:'2px solid #fff', zIndex:2}}></span>}
                     <div className="stamp">
                       {intern.status === 'نشط' && <span className="badge ok"><div className="dot"></div>نشط</span>}
                       {intern.status === 'مستندات ناقصة' && <span className="badge bad"><div className="dot"></div>مستندات ناقصة</span>}

@@ -754,6 +754,7 @@ def delete_user(user_id):
 @jwt_required()
 def get_interns():
     interns = Intern.query.all()
+    activity_statuses = {'PENDING_REVIEW', 'RETURNED'}
     return jsonify([{
         "id": i.id, 
         "name": i.name, 
@@ -767,7 +768,12 @@ def get_interns():
         "end_date": i.end_date,
         "department": i.department,
         "source": i.source,
-        "has_final_report": DocumentLifecycle.query.filter_by(intern_id=i.id, doc_type='FINAL_REPORT').first() is not None
+        "has_final_report": DocumentLifecycle.query.filter_by(intern_id=i.id, doc_type='FINAL_REPORT').first() is not None,
+        "has_pending_activity": DocumentLifecycle.query.filter(
+            DocumentLifecycle.intern_id == i.id,
+            DocumentLifecycle.status.in_(activity_statuses),
+            DocumentLifecycle.uploaded_by != 'ADMIN'
+        ).first() is not None
     } for i in interns])
 
 def create_user_for_intern(intern_obj):
