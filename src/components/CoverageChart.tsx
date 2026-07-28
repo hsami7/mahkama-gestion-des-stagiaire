@@ -17,8 +17,11 @@ function parseDate(value?: string): Date | null {
   if (!value || value.trim() === '') return null;
   const v = value.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return new Date(v + 'T00:00:00');
+  if (/^\d{4}-\d{2}-\d{2}T/.test(v)) return new Date(v);
   const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (m) return new Date(`${m[3]}-${m[2]}-${m[1]}T00:00:00`);
+  const d = new Date(v);
+  if (!isNaN(d.getTime())) return d;
   return null;
 }
 
