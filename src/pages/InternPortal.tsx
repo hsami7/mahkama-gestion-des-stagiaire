@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise, ClipboardText } from '@phosphor-icons/react';
+import { X, CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise, ClipboardText, Trash } from '@phosphor-icons/react';
 import { api, API_BASE } from '../services/api';
 import { handleViewFile, handleDownloadFile } from '../utils/documentUtils';
 import { InternSidebar } from '../components/InternSidebar';
@@ -199,14 +199,14 @@ export function InternPortal() {
   // Pending re-upload requests + sign/fill docs that need attention + revision-requested docs
   const pendingCount = useMemo(() => {
     const reqs = requests.filter((r: any) => !isRequestUploaded(r)).length;
-    const signFill = lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && !d.returned_file_path).length;
+    const signFill = lifecycleDocs.filter(d => d.requested_by !== 'INTERN' && (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && !d.returned_file_path).length;
     const revisionReqs = lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length;
     const missingTemplateDocs = lifecycleDocs.filter(d => d.status === 'MISSING' && d.action_type === 'view' && d.source === 'TEMPLATE_VIEW').length;
     return reqs + signFill + revisionReqs + missingTemplateDocs;
   }, [requests, lifecycleDocs]);
 
   // Count of sign/fill lifecycle docs that need the intern's return
-  const signFillCount = useMemo(() => lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && !d.returned_file_path).length, [lifecycleDocs]);
+  const signFillCount = useMemo(() => lifecycleDocs.filter(d => d.requested_by !== 'INTERN' && (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && !d.returned_file_path).length, [lifecycleDocs]);
 
   // Count of revision-requested docs (for main page alert)
   const revisionCount = useMemo(() => lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length, [lifecycleDocs]);
@@ -598,7 +598,7 @@ for (const [base, docs] of grouped) {
                                           {/* Upload return if not approved and not both returned */}
                                           {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && !bothReturned && (
                                             <>
-                                              <input type="file" id={inputId} style={{ display: 'none' }} accept=".pdf" onChange={e => {
+                                              <input type="file" id={inputId} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => {
                                                 if (!e.target.files?.[0]) return;
                                                 const file = e.target.files[0];
                                                 [d, fillDoc].forEach(doc => {
@@ -718,8 +718,8 @@ for (const [base, docs] of grouped) {
                                             try {
                                               await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-accept`, {});
                                               fetchLifecycleDocs();
-                                              setToastMsg({ msg: 'تم قبول المستند', type: 'success' });
-                                            } catch { setToastMsg({ msg: 'فشل قبول المستند', type: 'error' }); }
+                                              showToast('تم قبول المستند', 'success');
+                                            } catch { showToast('فشل قبول المستند', 'error'); }
                                           }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
                                             <CheckCircle size={14} />
                                           </button>
@@ -729,8 +729,8 @@ for (const [base, docs] of grouped) {
                                             try {
                                               await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
                                               fetchLifecycleDocs();
-                                              setToastMsg({ msg: 'تم طلب إعادة الرفع', type: 'success' });
-                                            } catch { setToastMsg({ msg: 'فشل إرسال الطلب', type: 'error' }); }
+                                              showToast('تم طلب إعادة الرفع', 'success');
+                                            } catch { showToast('فشل إرسال الطلب', 'error'); }
                                           }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
                                             <ArrowsClockwise size={14} />
                                           </button>
@@ -752,7 +752,7 @@ for (const [base, docs] of grouped) {
                                         {/* 4️⃣ Upload / re-upload button */}
                                         {canUpload && (
                                           <>
-                                            <input type="file" id={inputId2} style={{ display: 'none' }} accept=".pdf" onChange={e => {
+                                            <input type="file" id={inputId2} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => {
                                               if (!e.target.files?.[0]) return;
                                               const file = e.target.files[0];
                                               if (isSignFill) {
@@ -770,6 +770,19 @@ for (const [base, docs] of grouped) {
                                         {isUploadDisabled && (
                                           <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11, opacity: 0.4, cursor: 'not-allowed' }} disabled>
                                             <UploadSimple size={14} /> رفع
+                                          </button>
+                                        )}
+                                        {/* 6️⃣ Cancel button — intern can delete own request while AWAITING_ADMIN */}
+                                        {isInternInitiatedSignFill && d.status === 'AWAITING_ADMIN' && (
+                                          <button className="btn btn-ghost sm" title="حذف الطلب" onClick={async () => {
+                                            if (!confirm('هل تريد حذف هذا الطلب؟')) return;
+                                            try {
+                                              await api.post(`/interns/${internData?.id}/documents/${d.id}/cancel-request`, {});
+                                              showToast('تم حذف الطلب', 'success');
+                                              fetchLifecycleDocs();
+                                            } catch { showToast('فشل حذف الطلب', 'error'); }
+                                          }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)' }}>
+                                            <Trash size={14} />
                                           </button>
                                         )}
                                         </>
@@ -980,9 +993,9 @@ for (const [base, docs] of grouped) {
                   setInternUploadTitle('');
                   setInternUploadActionTypes(new Set(['view']));
                   fetchLifecycleDocs();
-                  setToastMsg({ msg: 'تم إرسال الطلب بنجاح', type: 'success' });
+                  showToast('تم إرسال الطلب بنجاح', 'success');
                 } catch {
-                  setToastMsg({ msg: 'فشل إرسال الطلب', type: 'error' });
+                  showToast('فشل إرسال الطلب', 'error');
                 }
               }}>
                 <UploadSimple size={14} /> رفع الملف
@@ -994,7 +1007,7 @@ for (const [base, docs] of grouped) {
 
       <div id="toast" className={toastMsg ? 'on' : ''} style={{
         position: 'fixed', bottom: 26, left: '50%', transform: toastMsg ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(20px)',
-        background: 'var(--ink)', color: '#fff', padding: '13px 22px', borderRadius: 10, fontSize: 13.5, opacity: toastMsg ? 1 : 0, transition: '.25s', zIndex: 100, display: 'flex', alignItems: 'center', gap: 9
+        background: toastMsg?.type === 'success' ? '#16A34A' : 'var(--ink)', color: '#fff', padding: '13px 22px', borderRadius: 10, fontSize: 13.5, opacity: toastMsg ? 1 : 0, transition: '.25s', zIndex: 100, display: 'flex', alignItems: 'center', gap: 9
       }}>
         {toastMsg?.msg}
       </div>

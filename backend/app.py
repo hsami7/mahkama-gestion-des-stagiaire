@@ -2617,10 +2617,15 @@ def upload_intern_document(intern_id):
         record = existing
 
     file_type = (record.file_type if record else request.form.get('file_type')) or 'pdf'
+    ext = ('.' + file.filename.rsplit('.', 1)[1].lower()) if '.' in file.filename else ''
     if not record and not request.form.get('file_type'):
-        ext = ('.' + file.filename.rsplit('.', 1)[1].lower()) if '.' in file.filename else ''
         for ft, exts in FILE_TYPE_EXTENSIONS.items():
             if ext in exts and ft != 'any':
+                file_type = ft
+                break
+    elif not _allowed_file(file.filename, file_type):
+        for ft, exts in FILE_TYPE_EXTENSIONS.items():
+            if ext in exts:
                 file_type = ft
                 break
     if not _allowed_file(file.filename, file_type):
@@ -2834,17 +2839,16 @@ def upload_returned_document(intern_id, doc_id):
     file = request.files['file']
     if file.filename == '':
         return jsonify({"msg": "No selected file"}), 400
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"msg": "PDF files only"}), 400
     file.seek(0, os.SEEK_END)
     size = file.tell()
     file.seek(0)
     if size > 15 * 1024 * 1024:
         return jsonify({"msg": "File too large (max 15MB)"}), 400
 
+    ext = '.' + file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else '.pdf'
+    if ext not in ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg']:
+        return jsonify({"msg": "PDF, Word, or image files only"}), 400
     filename = safe_filename('return', file.filename)
-    if not filename.lower().endswith('.pdf'):
-        filename += '.pdf'
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     file_url = f"/api/uploads/{filename}"
 
@@ -3691,6 +3695,34 @@ def auto_sync_loop():
 
 # Start background sync thread
 threading.Thread(target=auto_sync_loop, daemon=True).start()
+
+
+@app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/cancel-request', methods=['POST'])
+@jwt_required()
+def cancel_intern_request(intern_id, doc_id):
+    """Intern cancels their own sign/fill request before admin accepts."""
+    user_id = get_jwt_identity()
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"msg": "Unauthorized"}), 401
+
+    intern = Intern.query.filter_by(email=user.email).first()
+    if not intern:
+        return jsonify({"msg": "Unauthorized"}), 401
+
+    doc = db.session.get(DocumentLifecycle, doc_id)
+    if not doc or doc.intern_id != intern.id:
+        return jsonify({"msg": "Document not found"}), 400
+    if doc.requested_by != 'INTERN':
+        return jsonify({"msg": "Not an intern-initiated request"}), 400
+    if doc.status != 'AWAITING_ADMIN':
+        return jsonify({"msg": "Can only cancel while awaiting admin"}), 400
+
+    db.session.delete(doc)
+    db.session.commit()
+    log_action(user.name, f"ألغى المتدرب طلب {(doc.custom_title or doc.doc_type)}")
+    return jsonify({"success": True}), 200
+
 
 if __name__ == '__main__':
     init_db()

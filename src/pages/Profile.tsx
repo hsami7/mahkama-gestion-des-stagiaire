@@ -1161,10 +1161,17 @@ return rows.map(row => {
                           <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
                         </div>
                       )}
-                      {isSignFill && d.file_path && !d.returned_file_path && (
+                      {isSignFill && d.file_path && !d.returned_file_path && d.requested_by !== 'INTERN' && (
                         <div style={{marginTop:4}}>
                           <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#FEF3C7', color:'#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
                             في انتظار الرد من المتدرب
+                          </span>
+                        </div>
+                      )}
+                      {d.status === 'AWAITING_ADMIN' && d.requested_by === 'INTERN' && (
+                        <div style={{marginTop:4}}>
+                          <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#DBEAFE', color:'#1D4ED8', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
+                            بانتظار الإدارة
                           </span>
                         </div>
                       )}
@@ -1184,7 +1191,7 @@ return rows.map(row => {
                     </td>
                     <td style={{textAlign:'left', padding:'10px 8px'}}>
                       <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                      {docFilter === 'from_intern' && d.requested_by === 'INTERN' ? (
+                      {d.requested_by === 'INTERN' ? (
                         <>
                           {/* Common upload file picker helper */}
                           {(() => {
@@ -1226,23 +1233,6 @@ return rows.map(row => {
                                 } catch { toast.error('فشل قبول الطلب'); }
                               }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                                 <CheckCircle size={14} />
-                              </button>
-                              <button className="btn btn-ghost sm" onClick={() => {
-                                const input = document.createElement('input');
-                                input.type = 'file';
-                                input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                                input.onchange = async () => {
-                                  const file = input.files?.[0];
-                                  if (!file) return;
-                                  try {
-                                    await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
-                                    toast.success('تم رفع النسخة');
-                                    fetchDocsLifecycle();
-                                  } catch { toast.error('فشل رفع النسخة'); }
-                                };
-                                input.click();
-                              }} title="إعادة رفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                                <ArrowsClockwise size={14} />
                               </button>
                             </>
                           )}
