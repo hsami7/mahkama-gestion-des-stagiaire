@@ -835,42 +835,54 @@ export function Profile() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 24, padding: '12px 20px', direction: 'rtl' }}>
-        {(() => {
-          const requiredTypes = ['CIN', 'CV', 'INSURANCE', 'DEMANDE'];
-          const docsUploaded = docsLifecycle.some(d =>
-            requiredTypes.includes(d.doc_type) && (d.file_path || d.returned_file_path)
-          );
-          const isApproved = intern.status === 'نشط' || intern.status === 'مكتمل';
-          const stages = [
-            { label: 'إنشاء الحساب', done: true },
-            { label: 'رفع المستندات', done: docsUploaded },
-            { label: 'المراجعة والقبول', done: isApproved },
-          ];
-          return (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around' }}>
-              {stages.map((s, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{
-                    width: 30, height: 30, borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: s.done ? '#1E5631' : 'var(--paper)',
-                    color: s.done ? '#fff' : 'var(--slate-light)',
-                    fontSize: 13, fontWeight: 'bold',
-                    border: s.done ? 'none' : '2px solid var(--line)',
-                    transition: 'all 0.3s'
-                  }}>
-                    {s.done ? <CheckCircle weight="fill" size={15} /> : i + 1}
+      <div className="card" style={{ marginBottom: 24, padding: 24 }}>
+        <div className="intern-stepper" style={{ display: 'flex', alignItems: 'center' }}>
+          {(() => {
+            const templateDocs = docsLifecycle.filter(d => d.source === 'TEMPLATE_VIEW');
+            const uploadedTemplateDocs = templateDocs.filter(d => d.file_path || d.returned_file_path);
+            const anyUploaded = docsLifecycle.some(d => d.file_path || d.returned_file_path);
+            const allUploaded = templateDocs.length > 0 && uploadedTemplateDocs.length === templateDocs.length;
+            const isApproved = intern.status === 'نشط' || intern.status === 'مكتمل';
+            return (
+              <>
+                <div className="intern-step done" style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+                  <div className="sc" style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', position: 'relative', zIndex: 2 }}>
+                    <CheckCircle weight="fill" size={18} />
                   </div>
-                  <span style={{
-                    fontSize: 12, fontWeight: s.done ? 600 : 400,
-                    color: s.done ? '#1E5631' : 'var(--slate)',
-                  }}>{s.label}</span>
+                  <small style={{ display: 'block', color: 'var(--slate)' }}>إنشاء الحساب</small>
                 </div>
-              ))}
-            </div>
-          );
-        })()}
+                <div className={`intern-step ${allUploaded ? 'done' : anyUploaded ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+                  <div className="sc" style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 8px', position: 'relative', zIndex: 2,
+                    background: allUploaded ? 'var(--success)' : anyUploaded ? 'var(--gold)' : 'var(--paper)',
+                    border: allUploaded || anyUploaded ? 'none' : '2px solid var(--line)',
+                    color: allUploaded ? '#fff' : anyUploaded ? '#2A2005' : 'var(--slate-light)',
+                    boxShadow: anyUploaded && !allUploaded ? '0 0 0 5px rgba(201,162,39,.18)' : 'none'
+                  }}>
+                    {allUploaded ? <CheckCircle weight="fill" size={18} /> : '2'}
+                  </div>
+                  <small style={{ display: 'block', color: 'var(--slate)' }}>رفع المستندات</small>
+                </div>
+                <div className={`intern-step ${isApproved ? 'done' : allUploaded ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+                  <div className="sc" style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 8px', position: 'relative', zIndex: 2,
+                    background: isApproved ? 'var(--success)' : allUploaded ? 'var(--gold)' : 'var(--paper)',
+                    border: isApproved || allUploaded ? 'none' : '2px solid var(--line)',
+                    color: isApproved ? '#fff' : allUploaded ? '#2A2005' : 'var(--slate-light)',
+                    boxShadow: allUploaded && !isApproved ? '0 0 0 5px rgba(201,162,39,.18)' : 'none'
+                  }}>
+                    {isApproved ? <CheckCircle weight="fill" size={18} /> : '3'}
+                  </div>
+                  <small style={{ display: 'block', color: 'var(--slate)' }}>المراجعة والقبول</small>
+                </div>
+              </>
+            );
+          })()}
+        </div>
       </div>
 
       <div className="grid-2">
