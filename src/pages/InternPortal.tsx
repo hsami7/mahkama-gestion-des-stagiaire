@@ -978,7 +978,6 @@ for (const [base, docs] of grouped) {
               } onClick={async () => {
                 const title = internUploadTitle.trim() || internUploadFile?.name.replace(/\.\w+$/, '') || 'مستند';
                 let types = Array.from(internUploadActionTypes);
-                if (types.includes('sign') && types.includes('fill')) types = ['sign_fill'];
                 const primaryType = types[0] || 'view';
                 try {
                   const res = await api.post(`/interns/${internData?.id}/document-lifecycle`, {

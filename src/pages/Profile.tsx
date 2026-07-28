@@ -1915,7 +1915,6 @@ return rows.map(row => {
                 try {
                   let total = 0;
                   let types = Array.from(requestActionTypes);
-                  if (types.includes('sign') && types.includes('fill')) types = ['sign_fill'];
                   const primaryType = types[0] || 'view';
 
                   if (requestFiles.length > 0) {

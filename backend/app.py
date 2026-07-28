@@ -1619,7 +1619,7 @@ def create_intern_document_lifecycle(intern_id):
         is_visible = True
     else:
         requested_by = 'ADMIN'
-        status = 'MISSING'
+        status = 'AWAITING_RETURN' if action_type in ('sign', 'fill', 'sign_fill') else 'MISSING'
         uploaded_by = 'ADMIN'
         is_visible = True
 
