@@ -190,6 +190,18 @@ const filteredInterns = useMemo(() => {
           {isFormOpen ? <X weight="bold" size={19} color="#000" /> : <Plus weight="bold" size={19} color="#000" />} 
           {isFormOpen ? 'إغلاق النموذج' : 'إضافة متدرب يدويًا'}
         </button>
+        <button
+          className="btn btn-green"
+          style={{background:'#16A34A',color:'#fff'}}
+          onClick={() => {
+            const ids = filteredInterns.map(i => i.id);
+            if (ids.length === 0) return;
+            window.open(api.exportInterns('excel', ids), '_blank');
+          }}
+          title="تصدير النتائج إلى Excel"
+        >
+          <FileXls size={16} weight="bold" /> تصدير Excel
+        </button>
       </div>
 
       {isFormOpen && (
@@ -480,18 +492,6 @@ const filteredInterns = useMemo(() => {
               }}
             >
               مسح الفلتر
-            </button>
-            <button 
-              className="btn btn-ink" 
-              style={{ marginLeft: 'auto' }}
-              onClick={() => {
-                const ids = filteredInterns.map(i => i.id);
-                if (ids.length === 0) return;
-                window.open(api.exportInterns('excel', ids), '_blank');
-              }}
-              title="تصدير النتائج إلى Excel"
-            >
-              <FileXls size={16} weight="bold" /> تصدير Excel
             </button>
           </div>
 
