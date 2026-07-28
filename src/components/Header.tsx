@@ -34,7 +34,7 @@ export function Header({ title, missingCount, notifications = [], onReadNotifica
   );
   
   const unreadCount = notifications.filter(n => !n.is_read).length;
-  const totalBadgeCount = (missingCount || 0) + unreadCount;
+  const totalBadgeCount = unreadCount;
 
   return (
     <div className="topbar no-print">

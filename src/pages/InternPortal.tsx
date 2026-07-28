@@ -250,6 +250,7 @@ export function InternPortal() {
       />
       <div className="main">
         <Header title={getPageTitle(activeTab)} missingCount={missingCount} notifications={virtualNotifications} onReadNotification={async (id) => {
+          if (typeof id === 'number' && id < 0) return;
           try {
             await api.post(`/notifications/${id}/read`, {});
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
