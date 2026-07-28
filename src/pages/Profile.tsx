@@ -851,17 +851,17 @@ export function Profile() {
                   </div>
                   <small style={{ display: 'block', color: 'var(--slate)' }}>إنشاء الحساب</small>
                 </div>
-                <div className={`intern-step ${allUploaded ? 'done' : anyUploaded ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+                <div className={`intern-step ${isApproved ? 'done' : anyUploaded ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
                   <div className="sc" style={{
                     width: 34, height: 34, borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     margin: '0 auto 8px', position: 'relative', zIndex: 2,
-                    background: allUploaded ? 'var(--success)' : anyUploaded ? 'var(--gold)' : 'var(--paper)',
-                    border: allUploaded || anyUploaded ? 'none' : '2px solid var(--line)',
-                    color: allUploaded ? '#fff' : anyUploaded ? '#2A2005' : 'var(--slate-light)',
-                    boxShadow: anyUploaded && !allUploaded ? '0 0 0 5px rgba(201,162,39,.18)' : 'none'
+                    background: isApproved ? 'var(--success)' : anyUploaded ? 'var(--gold)' : 'var(--paper)',
+                    border: isApproved || anyUploaded ? 'none' : '2px solid var(--line)',
+                    color: isApproved ? '#fff' : anyUploaded ? '#2A2005' : 'var(--slate-light)',
+                    boxShadow: anyUploaded && !isApproved ? '0 0 0 5px rgba(201,162,39,.18)' : 'none'
                   }}>
-                    {allUploaded ? <CheckCircle weight="fill" size={18} /> : '2'}
+                    {isApproved ? <CheckCircle weight="fill" size={18} /> : '2'}
                   </div>
                   <small style={{ display: 'block', color: 'var(--slate)' }}>رفع المستندات</small>
                 </div>
