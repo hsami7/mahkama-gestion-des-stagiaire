@@ -903,7 +903,7 @@ for (const [base, docs] of grouped) {
               <div className="form-group">
                 <label>اسم المستند</label>
                 <input type="text" className="input" value={internUploadTitle} onChange={e => setInternUploadTitle(e.target.value)} placeholder="اتفاقية التدريب المعدلة 2026" />
-                {!internUploadFile && <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>إذا لم تختر ملفًا، سيتم إنشاء طلب للمتدرب لرفع المستند</small>}
+                {!internUploadFile && <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>إذا لم تختر ملفًا، سيتم إنشاء طلب مستند دون رفع ملف</small>}
               </div>
 
               <div className="form-group">
