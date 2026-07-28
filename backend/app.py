@@ -756,7 +756,7 @@ def delete_user(user_id):
 @jwt_required()
 def get_interns():
     interns = Intern.query.all()
-    activity_statuses = {'PENDING_REVIEW', 'RETURNED'}
+    activity_statuses = {'PENDING_REVIEW', 'RETURNED', 'AWAITING_ADMIN'}
     return jsonify([{
         "id": i.id, 
         "name": i.name, 

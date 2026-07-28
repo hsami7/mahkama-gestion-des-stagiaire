@@ -40,7 +40,8 @@ export function Interns() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({ query: '', status: '' });
+  const [filterPendingDocs, setFilterPendingDocs] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState({ query: '', status: '', pendingDocs: false });
   
   const [showAttestationModal, setShowAttestationModal] = useState(false);
   const [selectedIntern, setSelectedIntern] = useState<any>(null);
@@ -52,8 +53,9 @@ const filteredInterns = useMemo(() => {
         (intern.national_id && intern.national_id.toLowerCase().includes(appliedFilters.query.toLowerCase()));
 
       const matchStatus = !appliedFilters.status || intern.status === appliedFilters.status;
+      const matchPendingDocs = !appliedFilters.pendingDocs || intern.has_pending_activity;
 
-      return matchQuery && matchStatus;
+      return matchQuery && matchStatus && matchPendingDocs;
     });
 
     // Sort: active interns by remaining days ascending (closest to end first), then others by status
@@ -477,9 +479,13 @@ const filteredInterns = useMemo(() => {
               <CaretDown weight="bold" className="icon" style={{ marginLeft: '-5px' }} />
             </div>
 
+            <label style={{display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer', padding:'4px 0'}}>
+              <input type="checkbox" checked={filterPendingDocs} onChange={e => setFilterPendingDocs(e.target.checked)} style={{width:16,height:16,cursor:'pointer'}} />
+              ملفات المتدربين
+            </label>
             <button 
               className="btn btn-ink" 
-              onClick={() => setAppliedFilters({ query: searchQuery, status: filterStatus })}
+              onClick={() => setAppliedFilters({ query: searchQuery, status: filterStatus, pendingDocs: filterPendingDocs })}
             >
               تطبيق الفلتر
             </button>
@@ -488,7 +494,8 @@ const filteredInterns = useMemo(() => {
               onClick={() => {
                 setSearchQuery('');
                 setFilterStatus('');
-                setAppliedFilters({ query: '', status: '' });
+                setFilterPendingDocs(false);
+                setAppliedFilters({ query: '', status: '', pendingDocs: false });
               }}
             >
               مسح الفلتر
@@ -572,7 +579,7 @@ const filteredInterns = useMemo(() => {
               <p style={{ marginTop: '8px' }}>حاول تغيير خيارات البحث أو الفلتر للحصول على نتائج.</p>
               <button className="btn btn-ghost" style={{ marginTop: '16px' }} onClick={() => {
                 setFilterStatus('');
-                setAppliedFilters({ query: '', status: '' });
+                setAppliedFilters({ query: '', status: '', pendingDocs: false });
               }}>
                 مسح الفلتر
               </button>
