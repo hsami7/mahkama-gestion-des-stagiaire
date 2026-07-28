@@ -108,15 +108,17 @@ def safe_filename(prefix: str, original: str) -> str:
 def _uniquify_title(intern_id, title):
     if not title:
         return title
-    existing = DocumentLifecycle.query.filter(
+    exact = DocumentLifecycle.query.filter(
         DocumentLifecycle.intern_id == intern_id,
-        DocumentLifecycle.custom_title.like(f'{title}%')
-    ).all()
-    existing_titles = {d.custom_title for d in existing if d.custom_title}
-    if title not in existing_titles:
+        DocumentLifecycle.custom_title == title
+    ).first()
+    if not exact:
         return title
     n = 1
-    while f'{title} ({n})' in existing_titles:
+    while DocumentLifecycle.query.filter(
+        DocumentLifecycle.intern_id == intern_id,
+        DocumentLifecycle.custom_title == f'{title} ({n})'
+    ).first():
         n += 1
     return f'{title} ({n})'
 

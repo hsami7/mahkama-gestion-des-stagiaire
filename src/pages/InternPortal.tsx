@@ -457,12 +457,14 @@ export function InternPortal() {
                   const allDocs = lifecycleDocs;
                   const pendingDocs = lifecycleDocs.filter(d => d.status !== 'APPROVED_AND_SIGNED');
                   const completedDocs = lifecycleDocs.filter(d => d.status === 'APPROVED_AND_SIGNED');
-                  const counts = { all: allDocs.length, pending: pendingDocs.length, completed: completedDocs.length };
-                  const tabs = ['all', 'pending', 'completed'] as const;
-                  const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل' };
+                  const fromAdminDocs = lifecycleDocs.filter(d => d.requested_by === 'INTERN' && ['sign','fill','sign_fill'].includes(d.action_type));
+                  const counts = { all: allDocs.length, pending: pendingDocs.length, completed: completedDocs.length, from_admin: fromAdminDocs.length };
+                  const tabs = ['all', 'pending', 'completed', 'from_admin'] as const;
+                  const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل', from_admin: 'من الإدارة' };
                   const filtered = lifecycleDocs.filter(d => {
                     if (docFilter === 'pending') return d.status !== 'APPROVED_AND_SIGNED';
                     if (docFilter === 'completed') return d.status === 'APPROVED_AND_SIGNED';
+                    if (docFilter === 'from_admin') return d.requested_by === 'INTERN' && ['sign','fill','sign_fill'].includes(d.action_type);
                     return true;
                   }).sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
                   return (
@@ -497,7 +499,7 @@ export function InternPortal() {
                       {/* Unified table */}
                       {filtered.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '16px', color: 'var(--slate-light)', fontSize: 13, background: 'var(--paper)', borderRadius: 8 }}>
-                          {docFilter === 'pending' ? 'لا توجد مستندات قيد الإجراء' : docFilter === 'completed' ? 'لا توجد مستندات مكتملة' : 'لا توجد مستندات'}
+                          {docFilter === 'pending' ? 'لا توجد مستندات قيد الإجراء' : docFilter === 'completed' ? 'لا توجد مستندات مكتملة' : docFilter === 'from_admin' ? 'لا توجد طلبات من الإدارة' : 'لا توجد مستندات'}
                         </div>
                       ) : (
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
@@ -663,8 +665,9 @@ for (const [base, docs] of grouped) {
                                 const isTemplate = d.source === 'TEMPLATE_VIEW';
                                 const isTemplatePendingAdmin = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'ADMIN';
                                 const isTemplatePendingIntern = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'INTERN';
+                                const isInternInitiatedSignFill = d.requested_by === 'INTERN' && (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill');
                                 const showViewDownload = !!d.file_path && !isTemplatePendingAdmin;
-                                const canUpload = (!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin;
+                                const canUpload = !isInternInitiatedSignFill && ((!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin);
                                 const isUploadDisabled = isTemplatePendingIntern;
                                 return (
                                   <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
@@ -687,6 +690,11 @@ for (const [base, docs] of grouped) {
                                       {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
                                         <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2, background: '#FFF0EE', padding: '3px 6px', borderRadius: 4 }}>
                                           <Warning size={12} weight="fill" style={{ marginLeft: 4 }} /> {d.rejection_reason}
+                                        </div>
+                                      )}
+                                      {isInternInitiatedSignFill && d.status === 'AWAITING_ADMIN' && (
+                                        <div style={{ fontSize: 11, color: '#B45309', marginTop: 2, background: '#FEF3C7', padding: '3px 6px', borderRadius: 4 }}>
+                                          في انتظار رفع الإدارة للنسخة الموقعة/المعبأة
                                         </div>
                                       )}
                                     </td>
