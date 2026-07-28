@@ -1186,19 +1186,80 @@ return rows.map(row => {
                       <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
                       {docFilter === 'from_intern' && d.requested_by === 'INTERN' ? (
                         <>
-                          {d.file_path && (
+                          {/* Common upload file picker helper */}
+                          {(() => {
+                            const uploadFile = (endpoint: string) => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                              input.onchange = async () => {
+                                const file = input.files?.[0];
+                                if (!file) return;
+                                try {
+                                  await api.uploadFile(endpoint, file, {});
+                                  toast.success('تم رفع النسخة');
+                                  fetchDocsLifecycle();
+                                } catch { toast.error('فشل رفع النسخة'); }
+                              };
+                              input.click();
+                            };
+                            return null;
+                          })()}
+                          {/* AWAITING_ADMIN — new request, admin hasn't acted yet */}
+                          {d.status === 'AWAITING_ADMIN' && (
                             <>
-                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                <Eye size={14} />
+                              {d.file_path && (
+                                <>
+                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <Eye size={14} />
+                                  </button>
+                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <DownloadSimple size={14} />
+                                  </button>
+                                </>
+                              )}
+                              <button className="btn btn-ghost sm" onClick={async () => {
+                                try {
+                                  await api.post(`/interns/${id}/documents/${d.id}/accept-request`, {});
+                                  toast.success('تم قبول الطلب');
+                                  fetchDocsLifecycle();
+                                } catch { toast.error('فشل قبول الطلب'); }
+                              }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                                <CheckCircle size={14} />
                               </button>
-                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                <DownloadSimple size={14} />
+                              <button className="btn btn-ghost sm" onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                input.onchange = async () => {
+                                  const file = input.files?.[0];
+                                  if (!file) return;
+                                  try {
+                                    await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                    toast.success('تم رفع النسخة');
+                                    fetchDocsLifecycle();
+                                  } catch { toast.error('فشل رفع النسخة'); }
+                                };
+                                input.click();
+                              }} title="إعادة رفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                                <ArrowsClockwise size={14} />
                               </button>
                             </>
                           )}
-                          {(d.status === 'AWAITING_ADMIN' || d.status === 'PENDING_REVIEW') && (
+                          {/* PENDING_REVIEW — admin accepted, can upload signed version */}
+                          {d.status === 'PENDING_REVIEW' && (
                             <>
-                              <button className="btn btn-ghost sm" onClick={async () => {
+                              {d.file_path && (
+                                <>
+                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <Eye size={14} />
+                                  </button>
+                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <DownloadSimple size={14} />
+                                  </button>
+                                </>
+                              )}
+                              <button className="btn btn-ghost sm" onClick={() => {
                                 const input = document.createElement('input');
                                 input.type = 'file';
                                 input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
@@ -1217,6 +1278,7 @@ return rows.map(row => {
                               </button>
                             </>
                           )}
+                          {/* AWAITING_INTERN — admin uploaded, waiting for intern */}
                           {d.status === 'AWAITING_INTERN' && d.returned_file_path && (
                             <>
                               <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} title="معاينة المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1225,7 +1287,7 @@ return rows.map(row => {
                               <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                 <DownloadSimple size={14} />
                               </button>
-                              <button className="btn btn-ghost sm" onClick={async () => {
+                              <button className="btn btn-ghost sm" onClick={() => {
                                 const input = document.createElement('input');
                                 input.type = 'file';
                                 input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
@@ -1254,8 +1316,9 @@ return rows.map(row => {
                               </button>
                             </>
                           )}
+                          {/* REVISION_REQUESTED — intern asked for re-upload */}
                           {d.status === 'REVISION_REQUESTED' && (
-                            <button className="btn btn-ghost sm" onClick={async () => {
+                            <button className="btn btn-ghost sm" onClick={() => {
                               const input = document.createElement('input');
                               input.type = 'file';
                               input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';

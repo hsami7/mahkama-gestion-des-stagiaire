@@ -2954,12 +2954,34 @@ def admin_delete_upload(intern_id, doc_id):
 
     doc.returned_file_path = None
     doc.returned_files_history = None
-    doc.status = 'AWAITING_ADMIN'
+    doc.status = 'PENDING_REVIEW'
     doc.updated_at = datetime.now(timezone.utc)
     db.session.commit()
 
     log_action(current_user.get('name'), f"حذف الرفع الإداري للمستند {doc.custom_title or doc.doc_type}")
     return jsonify({"msg": "تم حذف النسخة المرفوعة"}), 200
+
+
+@app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/accept-request', methods=['POST'])
+@jwt_required()
+def admin_accept_request(intern_id, doc_id):
+    """Admin accepts the intern's sign/fill request, marking it as in progress."""
+    current_user = get_jwt()
+    if current_user.get('role') not in ('Admin', 'Manager'):
+        return jsonify({"msg": "Unauthorized"}), 403
+
+    doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
+    if not doc:
+        return jsonify({"msg": "Document not found"}), 404
+    if doc.status != 'AWAITING_ADMIN':
+        return jsonify({"msg": "Document is not awaiting admin action"}), 400
+
+    doc.status = 'PENDING_REVIEW'
+    doc.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+
+    log_action(current_user.get('name'), f"قبول طلب توقيع/تعبئة للمستند {doc.custom_title or doc.doc_type}")
+    return jsonify({"msg": "تم قبول الطلب"}), 200
 
 
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/intern-accept', methods=['POST'])
