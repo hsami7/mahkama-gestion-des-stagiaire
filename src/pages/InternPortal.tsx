@@ -189,14 +189,19 @@ export function InternPortal() {
   };
 
   // A request is only "actionable" (still nagging) if its document is not yet uploaded.
-  const missingCount = useMemo(() => requests.filter((r: any) => !isRequestUploaded(r)).length, [requests, lifecycleDocs]);
+  const missingCount = useMemo(() => {
+    const reqs = requests.filter((r: any) => !isRequestUploaded(r)).length;
+    const templateDocs = lifecycleDocs.filter(d => d.status === 'MISSING' && d.action_type === 'view' && d.source === 'TEMPLATE_VIEW').length;
+    return reqs + templateDocs;
+  }, [requests, lifecycleDocs]);
 
   // Pending re-upload requests + sign/fill docs that need attention + revision-requested docs
   const pendingCount = useMemo(() => {
     const reqs = requests.filter((r: any) => !isRequestUploaded(r)).length;
     const signFill = lifecycleDocs.filter(d => (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && !d.returned_file_path).length;
     const revisionReqs = lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length;
-    return reqs + signFill + revisionReqs;
+    const missingTemplateDocs = lifecycleDocs.filter(d => d.status === 'MISSING' && d.action_type === 'view' && d.source === 'TEMPLATE_VIEW').length;
+    return reqs + signFill + revisionReqs + missingTemplateDocs;
   }, [requests, lifecycleDocs]);
 
   // Count of sign/fill lifecycle docs that need the intern's return
@@ -567,25 +572,16 @@ for (const [base, docs] of grouped) {
                                       </td>
                                       <td style={{ textAlign: 'left', padding: '10px 8px' }}>
                                         <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                                          {/* View original file */}
-                                          <button className="btn btn-ghost sm" title={fileDoc ? "معاينة الأصل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleViewFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
+                                          {/* View latest document */}
+                                          <button className="btn btn-ghost sm" title={fileDoc ? "معاينة" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleViewFile(api.downloadDocument(fileDoc.id) + (anyReturned ? '&returned=1' : ''), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
                                             <Eye size={14} />
                                           </button>
-                                          {/* Download original file */}
-                                          <button className="btn btn-ghost sm" title={fileDoc ? "تحميل الأصل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleDownloadFile(api.downloadDocument(fileDoc.id), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
+                                          {/* Download latest document */}
+                                          <button className="btn btn-ghost sm" title={fileDoc ? "تحميل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleDownloadFile(api.downloadDocument(fileDoc.id) + (anyReturned ? '&returned=1' : ''), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
                                             <DownloadSimple size={14} />
                                           </button>
-                                          {/* View returned file if exists */}
-                                          {anyReturned && (
-                                            <button className="btn btn-ghost sm" title="معاينة النسخة المعادة" onClick={() => {
-                                              const retDoc = d.returned_file_path ? d : fillDoc;
-                                              handleViewFile(api.downloadDocument(retDoc.id) + '&returned=1', fileLabel + '_returned.pdf');
-                                            }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
-                                              <Eye size={14} />
-                                            </button>
-                                          )}
-                                          {/* Upload return if not both returned */}
-                                          {!bothReturned && (
+                                          {/* Upload return if not approved and not both returned */}
+                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && !bothReturned && (
                                             <>
                                               <input type="file" id={inputId} style={{ display: 'none' }} accept=".pdf" onChange={e => {
                                                 if (!e.target.files?.[0]) return;
@@ -603,8 +599,8 @@ for (const [base, docs] of grouped) {
                                               </button>
                                             </>
                                           )}
-                                          {/* Greyed upload if already returned */}
-                                          {bothReturned && (
+                                          {/* Greyed upload if already returned but not yet approved */}
+                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && bothReturned && (
                                             <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11, opacity: 0.4, cursor: 'not-allowed' }} disabled>
                                               <UploadSimple size={14} /> رفع
                                             </button>
@@ -685,23 +681,17 @@ for (const [base, docs] of grouped) {
                                     </td>
                                     <td style={{ textAlign: 'left', padding: '10px 8px' }}>
                                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                                        {/* 1️⃣ View original file (admin-uploaded or intern-uploaded) */}
+                                        {/* 1️⃣ View latest document */}
                                         {showViewDownload && (
                                           <>
-                                            <button className="btn btn-ghost sm" title="معاينة" onClick={() => handleViewFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <button className="btn btn-ghost sm" title="معاينة" onClick={() => handleViewFile(api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                               <Eye size={14} />
                                             </button>
-                                            {/* 2️⃣ Download original file */}
-                                            <button className="btn btn-ghost sm" title="تحميل" onClick={() => handleDownloadFile(api.downloadDocument(d.id), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {/* 2️⃣ Download latest document */}
+                                            <button className="btn btn-ghost sm" title="تحميل" onClick={() => handleDownloadFile(api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                               <DownloadSimple size={14} />
                                             </button>
                                           </>
-                                        )}
-                                        {/* 3️⃣ View returned file (for sign/fill docs) */}
-                                        {isReturned && (
-                                          <button className="btn btn-ghost sm" title="معاينة النسخة المعادة" onClick={() => handleViewFile(api.downloadDocument(d.id) + '&returned=1', fileLabel + '_returned.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
-                                            <Eye size={14} />
-                                          </button>
                                         )}
                                         {/* 4️⃣ Upload / re-upload button */}
                                         {canUpload && (
