@@ -1277,23 +1277,6 @@ return rows.map(row => {
                               <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                 <DownloadSimple size={14} />
                               </button>
-                              <button className="btn btn-ghost sm" onClick={() => {
-                                const input = document.createElement('input');
-                                input.type = 'file';
-                                input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                                input.onchange = async () => {
-                                  const file = input.files?.[0];
-                                  if (!file) return;
-                                  try {
-                                    await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
-                                    toast.success('تم إعادة رفع النسخة');
-                                    fetchDocsLifecycle();
-                                  } catch { toast.error('فشل رفع النسخة'); }
-                                };
-                                input.click();
-                              }} title="إعادة رفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                                <ArrowsClockwise size={14} />
-                              </button>
                               <button className="btn btn-ghost sm" onClick={async () => {
                                 if (!confirm('هل تريد حذف النسخة المرفوعة فقط (يبقى الطلب)؟')) return;
                                 try {
@@ -1308,23 +1291,35 @@ return rows.map(row => {
                           )}
                           {/* REVISION_REQUESTED — intern asked for re-upload */}
                           {d.status === 'REVISION_REQUESTED' && (
-                            <button className="btn btn-ghost sm" onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                              input.onchange = async () => {
-                                const file = input.files?.[0];
-                                if (!file) return;
-                                try {
-                                  await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
-                                  toast.success('تم إعادة رفع النسخة');
-                                  fetchDocsLifecycle();
-                                } catch { toast.error('فشل رفع النسخة'); }
-                              };
-                              input.click();
-                            }} title="إعادة رفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                              <ArrowsClockwise size={14} />
-                            </button>
+                            <>
+                              {(d.returned_file_path || d.file_path) && (
+                                <>
+                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <Eye size={14} />
+                                  </button>
+                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <DownloadSimple size={14} />
+                                  </button>
+                                </>
+                              )}
+                              <button className="btn btn-ghost sm" onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                input.onchange = async () => {
+                                  const file = input.files?.[0];
+                                  if (!file) return;
+                                  try {
+                                    await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                    toast.success('تم إعادة رفع النسخة');
+                                    fetchDocsLifecycle();
+                                  } catch { toast.error('فشل رفع النسخة'); }
+                                };
+                                input.click();
+                              }} title="رفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
+                                <UploadSimple size={14} />
+                              </button>
+                            </>
                           )}
                         </>
                       ) : (
