@@ -200,9 +200,10 @@ export function InternPortal() {
   const pendingCount = useMemo(() => {
     const reqs = requests.filter((r: any) => !isRequestUploaded(r)).length;
     const signFill = lifecycleDocs.filter(d => d.requested_by !== 'INTERN' && (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill') && !d.returned_file_path).length;
+    const awaitingIntern = lifecycleDocs.filter(d => d.requested_by === 'INTERN' && d.status === 'AWAITING_INTERN' && d.returned_file_path).length;
     const revisionReqs = lifecycleDocs.filter(d => d.status === 'REVISION_REQUESTED' && d.rejection_reason).length;
     const missingTemplateDocs = lifecycleDocs.filter(d => d.status === 'MISSING' && d.action_type === 'view' && d.source === 'TEMPLATE_VIEW').length;
-    return reqs + signFill + revisionReqs + missingTemplateDocs;
+    return reqs + signFill + awaitingIntern + revisionReqs + missingTemplateDocs;
   }, [requests, lifecycleDocs]);
 
   // Count of sign/fill lifecycle docs that need the intern's return
@@ -253,7 +254,7 @@ export function InternPortal() {
         <Header title={getPageTitle(activeTab)} missingCount={missingCount} notifications={virtualNotifications} onReadNotification={async (id) => {
           if (typeof id === 'number' && id < 0) return;
           try {
-            await api.post(`/notifications/${id}/read`, {});
+            await api.post(`/intern/notifications/${id}/read`, {});
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
           } catch { }
         }} onNotificationClick={() => setActiveTab('documents')} />
