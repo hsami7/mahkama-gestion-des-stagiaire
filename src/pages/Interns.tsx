@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MagnifyingGlass, Funnel, Hash, CaretDown, Plus, X, CalendarCheck, ClipboardText, Certificate, FilePlus, CheckCircle } from '@phosphor-icons/react';
+import { MagnifyingGlass, Funnel, Hash, CaretDown, Plus, X, CalendarCheck, ClipboardText, Certificate, FilePlus, CheckCircle, FileXls } from '@phosphor-icons/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, API_BASE } from '../services/api';
 import { TestModeAutofill } from '../components/TestModeAutofill';
@@ -480,6 +480,18 @@ const filteredInterns = useMemo(() => {
               }}
             >
               مسح الفلتر
+            </button>
+            <button 
+              className="btn btn-ink" 
+              style={{ marginLeft: 'auto' }}
+              onClick={() => {
+                const ids = filteredInterns.map(i => i.id);
+                if (ids.length === 0) return;
+                window.open(api.exportInterns('excel', ids), '_blank');
+              }}
+              title="تصدير النتائج إلى Excel"
+            >
+              <FileXls size={16} weight="bold" /> تصدير Excel
             </button>
           </div>
 
