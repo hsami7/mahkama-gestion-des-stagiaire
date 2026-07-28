@@ -93,7 +93,7 @@ export function Profile() {
 
   // Document Lifecycle Center
   const [docsLifecycle, setDocsLifecycle] = useState<any[]>([]);
-  const [docFilter, setDocFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [docFilter, setDocFilter] = useState<'all' | 'pending' | 'completed' | 'from_intern'>('all');
   const [assignDocType, setAssignDocType] = useState('CONVENTION_SIGNED');
   const [assignCustomTitle, setAssignCustomTitle] = useState('');
   const [assignFile, setAssignFile] = useState<File | null>(null);
@@ -959,13 +959,14 @@ export function Profile() {
           {/* Filter tabs + add button */}
           <div style={{display:'flex', gap:8, marginBottom:16, flexWrap:'wrap', alignItems:'center', justifyContent:'space-between'}}>
             <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-            {(['all', 'pending', 'completed'] as const).map(tab => {
+            {(['all', 'pending', 'completed', 'from_intern'] as const).map(tab => {
               const counts = {
                 all: docsLifecycle.length,
                 pending: docsLifecycle.filter(d => d.status !== 'APPROVED_AND_SIGNED').length,
-                completed: docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED').length
+                completed: docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED').length,
+                from_intern: docsLifecycle.filter(d => d.requested_by === 'INTERN' && ['sign','fill','sign_fill'].includes(d.action_type)).length
               };
-              const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل' };
+              const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل', from_intern: 'من المتدرب' };
               return (
                 <button key={tab} onClick={() => setDocFilter(tab)} style={{
                   padding:'6px 14px', borderRadius:20, border:'1px solid var(--line)', fontSize:12, fontWeight:600, cursor:'pointer',
@@ -991,6 +992,7 @@ export function Profile() {
             const filtered = docsLifecycle.filter(d => {
               if (docFilter === 'pending') return d.status !== 'APPROVED_AND_SIGNED';
               if (docFilter === 'completed') return d.status === 'APPROVED_AND_SIGNED';
+              if (docFilter === 'from_intern') return d.requested_by === 'INTERN' && ['sign','fill','sign_fill'].includes(d.action_type);
               return true;
             }).sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
             return (
@@ -1128,6 +1130,8 @@ return rows.map(row => {
                     if (d.status === 'APPROVED_AND_SIGNED') return <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>;
                     if (d.status === 'REVISION_REQUESTED') return <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span>;
                     if (d.status === 'RETURNED') return <span className="badge badge-warning" style={{fontSize:11}}>بانتظار المراجعة</span>;
+                    if (d.status === 'AWAITING_ADMIN') return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار الإدارة</span>;
+                    if (d.status === 'AWAITING_INTERN') return <span className="badge badge-warning" style={{fontSize:11}}>بانتظار المتدرب</span>;
                     if (d.status === 'PENDING_REVIEW') return <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span>;
 
                     // For MISSING and AWAITING_RETURN, label depends on action_type
@@ -1180,6 +1184,106 @@ return rows.map(row => {
                     </td>
                     <td style={{textAlign:'left', padding:'10px 8px'}}>
                       <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+                      {docFilter === 'from_intern' && d.requested_by === 'INTERN' ? (
+                        <>
+                          {d.file_path && (
+                            <>
+                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <Eye size={14} />
+                              </button>
+                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <DownloadSimple size={14} />
+                              </button>
+                            </>
+                          )}
+                          {(d.status === 'AWAITING_ADMIN' || d.status === 'PENDING_REVIEW') && (
+                            <>
+                              {d.status === 'AWAITING_ADMIN' && (
+                                <button className="btn btn-ghost sm" onClick={async () => {
+                                  await api.post(`/interns/${id}/documents/${d.id}/approve`, {});
+                                  fetchDocsLifecycle();
+                                }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                                  <CheckCircle size={14} />
+                                </button>
+                              )}
+                              <button className="btn btn-ghost sm" onClick={async () => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                input.onchange = async () => {
+                                  const file = input.files?.[0];
+                                  if (!file) return;
+                                  try {
+                                    await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                    toast.success('تم رفع النسخة');
+                                    fetchDocsLifecycle();
+                                  } catch { toast.error('فشل رفع النسخة'); }
+                                };
+                                input.click();
+                              }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
+                                <UploadSimple size={14} />
+                              </button>
+                            </>
+                          )}
+                          {d.status === 'AWAITING_INTERN' && d.returned_file_path && (
+                            <>
+                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} title="معاينة المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <Eye size={14} />
+                              </button>
+                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <DownloadSimple size={14} />
+                              </button>
+                              <button className="btn btn-ghost sm" onClick={async () => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                input.onchange = async () => {
+                                  const file = input.files?.[0];
+                                  if (!file) return;
+                                  try {
+                                    await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                    toast.success('تم إعادة رفع النسخة');
+                                    fetchDocsLifecycle();
+                                  } catch { toast.error('فشل رفع النسخة'); }
+                                };
+                                input.click();
+                              }} title="إعادة رفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                                <ArrowsClockwise size={14} />
+                              </button>
+                              <button className="btn btn-ghost sm" onClick={async () => {
+                                if (!confirm('هل تريد حذف النسخة المرفوعة فقط (يبقى الطلب)؟')) return;
+                                try {
+                                  await api.post(`/interns/${id}/documents/${d.id}/admin-delete-upload`, {});
+                                  toast.success('تم حذف النسخة');
+                                  fetchDocsLifecycle();
+                                } catch { toast.error('فشل حذف النسخة'); }
+                              }} title="حذف الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
+                                <Trash size={14} />
+                              </button>
+                            </>
+                          )}
+                          {d.status === 'REVISION_REQUESTED' && (
+                            <button className="btn btn-ghost sm" onClick={async () => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                              input.onchange = async () => {
+                                const file = input.files?.[0];
+                                if (!file) return;
+                                try {
+                                  await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                  toast.success('تم إعادة رفع النسخة');
+                                  fetchDocsLifecycle();
+                                } catch { toast.error('فشل رفع النسخة'); }
+                              };
+                              input.click();
+                            }} title="إعادة رفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                              <ArrowsClockwise size={14} />
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <>
                         {showViewDownload && (
                           <>
                             <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1214,6 +1318,8 @@ return rows.map(row => {
                             <Trash size={14} />
                           </button>
                         )}
+                        </>
+                      )}
                       </div>
                     </td>
                   </tr>

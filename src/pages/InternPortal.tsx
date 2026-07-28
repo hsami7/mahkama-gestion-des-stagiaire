@@ -635,6 +635,8 @@ for (const [base, docs] of grouped) {
                                   if (d.status === 'APPROVED_AND_SIGNED') return 'مقبول';
                                   if (d.status === 'REVISION_REQUESTED') return 'مطلوب إعادة';
                                   if (d.status === 'RETURNED') return 'تم الإرجاع';
+                                  if (d.status === 'AWAITING_ADMIN') return 'بانتظار الإدارة';
+                                  if (d.status === 'AWAITING_INTERN') return 'في انتظار قبولك';
                                   if (d.status === 'PENDING_REVIEW') return 'قيد المراجعة';
                                   if (d.status === 'AWAITING_RETURN') {
                                     if (d.action_type === 'sign') return 'بانتظار التوقيع';
@@ -653,8 +655,10 @@ for (const [base, docs] of grouped) {
                                 const statusClass = d.status === 'APPROVED_AND_SIGNED' ? 'badge-success' :
                                   d.status === 'RETURNED' ? 'badge-success' :
                                     d.status === 'PENDING_REVIEW' ? 'badge-warning' :
-                                      d.status === 'REVISION_REQUESTED' ? 'badge-danger' :
-                                        d.status === 'AWAITING_RETURN' ? 'badge-warning' : '';
+                                      d.status === 'AWAITING_INTERN' ? 'badge-warning' :
+                                        d.status === 'AWAITING_ADMIN' ? 'badge-warning' :
+                                          d.status === 'REVISION_REQUESTED' ? 'badge-danger' :
+                                            d.status === 'AWAITING_RETURN' ? 'badge-warning' : '';
                                 
                                 const isTemplate = d.source === 'TEMPLATE_VIEW';
                                 const isTemplatePendingAdmin = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'ADMIN';
@@ -694,6 +698,37 @@ for (const [base, docs] of grouped) {
                                     </td>
                                     <td style={{ textAlign: 'left', padding: '10px 8px' }}>
                                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                      {d.status === 'AWAITING_INTERN' && d.returned_file_path ? (
+                                        <>
+                                          <button className="btn btn-ghost sm" title="معاينة" onClick={() => handleViewFile(api.downloadDocument(d.id) + '&returned=1', fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Eye size={14} />
+                                          </button>
+                                          <button className="btn btn-ghost sm" title="تحميل" onClick={() => handleDownloadFile(api.downloadDocument(d.id) + '&returned=1', fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <DownloadSimple size={14} />
+                                          </button>
+                                          <button className="btn btn-ghost sm" title="قبول" onClick={async () => {
+                                            try {
+                                              await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-accept`, {});
+                                              fetchLifecycleDocs();
+                                              setToastMsg({ msg: 'تم قبول المستند', type: 'success' });
+                                            } catch { setToastMsg({ msg: 'فشل قبول المستند', type: 'error' }); }
+                                          }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
+                                            <CheckCircle size={14} />
+                                          </button>
+                                          <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {
+                                            const reason = window.prompt('سبب طلب إعادة الرفع:');
+                                            if (reason === null) return;
+                                            try {
+                                              await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
+                                              fetchLifecycleDocs();
+                                              setToastMsg({ msg: 'تم طلب إعادة الرفع', type: 'success' });
+                                            } catch { setToastMsg({ msg: 'فشل إرسال الطلب', type: 'error' }); }
+                                          }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                            <ArrowsClockwise size={14} />
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
                                         {/* 1️⃣ View latest document */}
                                         {showViewDownload && (
                                           <>
@@ -729,6 +764,8 @@ for (const [base, docs] of grouped) {
                                             <UploadSimple size={14} /> رفع
                                           </button>
                                         )}
+                                        </>
+                                      )}
                                       </div>
                                     </td>
                                   </tr>
@@ -882,9 +919,10 @@ for (const [base, docs] of grouped) {
                         <button className="btn btn-ghost sm" onClick={() => setInternUploadFile(null)} style={{marginRight:'auto', padding:2}}><X size={14} /></button>
                       </div>
                     )}
-                  </div>
                 </div>
-              <div className="form-group" style={{marginTop:16}}>
+              </div>
+            </div>
+            <div className="form-group" style={{marginTop:16}}>
                 <label>نوع الطلب للملفات المرفوعة</label>
                 <div style={{display:'flex', flexDirection:'column', gap:8, padding:'8px 12px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
                   {(['view','sign','fill'] as const).map(type => {
@@ -900,8 +938,8 @@ for (const [base, docs] of grouped) {
                       }} style={{width:18,height:18,cursor: viewLocked ? 'not-allowed' : 'pointer', accentColor:'var(--gold-dark)'}} />
                       <span style={{fontWeight: internUploadActionTypes.has(type) ? 600 : 400}}>
                         {type === 'view' ? 'عرض فقط — المتدرب يرى ويحمل المستند' : ''}
-                        {type === 'sign' ? 'توقيع — المتدرب يوقع ويعيد النسخة' : ''}
-                        {type === 'fill' ? 'تعبئة وإرجاع — المتدرب يعبي النموذج ويعيده' : ''}
+                        {type === 'sign' ? 'توقيع — الإدارة توقع وترفع النسخة' : ''}
+                        {type === 'fill' ? 'تعبئة وإرجاع — الإدارة تعبي النموذج وترفعه' : ''}
                       </span>
                     </label>
                     );
@@ -912,23 +950,22 @@ for (const [base, docs] of grouped) {
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={() => { setShowInternUploadModal(false); setInternUploadActionTypes(new Set(['view'])); }}>إلغاء</button>
               {Array.from(internUploadActionTypes).some(t => t === 'sign' || t === 'fill') && !internUploadFile && (
-                <div style={{color:'#DC2626', fontSize:12, marginBottom:8}}>يجب رفع ملف للمستندات التي تتطلب توقيع أو تعبئة</div>
+                <div style={{color:'#B45309', fontSize:12, marginBottom:8}}>إذا لم تختر ملفًا، ستتم إحالة الطلب إلى الإدارة لرفع النسخة الموقعة/المعبأة</div>
               )}
               <button className="btn btn-gold" disabled={
-                (!internUploadTitle.trim() && !internUploadFile) ||
-                (Array.from(internUploadActionTypes).some(t => t === 'sign' || t === 'fill') && !internUploadFile)
+                (!internUploadTitle.trim() && !internUploadFile)
               } onClick={async () => {
                 const title = internUploadTitle.trim() || internUploadFile?.name.replace(/\.\w+$/, '') || 'مستند';
                 let types = Array.from(internUploadActionTypes);
                 if (types.includes('sign') && types.includes('fill')) types = ['sign_fill'];
                 const primaryType = types[0] || 'view';
                 try {
+                  const res = await api.post(`/interns/${internData?.id}/document-lifecycle`, {
+                    document_type: 'OTHER', custom_title: title, action_type: primaryType
+                  });
+                  const docId = res.doc_id;
                   if (internUploadFile) {
-                    await api.uploadInternDocument(internData?.id, 'OTHER', internUploadFile, undefined, title);
-                  } else {
-                    await api.post(`/interns/${internData?.id}/document-lifecycle`, {
-                      document_type: 'OTHER', custom_title: title, action_type: primaryType
-                    });
+                    await api.uploadInternDocument(internData?.id, 'OTHER', internUploadFile, docId, title);
                   }
                   setShowInternUploadModal(false);
                   setInternUploadFile(null);
