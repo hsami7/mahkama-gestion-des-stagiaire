@@ -105,6 +105,22 @@ def safe_filename(prefix: str, original: str) -> str:
     return name
 
 
+def _uniquify_title(intern_id, title):
+    if not title:
+        return title
+    existing = DocumentLifecycle.query.filter(
+        DocumentLifecycle.intern_id == intern_id,
+        DocumentLifecycle.custom_title.like(f'{title}%')
+    ).all()
+    existing_titles = {d.custom_title for d in existing if d.custom_title}
+    if title not in existing_titles:
+        return title
+    n = 1
+    while f'{title} ({n})' in existing_titles:
+        n += 1
+    return f'{title} ({n})'
+
+
 # --- MODELS ---
 class User(db.Model):
     __tablename__ = 'users'
@@ -226,7 +242,7 @@ DOC_TYPES = [
     'CIN', 'CV', 'INSURANCE', 'DEMANDE', 'CONVENTION_SIGNED',
     'FINAL_REPORT', 'ATTESTATION_SIGNED', 'OTHER'
 ]
-DOC_STATUSES = ['MISSING', 'PENDING_REVIEW', 'REVISION_REQUESTED', 'APPROVED_AND_SIGNED']
+DOC_STATUSES = ['MISSING', 'AWAITING_RETURN', 'RETURNED', 'PENDING_REVIEW', 'REVISION_REQUESTED', 'APPROVED_AND_SIGNED']
 
 # Allowed file types for a requested/uploaded document. Maps the value stored on
 # DocumentLifecycle.file_type to the set of extensions the server will accept.
@@ -238,7 +254,7 @@ FILE_TYPE_EXTENSIONS = {
     'any':   ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'],
 }
 # What the document should be used for — drives lifecycle behaviour.
-ACTION_TYPES = {'sign', 'fill', 'view', 'view_or_return'}
+ACTION_TYPES = {'sign', 'fill', 'sign_fill', 'view', 'view_or_return'}
 
 class DocumentLifecycle(db.Model):
     __tablename__ = 'document_lifecycle'
@@ -253,6 +269,7 @@ class DocumentLifecycle(db.Model):
     custom_title = db.Column(db.String(150), nullable=True)
     requires_return = db.Column(db.Boolean, default=False)
     returned_file_path = db.Column(db.String(255), nullable=True)
+    returned_files_history = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=True)
     updated_at = db.Column(db.DateTime, nullable=True)
     lifecycle_type = db.Column(db.String(20), default='SIGN')
@@ -457,6 +474,18 @@ def init_db():
             db.session.rollback()
             print(f"DocumentLifecycle migration failed: {e}")
 
+        # Add returned_files_history column
+        try:
+            dl_cols = [c['name'] for c in db.inspect(db.engine).get_columns('document_lifecycle')]
+            with db.engine.connect() as conn:
+                from sqlalchemy import text as sql_text
+                if 'returned_files_history' not in dl_cols:
+                    conn.execute(sql_text('ALTER TABLE document_lifecycle ADD COLUMN returned_files_history TEXT'))
+                conn.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"returned_files_history migration failed: {e}")
+
         # Add source column to document_lifecycle + backfill TEMPLATE_VIEW
         try:
             dl_cols = [c['name'] for c in db.inspect(db.engine).get_columns('document_lifecycle')]
@@ -560,21 +589,21 @@ def init_db():
             db.session.rollback()
             print(f"Legacy sign/fill visibility migration failed: {e}")
 
-        # Set legacy sign/fill MISSING docs to AWAITING_RETURN
+        # Fix: revert AWAITING_RETURN docs that have no file_path back to MISSING
         try:
             fixed3 = DocumentLifecycle.query.filter(
-                DocumentLifecycle.action_type.in_(['sign', 'fill', 'sign_fill']),
-                DocumentLifecycle.status == 'MISSING'
+                DocumentLifecycle.status == 'AWAITING_RETURN',
+                DocumentLifecycle.file_path.is_(None)
             ).update(
-                {'status': 'AWAITING_RETURN'},
+                {'status': 'MISSING'},
                 synchronize_session='fetch'
             )
             db.session.commit()
             if fixed3:
-                print(f"Fixed {fixed3} legacy sign/fill docs (MISSING to AWAITING_RETURN)")
+                print(f"Fixed {fixed3} AWAITING_RETURN docs with no file (reverted to MISSING)")
         except Exception as e:
             db.session.rollback()
-            print(f"Status migration failed: {e}")
+            print(f"Status fixup migration failed: {e}")
 
 
 # --- AUTHENTICATION ROUTES ---
@@ -1367,7 +1396,7 @@ def attach_vault_to_intern(intern_id):
     now = datetime.now(timezone.utc)
     action_labels = {'sign': 'توقيع', 'fill': 'تعبئة وإرجاع', 'sign_fill': 'توقيع وتعبئة وإرجاع'}
     action_label = action_labels.get(action_type, '')
-    label = custom_title or f'{vault_name} ({action_label})'
+    label = _uniquify_title(intern.id, custom_title or f'{vault_name} ({action_label})')
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
         uploaded_by='ADMIN', status='AWAITING_RETURN' if requires_return else 'APPROVED_AND_SIGNED',
@@ -1567,7 +1596,7 @@ def create_intern_document_lifecycle(intern_id):
         return jsonify({"msg": "Intern not found"}), 404
     data = request.json or {}
     doc_type = (data.get('document_type') or 'OTHER').strip() or 'OTHER'
-    custom_title = data.get('custom_title', '').strip() or None
+    custom_title = _uniquify_title(intern_id, data.get('custom_title', '').strip() or None)
     action_type = data.get('action_type', 'view')
     now = datetime.now(timezone.utc)
     record = DocumentLifecycle(
@@ -2344,12 +2373,17 @@ def export_interns():
             c.font = Font(bold=True, color="FFFFFF")
             c.fill = header_fill
             c.alignment = Alignment(horizontal="right", vertical="center")
+        ws.sheet_view.rightToLeft = True
         for i in interns:
-            ws.append([
+            row_data = [
                 i.id, i.name, i.name_fr, i.email, i.phone, i.national_id,
                 i.department, i.encadrant, i.status, i.start_date, i.end_date,
                 i.date_of_birth, i.university, i.address
-            ])
+            ]
+            ws.append(row_data)
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=len(headers)):
+            for cell in row:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
         for col in range(1, len(headers) + 1):
             ws.column_dimensions[get_column_letter(col)].width = 18
         ws.column_dimensions['B'].width = 24
@@ -2408,6 +2442,7 @@ def list_intern_documents(intern_id):
             "custom_title": d.custom_title,
             "requires_return": d.requires_return,
             "returned_file_path": d.returned_file_path,
+            "returned_files_history": d.returned_files_history,
             "created_at": d.created_at,
             "updated_at": d.updated_at,
             "file_type": d.file_type or 'pdf',
@@ -2724,7 +2759,7 @@ def upload_signed_document(intern_id):
     record = DocumentLifecycle(
         intern_id=intern.id, doc_type=doc_type, file_path=file_url,
         uploaded_by='ADMIN', status='AWAITING_RETURN' if (action_type in ('sign', 'fill', 'sign_fill')) else 'PENDING_REVIEW',
-        is_visible_to_intern=True, custom_title=custom_title,
+        is_visible_to_intern=True, custom_title=_uniquify_title(intern.id, custom_title),
         file_type=file_type or 'pdf',
         action_type=action_type or 'view',
         created_at=now, updated_at=now
@@ -2773,6 +2808,19 @@ def upload_returned_document(intern_id, doc_id):
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     file_url = f"/api/uploads/{filename}"
 
+    history = []
+    if doc.returned_files_history:
+        try:
+            history = json.loads(doc.returned_files_history)
+        except:
+            history = []
+    if doc.returned_file_path:
+        history.append({
+            'file_path': doc.returned_file_path,
+            'uploaded_at': doc.updated_at.isoformat() if doc.updated_at else datetime.now(timezone.utc).isoformat(),
+            'status_before': doc.status
+        })
+    doc.returned_files_history = json.dumps(history, ensure_ascii=False)
     doc.returned_file_path = file_url
     doc.status = 'RETURNED'
     doc.updated_at = datetime.now(timezone.utc)
@@ -2834,7 +2882,9 @@ def download_intern_document(doc_id):
     if not file_path:
         return jsonify({"msg": "File not found"}), 404
     name = file_path.replace('/api/uploads/', '').replace('/', '')
-    return send_from_directory(app.config['UPLOAD_FOLDER'], name)
+    ext = os.path.splitext(name)[1] or '.pdf'
+    download_name = (doc.custom_title or doc.doc_type or 'document') + ext
+    return send_file(os.path.join(app.config['UPLOAD_FOLDER'], name), download_name=download_name)
 
 
 @app.route('/api/intern/documents', methods=['GET'])
@@ -2864,6 +2914,7 @@ def list_my_documents():
             "custom_title": d.custom_title,
             "requires_return": d.requires_return,
             "returned_file_path": d.returned_file_path,
+            "returned_files_history": d.returned_files_history,
             "created_at": d.created_at,
             "updated_at": d.updated_at,
             "file_type": d.file_type or 'pdf',
@@ -2927,11 +2978,26 @@ def export_intern_zip(intern_id):
                 fname = d.returned_file_path.replace('/api/uploads/', '').replace('/', '')
                 fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
                 if os.path.exists(fpath):
-                    arcname = f"Returned_{d.doc_type or 'doc'}_{d.id}_{fname}"
+                    arcname = f"Latest_Return_{d.doc_type or 'doc'}_{d.id}_{fname}"
                     if arcname not in added_files:
                         zf.write(fpath, arcname)
                         added_files.add(arcname)
-                        
+
+            if d.returned_files_history:
+                try:
+                    history = json.loads(d.returned_files_history)
+                    for idx, entry in enumerate(history):
+                        fname = entry.get('file_path', '').replace('/api/uploads/', '').replace('/', '')
+                        if not fname:
+                            continue
+                        fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+                        if os.path.exists(fpath):
+                            arcname = f"Return_History_{d.doc_type or 'doc'}_{d.id}_v{idx+1}_{fname}"
+                            if arcname not in added_files:
+                                zf.write(fpath, arcname)
+                                added_files.add(arcname)
+                except:
+                    pass
     tmp.close()
     return send_file(tmp.name, as_attachment=True, download_name=f"Intern_{intern_id}_Archive.zip", mimetype='application/zip')
 
