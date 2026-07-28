@@ -1198,14 +1198,6 @@ return rows.map(row => {
                           )}
                           {(d.status === 'AWAITING_ADMIN' || d.status === 'PENDING_REVIEW') && (
                             <>
-                              {d.status === 'AWAITING_ADMIN' && (
-                                <button className="btn btn-ghost sm" onClick={async () => {
-                                  await api.post(`/interns/${id}/documents/${d.id}/approve`, {});
-                                  fetchDocsLifecycle();
-                                }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                                  <CheckCircle size={14} />
-                                </button>
-                              )}
                               <button className="btn btn-ghost sm" onClick={async () => {
                                 const input = document.createElement('input');
                                 input.type = 'file';
