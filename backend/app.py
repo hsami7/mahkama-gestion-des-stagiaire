@@ -1260,6 +1260,9 @@ def delete_intern(intern_id):
         return jsonify({"msg": "Intern not found"}), 404
         
     name = intern.name
+    DocumentLifecycle.query.filter_by(intern_id=intern_id).delete()
+    Notification.query.filter_by(intern_id=intern_id).delete()
+    Attendance.query.filter_by(intern_id=intern_id).delete()
     db.session.delete(intern)
     db.session.commit()
     
