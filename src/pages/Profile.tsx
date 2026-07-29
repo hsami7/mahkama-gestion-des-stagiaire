@@ -1388,7 +1388,16 @@ return rows.map(row => {
                 if (!res.ok) throw new Error('Export failed');
                 const blob = await res.blob();
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = `Intern_${id}_Archive.zip`; a.click();
+                let filename = `Intern_${id}_Archive.zip`;
+                const disposition = res.headers.get('Content-Disposition');
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                  const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                  const matches = filenameRegex.exec(disposition);
+                  if (matches != null && matches[1]) { 
+                    filename = matches[1].replace(/['"]/g, '');
+                  }
+                }
+                const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
                 URL.revokeObjectURL(url);
               } catch (e) {
                 toast.error('فشل إنشاء الأرشيف');
