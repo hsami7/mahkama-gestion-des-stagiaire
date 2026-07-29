@@ -417,7 +417,7 @@ def build_intern_pdf(interns, mode="summary"):
 
         # --- 1. Header bar ------------------------------------------------
         header_right = [
-            Paragraph(ar("سِجِلّ - نظام إدارة المتدربين"), sys_title),
+            Paragraph(ar("متدرب - نظام إدارة المتدربين"), sys_title),
             Paragraph(ar("بطاقة معلومات متدرب"), doc_kicker),
         ]
         header_left = [
@@ -584,7 +584,7 @@ def build_intern_pdf(interns, mode="summary"):
 
         elements.append(Spacer(1, 20))
         footer_line = (
-            "وثيقة مصدرة آلياً من نظام سِجِلّ لإدارة المتدربين — تاريخ التصدير: "
+            "وثيقة مصدرة آلياً من نظام متدرب لإدارة المتدربين — تاريخ التصدير: "
             + export_date
         )
         elements.append(Paragraph(ar(footer_line), footer_style))

@@ -29,7 +29,7 @@ export function Login({ setAuthToken }: { setAuthToken: (token: string) => void 
         <div className="login-side">
           <div>
             <div className="brand-seal">س</div>
-            <h1>سِجِلّ</h1>
+            <h1>متدرب</h1>
             <p>نظام إدارة المتدربين<br/>وزارة العدل</p>
           </div>
           <div className="foot">

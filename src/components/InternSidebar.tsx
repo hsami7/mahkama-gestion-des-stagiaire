@@ -29,7 +29,7 @@ export function InternSidebar({ activeTab, setActiveTab, internData, user, missi
           س
         </div>
         <div>
-          <b style={{ fontSize: '15px' }}>سِجِلّ</b>
+          <b style={{ fontSize: '15px' }}>متدرب</b>
           <small>بوابة المتدرب</small>
         </div>
       </div>

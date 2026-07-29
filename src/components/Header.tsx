@@ -39,7 +39,7 @@ export function Header({ title, missingCount, notifications = [], onReadNotifica
   return (
     <div className="topbar no-print">
       <div className="tb-title">
-        <span className="crumb">سِجِلّ</span>
+        <span className="crumb">متدرب</span>
         <span id="pageTitle">{title}</span>
       </div>
       
