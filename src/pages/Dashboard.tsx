@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, CheckCircle, WarningCircle, Plus, Eye, X, UserCirclePlus, ChartBar } from '@phosphor-icons/react';
+import { FileText, CheckCircle, WarningCircle, Plus, Eye, X, UserCirclePlus, ChartBar, Users } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -20,7 +20,11 @@ function formatSubmittedAt(iso: string) {
   if (!iso) return '—';
   try {
     const d = new Date(iso);
-    return d.toLocaleDateString('ar-MA', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (isNaN(d.getTime())) return iso;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
   } catch { return iso; }
 }
 
@@ -263,6 +267,16 @@ export function Dashboard() {
       <div className="stat-grid">
         <div className="stat-card" onClick={() => navigate('/interns')} style={{ cursor: 'pointer' }}>
           <div className="top">
+            <div className="ic" style={{ backgroundColor: '#EFF6FF', color: '#1D4ED8' }}>
+              <Users size={20} weight="fill" />
+            </div>
+          </div>
+          <div className="num">{interns.length}</div>
+          <div className="lbl">إجمالي المتدربين</div>
+        </div>
+
+        <div className="stat-card" onClick={() => navigate('/interns')} style={{ cursor: 'pointer' }}>
+          <div className="top">
             <div className="ic" style={{ backgroundColor: 'var(--warning-bg)', color: 'var(--warning)' }}>
               <WarningCircle size={20} weight="fill" />
             </div>
@@ -471,7 +485,7 @@ export function Dashboard() {
                       } catch { alert('فشل تغيير الحالة'); }
                     }} style={{
                       fontSize: 11, padding: '4px 8px', borderRadius: 6,
-                      border: '1px solid var(--line)', background: 'var(--paper)',
+                      border: '1px solid var(--line)',
                       fontWeight: 600, cursor: 'pointer', outline: 'none',
                       color: intern.status === 'نشط' ? 'var(--ok)' :
                              intern.status === 'مستندات ناقصة' ? 'var(--bad)' :

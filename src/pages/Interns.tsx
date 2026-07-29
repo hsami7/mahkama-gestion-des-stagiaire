@@ -40,8 +40,9 @@ export function Interns() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterPendingDocs, setFilterPendingDocs] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState({ query: '', status: '', pendingDocs: false });
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({ query: '', status: '', startDate: '', endDate: '' });
   
   const [showAttestationModal, setShowAttestationModal] = useState(false);
   const [selectedIntern, setSelectedIntern] = useState<any>(null);
@@ -52,10 +53,22 @@ const filteredInterns = useMemo(() => {
         (intern.name && intern.name.toLowerCase().includes(appliedFilters.query.toLowerCase())) ||
         (intern.national_id && intern.national_id.toLowerCase().includes(appliedFilters.query.toLowerCase()));
 
-      const matchStatus = !appliedFilters.status || intern.status === appliedFilters.status;
-      const matchPendingDocs = !appliedFilters.pendingDocs || intern.has_pending_activity;
+            let matchStatus = true;
+      if (appliedFilters.status === 'وثائق معلقة') {
+        matchStatus = intern.has_pending_activity;
+      } else if (appliedFilters.status) {
+        matchStatus = intern.status === appliedFilters.status;
+      }
 
-      return matchQuery && matchStatus && matchPendingDocs;
+      let matchesDates = true;
+      if (appliedFilters.startDate) {
+        matchesDates = matchesDates && intern.start_date >= appliedFilters.startDate;
+      }
+      if (appliedFilters.endDate) {
+        matchesDates = matchesDates && intern.end_date <= appliedFilters.endDate;
+      }
+
+      return matchQuery && matchStatus && matchesDates;
     });
 
     // Sort: active interns by remaining days ascending (closest to end first), then others by status
@@ -180,30 +193,34 @@ const filteredInterns = useMemo(() => {
           <h2>ملفات المتدربين</h2>
           <p>{interns.length} ملفًا مسجّلًا</p>
         </div>
-        <button className="btn btn-gold" onClick={() => {
-            if (isFormOpen) {
-                setIsFormOpen(false);
-                setEditingInternId(null);
-                setNewIntern(defaultIntern);
-            } else {
-                setIsFormOpen(true);
-            }
-        }}>
-          {isFormOpen ? <X weight="bold" size={19} color="#000" /> : <Plus weight="bold" size={19} color="#000" />} 
-          {isFormOpen ? 'إغلاق النموذج' : 'إضافة متدرب يدويًا'}
-        </button>
-        <button
-          className="btn btn-green"
-          style={{background:'#16A34A',color:'#fff'}}
-          onClick={() => {
-            const ids = filteredInterns.map(i => i.id);
-            if (ids.length === 0) return;
-            window.open(api.exportInterns('excel', ids), '_blank');
-          }}
-          title="تصدير النتائج إلى Excel"
-        >
-          <FileXls size={16} weight="bold" /> تصدير Excel
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {!isFormOpen && (
+            <button
+              className="btn btn-green"
+              style={{background:'#16A34A',color:'#fff'}}
+              onClick={() => {
+                const ids = filteredInterns.map(i => i.id);
+                if (ids.length === 0) return;
+                window.open(api.exportInterns('excel', ids), '_blank');
+              }}
+              title="تصدير النتائج إلى Excel"
+            >
+              <FileXls size={16} weight="bold" /> تصدير Excel
+            </button>
+          )}
+          <button className="btn btn-gold" onClick={() => {
+              if (isFormOpen) {
+                  setIsFormOpen(false);
+                  setEditingInternId(null);
+                  setNewIntern(defaultIntern);
+              } else {
+                  setIsFormOpen(true);
+              }
+          }}>
+            {isFormOpen ? <X weight="bold" size={19} color="#000" /> : <Plus weight="bold" size={19} color="#000" />} 
+            {isFormOpen ? 'إغلاق النموذج' : 'إضافة متدرب يدويًا'}
+          </button>
+        </div>
       </div>
 
       {isFormOpen && (
@@ -330,8 +347,8 @@ const filteredInterns = useMemo(() => {
                     onFocus={e => e.target.style.borderColor = 'var(--gold)'}
                     onBlur={e => e.target.style.borderColor = 'var(--line)'}
                   />
-                  <div style={{ position: 'absolute', left: '10px', width: '20px', height: '20px' }}>
-                    <CalendarCheck size={18} color="var(--slate)" style={{ pointerEvents: 'none', position: 'absolute', top: '1px' }} />
+                  <div style={{ position: 'absolute', left: '4px', top: '4px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                    <CalendarCheck size={18} color="var(--slate)" style={{ pointerEvents: 'none' }} />
                     <input 
                       type="date" 
                       style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
@@ -360,8 +377,8 @@ const filteredInterns = useMemo(() => {
                     onFocus={e => e.target.style.borderColor = 'var(--gold)'}
                     onBlur={e => e.target.style.borderColor = 'var(--line)'}
                   />
-                  <div style={{ position: 'absolute', left: '10px', width: '20px', height: '20px' }}>
-                    <CalendarCheck size={18} color="var(--slate)" style={{ pointerEvents: 'none', position: 'absolute', top: '1px' }} />
+                  <div style={{ position: 'absolute', left: '4px', top: '4px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                    <CalendarCheck size={18} color="var(--slate)" style={{ pointerEvents: 'none' }} />
                     <input 
                       type="date" 
                       style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
@@ -390,8 +407,8 @@ const filteredInterns = useMemo(() => {
                     onFocus={e => e.target.style.borderColor = 'var(--gold)'}
                     onBlur={e => e.target.style.borderColor = 'var(--line)'}
                   />
-                  <div style={{ position: 'absolute', left: '10px', width: '20px', height: '20px' }}>
-                    <CalendarCheck size={18} color="var(--slate)" style={{ pointerEvents: 'none', position: 'absolute', top: '1px' }} />
+                  <div style={{ position: 'absolute', left: '4px', top: '4px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                    <CalendarCheck size={18} color="var(--slate)" style={{ pointerEvents: 'none' }} />
                     <input 
                       type="date" 
                       style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
@@ -475,17 +492,33 @@ const filteredInterns = useMemo(() => {
                 <option value="قيد المراجعة">قيد المراجعة</option>
                 <option value="منتهي">منتهي</option>
                 <option value="مرفوض">مرفوض</option>
+                <option value="وثائق معلقة">وثائق معلقة</option>
               </select>
               <CaretDown weight="bold" className="icon" style={{ marginLeft: '-5px' }} />
             </div>
 
-            <label style={{display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer', padding:'4px 0'}}>
-              <input type="checkbox" checked={filterPendingDocs} onChange={e => setFilterPendingDocs(e.target.checked)} style={{width:16,height:16,cursor:'pointer'}} />
-              ملفات المتدربين
-            </label>
+            <div className="filter-input" style={{ padding: '5px 10px', display: 'flex', gap: '8px', flexWrap: 'nowrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: 'var(--slate)', marginRight: '4px' }}>من:</span>
+              <input 
+                type="date" 
+                style={{ width: '105px' }}
+                value={filterStartDate}
+                onChange={e => setFilterStartDate(e.target.value)}
+              />
+              <div style={{ width: '1px', background: 'var(--line)', height: '16px', margin: '0 4px' }}></div>
+              <span style={{ fontSize: '11px', color: 'var(--slate)' }}>إلى:</span>
+              <input 
+                type="date" 
+                style={{ width: '105px' }}
+                value={filterEndDate}
+                onChange={e => setFilterEndDate(e.target.value)}
+              />
+            </div>
+
+            
             <button 
               className="btn btn-ink" 
-              onClick={() => setAppliedFilters({ query: searchQuery, status: filterStatus, pendingDocs: filterPendingDocs })}
+              onClick={() => setAppliedFilters({ query: searchQuery, status: filterStatus, startDate: filterStartDate, endDate: filterEndDate })}
             >
               تطبيق الفلتر
             </button>
@@ -494,8 +527,9 @@ const filteredInterns = useMemo(() => {
               onClick={() => {
                 setSearchQuery('');
                 setFilterStatus('');
-                setFilterPendingDocs(false);
-                setAppliedFilters({ query: '', status: '', pendingDocs: false });
+                setFilterStartDate('');
+                setFilterEndDate('');
+                setAppliedFilters({ query: '', status: '', startDate: '', endDate: '' });
               }}
             >
               مسح الفلتر
@@ -579,7 +613,7 @@ const filteredInterns = useMemo(() => {
               <p style={{ marginTop: '8px' }}>حاول تغيير خيارات البحث أو الفلتر للحصول على نتائج.</p>
               <button className="btn btn-ghost" style={{ marginTop: '16px' }} onClick={() => {
                 setFilterStatus('');
-                setAppliedFilters({ query: '', status: '', pendingDocs: false });
+                setAppliedFilters({ query: '', status: '', startDate: '', endDate: '' });
               }}>
                 مسح الفلتر
               </button>

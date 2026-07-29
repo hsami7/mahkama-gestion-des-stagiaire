@@ -377,7 +377,7 @@ function DocumentTemplatesManager() {
 
   const API_BASE = (window as any).API_BASE || 'http://localhost:5055';
   const token = sessionStorage.getItem('token');
-  const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
+  const authHeaders = (token ? { 'Authorization': `Bearer ${token}` } : {}) as HeadersInit;
 
   const addTemplate = async () => {
     if (!label.trim()) return toast.warning('الرجاء إدخال اسم المستند');

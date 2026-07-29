@@ -22,7 +22,8 @@ function parseDate(value?: string): Date | null {
   if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return new Date(v + 'T00:00:00');
   const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (m) return new Date(`${m[3]}-${m[2]}-${m[1]}T00:00:00`);
-  return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 // DD/MM/YYYY Western

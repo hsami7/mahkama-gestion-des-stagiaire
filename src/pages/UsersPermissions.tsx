@@ -46,7 +46,7 @@ export function UsersPermissions() {
         await api.post('/users', newUser);
       }
       setEditingUserId(null);
-      setNewUser({ name: '', email: '', role: '', password: 'password123', permissions: JSON.stringify(defaultPermissions) });
+      setNewUser({ name: '', email: '', role: '', password: 'password123', permissions: JSON.stringify(defaultPermissions), can_manage_documents: false });
       fetchUsers();
     } catch (err: any) {
       toast.error(err.message || 'فشل حفظ المستخدم');
@@ -68,7 +68,7 @@ export function UsersPermissions() {
 
   const handleCancelEdit = () => {
     setEditingUserId(null);
-    setNewUser({ name: '', email: '', role: 'Manager', password: 'password123', permissions: JSON.stringify(defaultPermissions) });
+    setNewUser({ name: '', email: '', role: 'Manager', password: 'password123', permissions: JSON.stringify(defaultPermissions), can_manage_documents: false });
   };
 
   const handleDelete = async (id: number) => {

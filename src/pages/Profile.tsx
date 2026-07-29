@@ -68,7 +68,7 @@ const RotDateInput = React.memo(({ value, onChange, placeholder }: { value: stri
   };
   return (
     <div style={{position:'relative'}}>
-      <input type="text" inputMode="numeric" className="input" style={{fontSize:12, width:'100%', paddingLeft:34}} value={text} onChange={e => commit(e.target.value)} onBlur={e => commit(e.target.value)} placeholder={placeholder} />
+      <input type="text" inputMode="numeric" className="input" style={{fontSize:12, width:'100%', paddingLeft:46}} value={text} onChange={e => commit(e.target.value)} onBlur={e => commit(e.target.value)} placeholder={placeholder} />
       <button type="button" onClick={() => hiddenRef.current?.showPicker()} style={{position:'absolute',left:4,top:'50%',transform:'translateY(-50%)',width:28,height:28,borderRadius:6,border:'none',background:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--slate)'}}><CalendarBlank size={16} /></button>
       <input type="date" ref={hiddenRef} onChange={e => { const iso = e.target.value; if (iso) { onChange(iso); setText(formatDate(iso)); }}}
         style={{position:'absolute',left:0,top:'50%',transform:'translateY(-50%)',width:28,height:28,opacity:0,pointerEvents:'none'}} />
@@ -813,9 +813,6 @@ export function Profile() {
             <Certificate weight="bold" size={18} color="#1a1a1a" />
           </button>
           )}
-           <button title="تصدير الملف الشخصي Excel" onClick={() => window.open(api.exportInterns('excel', [intern.id]), '_blank')} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#E8F5E9', border: '1.5px solid #21A366', color: '#1a1a1a', transition: 'all 0.2s' }}>
-             <MicrosoftExcelLogo weight="bold" size={18} color="#1a1a1a" />
-           </button>
            <button title="تصدير PDF" onClick={() => { setExportMode('summary'); setShowExportModal(true); }} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#1E5631', border: '1.5px solid #1E5631', color: '#fff', transition: 'all 0.2s' }}>
              <FilePdf weight="bold" size={18} color="#fff" />
            </button>

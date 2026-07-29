@@ -43,7 +43,7 @@ export function Layout() {
   return (
     <div className="app-container">
       <Sidebar />
-      <div className="main">
+      <div className="main-content">
         <Header title={getPageTitle(location.pathname)} notifications={notifications} onReadNotification={handleReadNotification} onNotificationClick={n => navigate(n.intern_id ? `/interns/${n.intern_id}` : '#')} />
         <div className="view on">
           <Outlet />
