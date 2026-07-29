@@ -542,6 +542,17 @@ for (const [base, docs] of grouped) {
                                   docs.forEach(d => rows.push(d));
                                 }
                               }
+                              rows.sort((a, b) => {
+                                const getLatestTime = (item: any) => {
+                                  if (item.isCombined) {
+                                    const t1 = new Date(item.sign.updated_at || item.sign.created_at || 0).getTime();
+                                    const t2 = new Date(item.fill.updated_at || item.fill.created_at || 0).getTime();
+                                    return Math.max(t1, t2);
+                                  }
+                                  return new Date(item.updated_at || item.created_at || 0).getTime();
+                                };
+                                return getLatestTime(a) - getLatestTime(b);
+                              });
                               return rows.map(row => {
                                 if (row.isCombined) {
                                   const d = row.sign;
