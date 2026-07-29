@@ -1300,6 +1300,8 @@ def delete_intern(intern_id):
     DocumentLifecycle.query.filter_by(intern_id=intern_id).delete()
     Notification.query.filter_by(intern_id=intern_id).delete()
     Attendance.query.filter_by(intern_id=intern_id).delete()
+    if intern.email:
+        User.query.filter_by(email=intern.email, role='Intern').delete()
     db.session.delete(intern)
     db.session.commit()
     
@@ -2897,15 +2899,22 @@ def upload_returned_document(intern_id, doc_id):
         })
     doc.returned_files_history = json.dumps(history, ensure_ascii=False)
     doc.returned_file_path = file_url
-    doc.status = 'RETURNED'
+    # Admin-initiated: upload at PENDING_REVIEW or AWAITING_RETURN → AWAITING_ADMIN
+    # Otherwise: standard return or revision re-upload → RETURNED
+    if doc.requested_by == 'ADMIN' and doc.status in ('PENDING_REVIEW', 'AWAITING_RETURN'):
+        doc.status = 'AWAITING_ADMIN'
+    else:
+        doc.status = 'RETURNED'
     doc.updated_at = datetime.now(timezone.utc)
 
     # Notify Admin and Manager about the return
     doc_title = doc.custom_title or doc.doc_type
+    notif_type = 'GENERIC' if doc.status == 'AWAITING_ADMIN' else 'DOCUMENT_RETURNED'
+    notif_body = f'تم رفع النسخة المعبأة من "{doc_title}" من قبل المتدرب بانتظار قبولك.' if doc.status == 'AWAITING_ADMIN' else f'تم إرجاع "{doc_title}" من قبل المتدرب وهو قيد المراجعة.'
     notif = Notification(
-        intern_id=intern_id, type='DOCUMENT_RETURNED',
+        intern_id=intern_id, type=notif_type,
         title=f'إعادة مستند من {intern.name if intern else "متدرب"}',
-        body=f'تم إرجاع "{doc_title}" من قبل المتدرب وهو قيد المراجعة.',
+        body=notif_body,
         related_doc_id=doc.id
     )
     db.session.add(notif)
@@ -2925,7 +2934,7 @@ def admin_upload_signed(intern_id, doc_id):
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
-    if doc.requested_by != 'INTERN':
+    if doc.requested_by == 'ADMIN' and doc.status != 'REVISION_REQUESTED':
         return jsonify({"msg": "Not an intern-initiated request"}), 400
     if doc.action_type not in ('sign', 'fill', 'sign_fill', 'view', 'view_or_return'):
         return jsonify({"msg": "Document action type does not require admin upload"}), 400
@@ -2955,7 +2964,10 @@ def admin_upload_signed(intern_id, doc_id):
         })
     doc.returned_files_history = json.dumps(history, ensure_ascii=False)
     doc.returned_file_path = file_url
-    doc.status = 'AWAITING_INTERN'
+    if doc.requested_by == 'ADMIN' and doc.status == 'REVISION_REQUESTED':
+        doc.status = 'AWAITING_RETURN'
+    else:
+        doc.status = 'AWAITING_INTERN'
     doc.updated_at = datetime.now(timezone.utc)
 
     intern = db.session.get(Intern, intern_id)
@@ -3019,6 +3031,42 @@ def admin_accept_request(intern_id, doc_id):
     return jsonify({"msg": "تم قبول الطلب"}), 200
 
 
+@app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/intern-accept-request', methods=['POST'])
+@jwt_required()
+def intern_accept_request(intern_id, doc_id):
+    """Intern accepts the admin's sign/fill request, marking it as in progress."""
+    intern, claims, user = _get_doc_type_intern()
+    if not intern or intern.id != intern_id:
+        return jsonify({"msg": "Unauthorized"}), 403
+
+    doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
+    if not doc:
+        return jsonify({"msg": "Document not found"}), 404
+    if doc.status != 'AWAITING_RETURN':
+        return jsonify({"msg": "Document is not awaiting return"}), 400
+    if doc.requested_by != 'ADMIN':
+        return jsonify({"msg": "Not an admin-initiated request"}), 400
+    if doc.action_type not in ('sign', 'fill', 'sign_fill'):
+        return jsonify({"msg": "Not a sign/fill request"}), 400
+
+    doc.status = 'APPROVED_AND_SIGNED'
+    doc.updated_at = datetime.now(timezone.utc)
+
+    # Also accept the paired fill doc for sign_fill groups
+    if doc.action_type == 'sign_fill':
+        fill_doc = DocumentLifecycle.query.filter_by(
+            intern_id=intern_id, doc_group=doc.doc_group, action_type='fill'
+        ).first()
+        if fill_doc:
+            fill_doc.status = 'APPROVED_AND_SIGNED'
+            fill_doc.updated_at = datetime.now(timezone.utc)
+
+    db.session.commit()
+
+    log_action(intern.name or 'متدرب', f"قبول طلب توقيع/تعبئة من الإدارة للمستند {doc.custom_title or doc.doc_type}")
+    return jsonify({"msg": "تم قبول الطلب"}), 200
+
+
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/intern-accept', methods=['POST'])
 @jwt_required()
 def intern_accept_admin_upload(intern_id, doc_id):
@@ -3061,7 +3109,7 @@ def intern_request_revision(intern_id, doc_id):
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
-    if doc.status not in ('AWAITING_INTERN', 'PENDING_REVIEW'):
+    if doc.status not in ('AWAITING_INTERN', 'PENDING_REVIEW', 'AWAITING_ADMIN', 'AWAITING_RETURN'):
         return jsonify({"msg": "Document not in a revisable state"}), 400
 
     data = request.json or {}
