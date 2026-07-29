@@ -3190,6 +3190,7 @@ def list_my_documents():
 
 # --- ZIP ARCHIVE EXPORT ---
 
+
 @app.route('/api/interns/<int:intern_id>/export-zip', methods=['GET'])
 @jwt_required()
 def export_intern_zip(intern_id):
@@ -3199,7 +3200,7 @@ def export_intern_zip(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
-    import tempfile, zipfile, json
+    import tempfile, zipfile, json, re
     
     docs = DocumentLifecycle.query.filter_by(intern_id=intern_id).all()
     
@@ -3214,37 +3215,93 @@ def export_intern_zip(intern_id):
     with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zf:
         added_files = set()
         
-        # Add old documents
+        # Helper to get the correct suffix based on status and action_type
+        def get_suffix(d):
+            if d.status == 'APPROVED_AND_SIGNED':
+                return "_Signed"
+            if d.status == 'RETURNED':
+                return "_Filled_And_Returned"
+            if d.status == 'AWAITING_INTERN':
+                act = str(d.action_type or '').lower()
+                lc = str(d.lifecycle_type or '').lower()
+                req = act if act and act != 'view' else lc
+                if 'sign_fill' in req or ('sign' in req and 'fill' in req):
+                    return "_Requested_To_Fill_And_Sign"
+                elif 'sign' in req:
+                    return "_Requested_To_Sign"
+                elif 'fill' in req:
+                    return "_Requested_To_Fill"
+                return "_Requested_To_Review"
+            return ""
+
+        # Folders
+        dir_admin = "01_Administration_To_Intern"
+        dir_intern = "02_Intern_To_Administration"
+        dir_history = "03_History_And_Returns"
+        dir_all = "04_All_Files"
+
+        # Add old documents (mostly from intern)
         for k, v in old_docs.items():
             if v and isinstance(v, str):
                 fname = v.replace('/api/uploads/', '').replace('/', '')
                 fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
                 if os.path.exists(fpath):
-                    arcname = f"old_{k}_{fname}"
-                    if arcname not in added_files:
-                        zf.write(fpath, arcname)
-                        added_files.add(arcname)
+                    name_base, ext = os.path.splitext(fname)
+                    arc_name = f"{k}{ext}"
+                    # Add to Intern to Admin and All
+                    path1 = f"{dir_intern}/{arc_name}"
+                    path2 = f"{dir_all}/old_{arc_name}"
+                    if path1 not in added_files:
+                        zf.write(fpath, path1)
+                        added_files.add(path1)
+                    if path2 not in added_files:
+                        zf.write(fpath, path2)
+                        added_files.add(path2)
         
         # Add lifecycle documents
         for d in docs:
+            suffix = get_suffix(d)
+            
+            # Original file (uploaded by admin or intern)
             if d.file_path:
                 fname = d.file_path.replace('/api/uploads/', '').replace('/', '')
                 fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
                 if os.path.exists(fpath):
-                    arcname = f"{d.doc_type or 'doc'}_{d.id}_{fname}"
-                    if arcname not in added_files:
-                        zf.write(fpath, arcname)
-                        added_files.add(arcname)
+                    title = re.sub(r'[^\w\-\.]', '_', d.custom_title or d.doc_type or f"doc_{d.id}")
+                    _, ext = os.path.splitext(fname)
+                    arc_name = f"{title}{suffix}{ext}"
+                    
+                    folder = dir_admin if d.uploaded_by == 'ADMIN' else dir_intern
+                    path1 = f"{folder}/{arc_name}"
+                    path2 = f"{dir_all}/{arc_name}"
+                    
+                    if path1 not in added_files:
+                        zf.write(fpath, path1)
+                        added_files.add(path1)
+                    if path2 not in added_files:
+                        zf.write(fpath, path2)
+                        added_files.add(path2)
             
+            # Latest Return (from intern)
             if d.returned_file_path:
                 fname = d.returned_file_path.replace('/api/uploads/', '').replace('/', '')
                 fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
                 if os.path.exists(fpath):
-                    arcname = f"Latest_Return_{d.doc_type or 'doc'}_{d.id}_{fname}"
-                    if arcname not in added_files:
-                        zf.write(fpath, arcname)
-                        added_files.add(arcname)
+                    title = re.sub(r'[^\w\-\.]', '_', d.custom_title or d.doc_type or f"doc_{d.id}")
+                    _, ext = os.path.splitext(fname)
+                    arc_name = f"{title}_Latest_Return{ext}"
+                    
+                    path1 = f"{dir_intern}/{arc_name}"
+                    path2 = f"{dir_all}/{arc_name}"
+                    
+                    if path1 not in added_files:
+                        zf.write(fpath, path1)
+                        added_files.add(path1)
+                    if path2 not in added_files:
+                        zf.write(fpath, path2)
+                        added_files.add(path2)
 
+            # History Returns
             if d.returned_files_history:
                 try:
                     history = json.loads(d.returned_files_history)
@@ -3254,14 +3311,59 @@ def export_intern_zip(intern_id):
                             continue
                         fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
                         if os.path.exists(fpath):
-                            arcname = f"Return_History_{d.doc_type or 'doc'}_{d.id}_v{idx+1}_{fname}"
-                            if arcname not in added_files:
-                                zf.write(fpath, arcname)
-                                added_files.add(arcname)
+                            title = re.sub(r'[^\w\-\.]', '_', d.custom_title or d.doc_type or f"doc_{d.id}")
+                            _, ext = os.path.splitext(fname)
+                            arc_name = f"{title}_v{idx+1}{ext}"
+                            
+                            path1 = f"{dir_history}/{arc_name}"
+                            path2 = f"{dir_all}/{arc_name}"
+                            
+                            if path1 not in added_files:
+                                zf.write(fpath, path1)
+                                added_files.add(path1)
+                            if path2 not in added_files:
+                                zf.write(fpath, path2)
+                                added_files.add(path2)
                 except:
                     pass
+
+        # Write README
+        readme_content = """دليل ملفات المتدرب
+
+يهدف هذا الأرشيف إلى تنظيم ملفات المتدرب بناءً على مصدرها وحالتها:
+
+1. مجلد "01_Administration_To_Intern": 
+يحتوي على النماذج الفارغة التي يطلب من المتدرب تحميلها وتعبئتها، بالإضافة إلى الشهادات الموقعة النهائية التي تمنحها الإدارة.
+
+2. مجلد "02_Intern_To_Administration": 
+يحتوي على الوثائق الشخصية للمتدرب (مثل السيرة الذاتية والبطاقة الوطنية) والوثائق التي قام المتدرب بتعبئتها وإعادتها.
+
+3. مجلد "03_History_And_Returns": 
+يحتوي على النسخ القديمة من الوثائق في حال تم إرجاعها للمتدرب لتعديلها عدة مرات.
+
+4. مجلد "04_All_Files": 
+يحتوي على جميع الوثائق والملفات بدون تقسيم للمجلدات.
+
+---
+
+شرح الملحقات المضافة لأسماء الملفات:
+- Requested_To_Fill_And_Sign : نموذج طلب من المتدرب تعبئته وتوقيعه.
+- Requested_To_Sign : نموذج يطلب من المتدرب توقيعه فقط.
+- Requested_To_Fill : نموذج يطلب تعبئته فقط.
+- Filled_And_Returned : وثيقة قام المتدرب بتعبئتها وإرسالها للإدارة وهي بانتظار المراجعة والاعتماد.
+- Signed : وثيقة نهائية تمت الموافقة عليها وتم توقيعها بنجاح.
+"""
+        zf.writestr('README.txt', readme_content.encode('utf-8'))
+
     tmp.close()
-    return send_file(tmp.name, as_attachment=True, download_name=f"Intern_{intern_id}_Archive.zip", mimetype='application/zip')
+    
+    # Safe filename
+    safe_name = re.sub(r'[^\w\-\s]', '', intern.name or f"Intern_{intern_id}").strip().replace(' ', '_')
+    if not safe_name:
+        safe_name = f"Intern_{intern_id}"
+        
+    return send_file(tmp.name, as_attachment=True, download_name=f"{safe_name}_Files.zip", mimetype='application/zip')
+
 
 
 # --- FORM BUILDER ROUTES ---
