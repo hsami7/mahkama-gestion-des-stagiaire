@@ -2896,7 +2896,7 @@ def admin_upload_signed(intern_id, doc_id):
         return jsonify({"msg": "Document not found"}), 404
     if doc.requested_by != 'INTERN':
         return jsonify({"msg": "Not an intern-initiated request"}), 400
-    if doc.action_type not in ('sign', 'fill', 'sign_fill'):
+    if doc.action_type not in ('sign', 'fill', 'sign_fill', 'view', 'view_or_return'):
         return jsonify({"msg": "Document action type does not require admin upload"}), 400
 
     if 'file' not in request.files:
