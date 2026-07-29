@@ -746,6 +746,19 @@ export function Profile() {
 
 
 
+  const handleViewDocument = (docId: number, filePath: string, returned: boolean = false) => {
+    const isWord = filePath && (filePath.toLowerCase().endsWith('.doc') || filePath.toLowerCase().endsWith('.docx'));
+    if (isWord) {
+        toast.info('جاري فتح المستند في برنامج Word...');
+        api.openDocument(docId, returned).catch(err => {
+            console.error("Error opening document:", err);
+            toast.error("حدث خطأ أثناء فتح الملف");
+        });
+    } else {
+        window.open(api.downloadDocument(docId) + (returned ? '&returned=1' : ''), '_blank');
+    }
+  };
+
   const handleDownloadPdf = () => {
     const html = generateEvalHtml();
 
@@ -1073,7 +1086,7 @@ return rows.map(row => {
                             const fileDoc = d.file_path ? d : fillDoc;
                             return (
                               <>
-                                <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(fileDoc.id) + (anyReturned ? '&returned=1' : ''), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <button className="btn btn-ghost sm" onClick={() => handleViewDocument(fileDoc.id, anyReturned ? (fileDoc.returned_file_path || fileDoc.file_path) : fileDoc.file_path, anyReturned)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                   <Eye size={14} />
                                 </button>
                                 <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(fileDoc.id) + (anyReturned ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1214,7 +1227,7 @@ return rows.map(row => {
                             <>
                               {d.file_path && (
                                 <>
-                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                  <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.file_path, false)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                     <Eye size={14} />
                                   </button>
                                   <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1238,7 +1251,7 @@ return rows.map(row => {
                             <>
                               {d.file_path && (
                                 <>
-                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                  <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.file_path, false)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                     <Eye size={14} />
                                   </button>
                                   <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1268,7 +1281,7 @@ return rows.map(row => {
                           {/* AWAITING_INTERN — admin uploaded, waiting for intern */}
                           {d.status === 'AWAITING_INTERN' && d.returned_file_path && (
                             <>
-                              <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} title="معاينة المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, true)} title="معاينة المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                 <Eye size={14} />
                               </button>
                               <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1291,7 +1304,7 @@ return rows.map(row => {
                             <>
                               {(d.returned_file_path || d.file_path) && (
                                 <>
-                                  <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + '&returned=1', '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                  <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, true)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                                     <Eye size={14} />
                                   </button>
                                   <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1323,7 +1336,7 @@ return rows.map(row => {
                         <>
                         {showViewDownload && (
                           <>
-                            <button className="btn btn-ghost sm" onClick={() => window.open(api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''), '_blank')} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, !!d.returned_file_path)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                               <Eye size={14} />
                             </button>
                             <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>

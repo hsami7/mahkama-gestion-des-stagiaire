@@ -3101,6 +3101,54 @@ def download_intern_document(doc_id):
     return send_file(os.path.join(app.config['UPLOAD_FOLDER'], name), download_name=download_name)
 
 
+
+@app.route('/api/intern-documents/<int:doc_id>/open', methods=['GET'])
+def open_intern_document(doc_id):
+    """Open intern document locally using os.startfile."""
+    doc = db.session.get(DocumentLifecycle, doc_id)
+    if not doc or not doc.file_path:
+        return jsonify({"msg": "Document not found"}), 404
+
+    # Determine requester role
+    token = request.args.get('token')
+    intern_identity = None
+    is_admin = False
+    if token:
+        try:
+            from flask_jwt_extended import decode_token
+            decoded = decode_token(token)
+            role = decoded.get('role')
+            is_admin = role in ('Admin', 'Manager')
+            if role == 'Intern':
+                user = db.session.get(User, int(decoded.get('sub', 0)))
+                if user:
+                    intern_identity = Intern.query.filter_by(email=user.email).first()
+        except Exception:
+            pass
+
+    if not is_admin:
+        if not intern_identity or intern_identity.id != doc.intern_id:
+            return jsonify({"msg": "Unauthorized"}), 403
+        if not doc.is_visible_to_intern and doc.uploaded_by == 'ADMIN':
+            return jsonify({"msg": "Unauthorized"}), 403
+
+    is_returned = request.args.get('returned') == '1'
+    file_path = doc.returned_file_path if (is_returned and doc.returned_file_path) else doc.file_path
+    if not file_path:
+        return jsonify({"msg": "File not found"}), 404
+        
+    name = file_path.replace('/api/uploads/', '').replace('/', '')
+    full_path = os.path.join(app.config['UPLOAD_FOLDER'], name)
+    if os.path.exists(full_path):
+        import subprocess
+        if os.name == 'nt':
+            os.startfile(full_path)
+        else:
+            subprocess.call(['open', full_path])
+        return jsonify({"msg": "Opened successfully"}), 200
+    return jsonify({"msg": "File not found locally"}), 404
+
+
 @app.route('/api/intern/documents', methods=['GET'])
 @jwt_required()
 def list_my_documents():

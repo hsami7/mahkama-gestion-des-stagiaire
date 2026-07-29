@@ -165,6 +165,10 @@ export const api = {
 
   getMyDocuments: () => api.get('/intern/documents'),
 
+  openDocument: async (docId: number, returned: boolean = false) => {
+    const res = await fetch(`${API_BASE}/intern-documents/${docId}/open?token=${sessionStorage.getItem('token')}${returned ? '&returned=1' : ''}`);
+    if (!res.ok) throw new Error('فشل فتح المستند');
+  },
   downloadDocument: (docId: number) =>
     `${API_BASE}/intern-documents/${docId}/download?token=${sessionStorage.getItem('token')}`,
 
