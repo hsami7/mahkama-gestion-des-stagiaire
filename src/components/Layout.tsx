@@ -10,13 +10,33 @@ export function Layout() {
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  useEffect(() => {
     const userStr = sessionStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
     if (user?.role === 'Admin' || user?.role === 'Manager') {
-      api.get('/notifications').then(setNotifications).catch(() => {});
-      const interval = setInterval(() => {
-        api.get('/notifications').then(setNotifications).catch(() => {});
-      }, 15000);
+      const fetchNotifs = () => {
+        api.get('/notifications').then(newNotifs => {
+          setNotifications(prev => {
+            if (prev.length > 0) {
+              const newUnread = newNotifs.filter((n: any) => !n.is_read && !prev.find((p: any) => p.id === n.id));
+              newUnread.forEach((n: any) => {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  new Notification(n.title, { body: n.body });
+                }
+              });
+            }
+            return newNotifs;
+          });
+        }).catch(() => {});
+      };
+      
+      fetchNotifs();
+      const interval = setInterval(fetchNotifs, 15000);
       return () => clearInterval(interval);
     }
   }, []);
