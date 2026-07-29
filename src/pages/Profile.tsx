@@ -1102,12 +1102,47 @@ return rows.map(row => {
                               </>
                             );
                           })()}
-                          {canManageDocs && (d.status === 'RETURNED' || d.status === 'PENDING_REVIEW') && (
+                          {canManageDocs && (d.status === 'RETURNED' || (d.status === 'PENDING_REVIEW' && row.sign.requested_by !== 'INTERN')) && (
                             <button className="btn btn-ghost sm" onClick={() => {
         if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله.')) return;
         api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle());
     }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                               <CheckCircle size={14} />
+                            </button>
+                          )}
+                          {canManageDocs && d.status === 'PENDING_REVIEW' && row.sign.requested_by === 'INTERN' && (
+                            <button className="btn btn-ghost sm" onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                              input.onchange = async () => {
+                                const file = input.files?.[0];
+                                if (!file) return;
+                                try {
+                                  await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                  toast.success('تم رفع النسخة');
+                                  fetchDocsLifecycle();
+                                } catch { toast.error('فشل رفع النسخة'); }
+                              };
+                              input.click();
+                            }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
+                              <UploadSimple size={14} />
+                            </button>
+                          )}
+                          {canManageDocs && d.status === 'AWAITING_INTERN' && anyReturned && (
+                            <button className="btn btn-ghost sm" onClick={async () => {
+                              if (!window.confirm('هل تريد حذف النسخة المرفوعة فقط (يبقى الطلب)؟')) return;
+                              try {
+                                const docsToDeleteUpload = isSignFillRow ? [d] : [d, fillDoc];
+                                await Promise.all(docsToDeleteUpload.map(doc => {
+                                  if (doc.returned_file_path) return api.post(`/interns/${id}/documents/${doc.id}/admin-delete-upload`, {});
+                                  return Promise.resolve();
+                                }));
+                                toast.success('تم حذف النسخة');
+                                fetchDocsLifecycle();
+                              } catch { toast.error('فشل حذف النسخة'); }
+                            }} title="حذف الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
+                              <Trash size={14} />
                             </button>
                           )}
                           {canManageDocs && isSignFillRow && d.file_path && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && d.status !== 'AWAITING_RETURN' && d.status !== 'AWAITING_ADMIN' && (
