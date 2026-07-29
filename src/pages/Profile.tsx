@@ -974,7 +974,7 @@ export function Profile() {
                 all: docsLifecycle.length,
                 pending: docsLifecycle.filter(d => d.status !== 'APPROVED_AND_SIGNED').length,
                 completed: docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED').length,
-                from_intern: docsLifecycle.filter(d => d.requested_by === 'INTERN' && ['sign','fill','sign_fill'].includes(d.action_type)).length
+                from_intern: docsLifecycle.filter(d => d.requested_by === 'INTERN').length
               };
               const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل', from_intern: 'من المتدرب' };
               return (
@@ -1002,7 +1002,7 @@ export function Profile() {
             const filtered = docsLifecycle.filter(d => {
               if (docFilter === 'pending') return d.status !== 'APPROVED_AND_SIGNED';
               if (docFilter === 'completed') return d.status === 'APPROVED_AND_SIGNED';
-              if (docFilter === 'from_intern') return d.requested_by === 'INTERN' && ['sign','fill','sign_fill'].includes(d.action_type);
+              if (docFilter === 'from_intern') return d.requested_by === 'INTERN';
               return true;
             }).sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
             return (
@@ -1077,7 +1077,7 @@ return rows.map(row => {
                           {row.base}
                           <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>{isSignFillRow ? '(توقيع وتعبئة)' : '(توقيع) و (تعبئة وإرجاع)'}</span>
                         </div>
-                        {anyReturned && (
+                        {anyReturned && d.status !== 'REVISION_REQUESTED' && fillDoc.status !== 'REVISION_REQUESTED' && (
                           <div style={{marginTop:4}}>
                             <span style={{display:'inline-flex', alignItems:'center', gap:4, background: bothReturned ? '#E7F8EE' : '#FFF6E5', color: bothReturned ? '#15803D' : '#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
                               {bothReturned ? <CheckCircle size={10} weight="fill" /> : <ArrowsClockwise size={10} weight="bold" />}
@@ -1085,20 +1085,20 @@ return rows.map(row => {
                             </span>
                           </div>
                         )}
-                        {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || fillDoc.status === 'REVISION_REQUESTED') && (
+                        {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN' || fillDoc.status === 'REVISION_REQUESTED' || fillDoc.status === 'AWAITING_RETURN') && (
                           <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
                             <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
                           </div>
                         )}
                       </td>
-<td style={{textAlign:'center', padding:'10px 8px'}}>
-                        {bothReturned ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
-                         anyReturned ? <span className="badge badge-warning" style={{fontSize:11}}>قيد الإجراء</span> :
+ <td style={{textAlign:'center', padding:'10px 8px'}}>
+                        {(d.status === 'REVISION_REQUESTED' || fillDoc.status === 'REVISION_REQUESTED') ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> :
                          (d.status === 'APPROVED_AND_SIGNED' && fillDoc.status === 'APPROVED_AND_SIGNED') ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
                          (d.status === 'PENDING_REVIEW' || fillDoc.status === 'PENDING_REVIEW') ? <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span> :
                           (d.status === 'AWAITING_RETURN' || fillDoc.status === 'AWAITING_RETURN') ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار التوقيع والتعبئة</span> :
                            (d.status === 'AWAITING_ADMIN' || fillDoc.status === 'AWAITING_ADMIN') ? <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار الإدارة</span> :
-                           (d.status === 'REVISION_REQUESTED' || fillDoc.status === 'REVISION_REQUESTED') ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> :
+                          bothReturned ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
+                         anyReturned ? <span className="badge badge-warning" style={{fontSize:11}}>قيد الإجراء</span> :
                           <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>}
                       </td>
                       <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
@@ -1122,7 +1122,8 @@ return rows.map(row => {
                           })()}
                           {d.status === 'AWAITING_ADMIN' && canManageDocs && (
                             <>
-                              <button className="btn btn-ghost sm" onClick={async () => {
+                              {d.requested_by === 'INTERN' ? (
+                                <button className="btn btn-ghost sm" onClick={async () => {
         if (!window.confirm('هل أنت متأكد من قبول هذا الطلب؟ سيتوجب عليك رفع المستند المطلوب.')) return;
         try {
             await api.post(`/interns/${id}/documents/${d.id}/accept-request`, {});
@@ -1130,8 +1131,20 @@ return rows.map(row => {
             fetchDocsLifecycle();
         } catch { toast.error('فشل قبول الطلب'); }
     }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                                <CheckCircle size={14} />
-                              </button>
+                                  <CheckCircle size={14} />
+                                </button>
+                              ) : (
+                                <button className="btn btn-ghost sm" onClick={async () => {
+        if (!window.confirm('هل أنت متأكد من قبول المستند؟ سيتم اعتماد المستند نهائياً.')) return;
+        try {
+            await api.post(`/interns/${id}/documents/${d.id}/approve-document`, {});
+            toast.success('تم اعتماد المستند');
+            fetchDocsLifecycle();
+        } catch { toast.error('فشل اعتماد المستند'); }
+    }} title="اعتماد" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                                  <CheckCircle size={14} />
+                                </button>
+                              )}
                               {isSignFillRow && (
                                 <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
                                   <ArrowsClockwise size={14} />
@@ -1148,6 +1161,25 @@ return rows.map(row => {
                             </button>
                           )}
                           {canManageDocs && d.status === 'PENDING_REVIEW' && d.action_type !== 'view' && (
+                            <button className="btn btn-ghost sm" onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                              input.onchange = async () => {
+                                const file = input.files?.[0];
+                                if (!file) return;
+                                try {
+                                  await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                  toast.success('تم رفع النسخة');
+                                  fetchDocsLifecycle();
+                                } catch { toast.error('فشل رفع النسخة'); }
+                              };
+                              input.click();
+                            }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
+                              <UploadSimple size={14} />
+                            </button>
+                          )}
+                          {canManageDocs && d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN' && (
                             <button className="btn btn-ghost sm" onClick={() => {
                               const input = document.createElement('input');
                               input.type = 'file';
@@ -1248,7 +1280,7 @@ return rows.map(row => {
                           {d.custom_title || d.doc_type}
                           {actionLabel && <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>({actionLabel})</span>}
                         </div>
-                      {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
+                      {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN') && (
                         <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
                           <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
                         </div>
@@ -1461,10 +1493,47 @@ return rows.map(row => {
                             <CheckCircle size={14} />
                           </button>
                         )}
+                        {d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN' && canManageDocs && (
+                          <button className="btn btn-ghost sm" onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                            input.onchange = async () => {
+                              const file = input.files?.[0];
+                              if (!file) return;
+                              try {
+                                await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                toast.success('تم رفع النسخة');
+                                fetchDocsLifecycle();
+                              } catch { toast.error('فشل رفع النسخة'); }
+                            };
+                            input.click();
+                          }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
+                            <UploadSimple size={14} />
+                          </button>
+                        )}
                         {showRevisionRequest && (
                           <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
                             <ArrowsClockwise size={14} />
                           </button>
+                        )}
+                        {/* AWAITING_ADMIN admin-initiated — accept intern's upload */}
+                        {d.status === 'AWAITING_ADMIN' && d.requested_by === 'ADMIN' && canManageDocs && (
+                          <>
+                            <button className="btn btn-ghost sm" onClick={async () => {
+        if (!window.confirm('هل أنت متأكد من اعتماد هذا المستند؟')) return;
+        try {
+            await api.post(`/interns/${id}/documents/${d.id}/approve-document`, {});
+            toast.success('تم اعتماد المستند');
+            fetchDocsLifecycle();
+        } catch { toast.error('فشل اعتماد المستند'); }
+    }} title="اعتماد" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                              <CheckCircle size={14} />
+                            </button>
+                            <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                              <ArrowsClockwise size={14} />
+                            </button>
+                          </>
                         )}
                         {canManageDocs && d.requested_by === 'ADMIN' && (
                           <button className="btn btn-ghost sm" onClick={async () => {
