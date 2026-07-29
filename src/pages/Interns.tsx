@@ -97,7 +97,7 @@ const filteredInterns = useMemo(() => {
 
   useEffect(() => {
     fetchInterns();
-  }, []);
+  }, [location.key]);
 
   useEffect(() => {
     if (location.state?.editIntern) {
