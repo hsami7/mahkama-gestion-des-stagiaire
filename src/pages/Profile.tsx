@@ -1255,23 +1255,29 @@ return rows.map(row => {
                                   </button>
                                 </>
                               )}
-                              <button className="btn btn-ghost sm" onClick={() => {
-                                const input = document.createElement('input');
-                                input.type = 'file';
-                                input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                                input.onchange = async () => {
-                                  const file = input.files?.[0];
-                                  if (!file) return;
-                                  try {
-                                    await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
-                                    toast.success('تم رفع النسخة');
-                                    fetchDocsLifecycle();
-                                  } catch { toast.error('فشل رفع النسخة'); }
-                                };
-                                input.click();
-                              }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
-                                <UploadSimple size={14} />
-                              </button>
+                              {d.action_type === 'view' && d.file_path ? (
+                                <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                                  <CheckCircle size={14} />
+                                </button>
+                              ) : (
+                                <button className="btn btn-ghost sm" onClick={() => {
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                  input.onchange = async () => {
+                                    const file = input.files?.[0];
+                                    if (!file) return;
+                                    try {
+                                      await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                      toast.success('تم رفع النسخة');
+                                      fetchDocsLifecycle();
+                                    } catch { toast.error('فشل رفع النسخة'); }
+                                  };
+                                  input.click();
+                                }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
+                                  <UploadSimple size={14} />
+                                </button>
+                              )}
                             </>
                           )}
                           {/* AWAITING_INTERN — admin uploaded, waiting for intern */}
