@@ -5,7 +5,7 @@ import { useToast } from '../components/Toast';
 
 type FieldType = 'text' | 'email' | 'number' | 'photo' | 'date' | 'pdf';
 
-type MapsTo = '' | 'name' | 'name_fr' | 'email' | 'national_id' | 'phone' | 'university'
+type MapsTo = '' | 'name' | 'name_fr' | 'email' | 'national_id' | 'phone' | 'university' | 'specialty'
   | 'start_date' | 'end_date' | 'date_of_birth' | 'address' | 'department' | 'photo_path';
 
 interface FormField {
@@ -33,6 +33,7 @@ const MAPS_TO_TYPE: Record<string, FieldType> = {
   'national_id': 'text',
   'phone': 'text',
   'university': 'text',
+  'specialty': 'text',
   'start_date': 'date',
   'end_date': 'date',
   'date_of_birth': 'date',
@@ -49,6 +50,7 @@ const MAPS_TO_LABELS: Record<string, string> = {
   'national_id': 'رقم البطاقة الوطنية',
   'phone': 'رقم الهاتف',
   'university': 'الجامعة / المؤسسة',
+  'specialty': 'التخصص',
   'start_date': 'تاريخ بدء التدريب',
   'end_date': 'تاريخ إنتهاء التدريب',
   'date_of_birth': 'تاريخ الميلاد',

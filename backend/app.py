@@ -152,6 +152,7 @@ class Intern(db.Model):
     end_date = db.Column(db.Date, nullable=True)
     date_of_birth = db.Column(db.Date, nullable=True)
     university = db.Column(db.String(150), nullable=True)
+    specialty = db.Column(db.String(150), nullable=True)
     address = db.Column(db.Text, nullable=True)
     documents = db.Column(db.Text, nullable=True)
     evaluation = db.Column(db.Text, nullable=True)
@@ -342,6 +343,15 @@ def init_db():
         except Exception as e:
             db.session.rollback()
             print(f"Migration check failed: {e}")
+        # Auto-add specialty column
+        try:
+            cols = [c['name'] for c in db.inspect(db.engine).get_columns('interns')]
+            if 'specialty' not in cols:
+                db.session.execute(db.text('ALTER TABLE interns ADD COLUMN specialty VARCHAR(150)'))
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Specialty migration failed: {e}")
         # Auto-add username column to users table
         try:
             ucols = [c['name'] for c in db.inspect(db.engine).get_columns('users')]
@@ -750,6 +760,22 @@ def delete_user(user_id):
         log_action(current_user.get('name', 'Admin'), f"قام بحذف المستخدم: {name_deleted}")
     return jsonify({"success": True})
 
+@app.route('/api/users/<int:user_id>/reset-password', methods=['POST'])
+@jwt_required()
+def reset_user_password(user_id):
+    current_user = get_jwt()
+    if current_user.get('role') != 'Admin':
+        return jsonify({"msg": "Unauthorized"}), 403
+
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+    from werkzeug.security import generate_password_hash
+    user.password = generate_password_hash('password123')
+    db.session.commit()
+    log_action(current_user.get('name', 'Admin'), f"قام بإعادة تعيين كلمة مرور المستخدم: {user.name}")
+    return jsonify({"success": True, "msg": f"تم إعادة تعيين كلمة مرور {user.name} إلى password123"})
+
 
 # --- INTERN ROUTES ---
 @app.route('/api/interns', methods=['GET'])
@@ -840,6 +866,7 @@ def get_intern(intern_id):
         "end_date": intern.end_date,
         "date_of_birth": intern.date_of_birth,
         "university": intern.university,
+        "specialty": intern.specialty,
         "address": intern.address,
         "documents": docs,
         "evaluation": evaluation
@@ -862,6 +889,7 @@ def add_intern():
         end_date=_parse_date(data.get('end_date')),
         date_of_birth=_parse_date(data.get('date_of_birth')),
         university=data.get('university'),
+        specialty=data.get('specialty'),
         address=data.get('address'),
         photo_path=data.get('photo_path'),
         status=data.get('status', 'قيد المراجعة'),
@@ -940,6 +968,7 @@ def update_intern(intern_id):
     intern.end_date = _parse_date(data.get('end_date')) if 'end_date' in data else intern.end_date
     intern.date_of_birth = _parse_date(data.get('date_of_birth')) if 'date_of_birth' in data else intern.date_of_birth
     intern.university = data.get('university', intern.university)
+    intern.specialty = data.get('specialty', intern.specialty)
     intern.address = data.get('address', intern.address)
     if 'status' in data:
         intern.status = data.get('status')
@@ -1695,6 +1724,7 @@ def get_my_intern_profile():
         "end_date": intern.end_date,
         "date_of_birth": intern.date_of_birth,
         "university": intern.university,
+        "specialty": intern.specialty,
         "address": intern.address,
         "documents": docs
     }), 200
@@ -1929,7 +1959,7 @@ def pending_sign_fill_count():
     if current_user.get('role') not in ('Admin', 'Manager'):
         return jsonify({"msg": "Unauthorized"}), 403
     count = DocumentLifecycle.query.filter(
-        DocumentLifecycle.action_type.in_(['sign', 'fill']),
+        DocumentLifecycle.action_type.in_(['sign', 'fill', 'sign_fill']),
         DocumentLifecycle.file_path.isnot(None),
         (DocumentLifecycle.returned_file_path.is_(None) | (DocumentLifecycle.returned_file_path == ''))
     ).with_entities(DocumentLifecycle.intern_id).distinct().count()
@@ -2316,6 +2346,7 @@ def render_intern_md(intern: Intern) -> str:
     lines.append(row("تاريخ البدء", intern.start_date))
     lines.append(row("تاريخ الانتهاء", intern.end_date))
     lines.append(row("الجامعة أو المعهد", intern.university))
+    lines.append(row("التخصص", intern.specialty))
     lines.append(row("القسم", intern.department))
     lines.append(row("المؤطر", intern.encadrant))
     lines.append(row("الحالة", intern.status))
@@ -2401,7 +2432,7 @@ def export_interns():
         ws.title = "Interns"
         headers = ["ID", "الاسم", "الاسم (فرنسية)", "البريد", "الهاتف", "رقم الهوية",
                    "القسم", "المؤطر", "الحالة", "تاريخ البدء", "تاريخ الانتهاء",
-                   "تاريخ الازدياد", "الجامعة", "العنوان"]
+                   "تاريخ الازدياد", "الجامعة", "التخصص", "العنوان"]
         ws.append(headers)
         header_fill = PatternFill(start_color="1E5631", end_color="1E5631", fill_type="solid")
         for col, _ in enumerate(headers, start=1):
@@ -2414,7 +2445,7 @@ def export_interns():
             row_data = [
                 i.id, i.name, i.name_fr, i.email, i.phone, i.national_id,
                 i.department, i.encadrant, i.status, i.start_date, i.end_date,
-                i.date_of_birth, i.university, i.address
+                i.date_of_birth, i.university, i.specialty, i.address
             ]
             ws.append(row_data)
         for row in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=len(headers)):
@@ -3537,7 +3568,7 @@ def _process_submission_to_intern(submission):
     # Map form fields to intern model
     mapping = {f['label']: f.get('maps_to') for f in fields if f.get('maps_to')}
     intern_data = {'name': None, 'name_fr': None, 'email': None, 'national_id': None,
-                   'phone': None, 'university': None, 'start_date': None, 'end_date': None,
+                   'phone': None, 'university': None, 'specialty': None, 'start_date': None, 'end_date': None,
                    'date_of_birth': None, 'address': None, 'department': None, 'photo_path': None}
 
     for label, value in data.items():
@@ -3569,6 +3600,7 @@ def _process_submission_to_intern(submission):
         national_id=intern_data['national_id'],
         phone=intern_data['phone'],
         university=intern_data['university'],
+        specialty=intern_data['specialty'],
         start_date=intern_data['start_date'],
         end_date=intern_data['end_date'],
         date_of_birth=intern_data['date_of_birth'],

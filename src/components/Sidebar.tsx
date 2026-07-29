@@ -11,22 +11,23 @@ export function Sidebar() {
   const [signFillCount, setSignFillCount] = useState(0);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
 
+  const fetchCounts = async () => {
+    try {
+      const [a, b] = await Promise.all([
+        api.get('/admin/pending-sign-fill-count'),
+        api.get('/admin/pending-review-count')
+      ]);
+      setSignFillCount(a.count);
+      setPendingReviewCount(b.count);
+    } catch {}
+  };
+
+  useEffect(() => { fetchCounts(); }, [user?.role, location.pathname]);
+
   useEffect(() => {
-    if (user?.role !== 'Intern') {
-      const fetchCounts = async () => {
-        try {
-          const [a, b] = await Promise.all([
-            api.get('/admin/pending-sign-fill-count'),
-            api.get('/admin/pending-review-count')
-          ]);
-          setSignFillCount(a.count);
-          setPendingReviewCount(b.count);
-        } catch {}
-      };
-      fetchCounts();
-      const interval = setInterval(fetchCounts, 15000);
-      return () => clearInterval(interval);
-    }
+    if (user?.role === 'Intern') return;
+    const interval = setInterval(fetchCounts, 15000);
+    return () => clearInterval(interval);
   }, [user?.role]);
   
   const isIntern = user?.role === 'Intern';

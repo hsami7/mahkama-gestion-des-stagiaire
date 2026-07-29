@@ -26,7 +26,7 @@ function remainingDays(endDate?: string): number | null {
 
 const defaultIntern = { 
   name: '', name_fr: '', encadrant: '', email: '', national_id: '', department: '',
-  phone: '', start_date: '', end_date: '', date_of_birth: '', university: '', address: '', photo_path: '',
+  phone: '', start_date: '', end_date: '', date_of_birth: '', university: '', specialty: '', address: '', photo_path: '',
 };
 
 export function Interns() {
@@ -430,6 +430,18 @@ const filteredInterns = useMemo(() => {
                   required
                   value={newIntern.university}
                   onChange={e => setNewIntern({...newIntern, university: e.target.value})}
+                  style={{ background: 'var(--paper)', transition: 'border-color 0.2s, box-shadow 0.2s', padding: '12px 16px', border: '1px solid var(--line)', outline: 'none' }}
+                  onFocus={e => e.target.style.borderColor = 'var(--gold)'}
+                  onBlur={e => e.target.style.borderColor = 'var(--line)'}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>التخصص</label>
+                <input 
+                  type="text" 
+                  placeholder="التخصص الدراسي..."
+                  value={newIntern.specialty}
+                  onChange={e => setNewIntern({...newIntern, specialty: e.target.value})}
                   style={{ background: 'var(--paper)', transition: 'border-color 0.2s, box-shadow 0.2s', padding: '12px 16px', border: '1px solid var(--line)', outline: 'none' }}
                   onFocus={e => e.target.style.borderColor = 'var(--gold)'}
                   onBlur={e => e.target.style.borderColor = 'var(--line)'}

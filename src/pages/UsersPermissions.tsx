@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Trash, PencilSimple, UserList } from '@phosphor-icons/react';
+import { UserPlus, Trash, PencilSimple, UserList, LockKey } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
 
@@ -69,6 +69,17 @@ export function UsersPermissions() {
   const handleCancelEdit = () => {
     setEditingUserId(null);
     setNewUser({ name: '', email: '', role: 'Manager', password: 'password123', permissions: JSON.stringify(defaultPermissions), can_manage_documents: false });
+  };
+
+  const handleResetPassword = async (id: number, name: string) => {
+    if (!window.confirm(`هل أنت متأكد من إعادة تعيين كلمة مرور "${name}" إلى password123؟`)) return;
+    try {
+      await api.post(`/users/${id}/reset-password`, {});
+      toast.success(`تم إعادة تعيين كلمة مرور ${name}`);
+    } catch (err) {
+      console.error(err);
+      toast.error('فشل إعادة تعيين كلمة المرور');
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -289,6 +300,9 @@ export function UsersPermissions() {
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={() => handleEdit(u)} style={{ background: 'var(--gold-light)', border: 'none', color: 'var(--gold-dark)', cursor: 'pointer', padding: '6px', borderRadius: '6px' }} title="تعديل">
                         <PencilSimple size={18} weight="bold" />
+                      </button>
+                      <button onClick={() => handleResetPassword(u.id, u.name)} style={{ background: '#FEF3C7', border: 'none', color: '#B45309', cursor: 'pointer', padding: '6px', borderRadius: '6px' }} title="إعادة تعيين كلمة المرور">
+                        <LockKey size={18} weight="bold" />
                       </button>
                       {u.email !== 'admin@mahkama.ma' && (
                         <button onClick={() => handleDelete(u.id)} style={{ background: 'var(--danger-bg)', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '6px', borderRadius: '6px' }} title="حذف">
