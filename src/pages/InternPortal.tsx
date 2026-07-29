@@ -458,14 +458,14 @@ export function InternPortal() {
                   const allDocs = lifecycleDocs;
                   const pendingDocs = lifecycleDocs.filter(d => d.status !== 'APPROVED_AND_SIGNED');
                   const completedDocs = lifecycleDocs.filter(d => d.status === 'APPROVED_AND_SIGNED');
-                  const fromAdminDocs = lifecycleDocs.filter(d => d.requested_by === 'INTERN' && ['sign','fill','sign_fill'].includes(d.action_type));
+                  const fromAdminDocs = lifecycleDocs.filter(d => d.requested_by === 'ADMIN' && ['sign','fill','sign_fill'].includes(d.action_type));
                   const counts = { all: allDocs.length, pending: pendingDocs.length, completed: completedDocs.length, from_admin: fromAdminDocs.length };
                   const tabs = ['all', 'pending', 'completed', 'from_admin'] as const;
                   const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل', from_admin: 'من الإدارة' };
                   const filtered = lifecycleDocs.filter(d => {
                     if (docFilter === 'pending') return d.status !== 'APPROVED_AND_SIGNED';
                     if (docFilter === 'completed') return d.status === 'APPROVED_AND_SIGNED';
-                    if (docFilter === 'from_admin') return d.requested_by === 'INTERN' && ['sign','fill','sign_fill'].includes(d.action_type);
+                    if (docFilter === 'from_admin') return d.requested_by === 'ADMIN' && ['sign','fill','sign_fill'].includes(d.action_type);
                     return true;
                   }).sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
                   return (
@@ -596,9 +596,17 @@ for (const [base, docs] of grouped) {
                                           {row.base}
                                           {row.isSignFill ? <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>({d.action_type === 'sign_fill' ? 'توقيع وتعبئة' : 'توقيع وتعبئة'})</span> : <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>(توقيع) و (تعبئة وإرجاع)</span>}
                                         </div>
-                                        {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || fillDoc.status === 'REVISION_REQUESTED') && (
+                                        {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN' || fillDoc.status === 'REVISION_REQUESTED' || fillDoc.status === 'AWAITING_RETURN') && (
                                           <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2, background: '#FFF0EE', padding: '3px 6px', borderRadius: 4 }}>
                                             <Warning size={12} weight="fill" style={{ marginLeft: 4 }} /> {d.rejection_reason}
+                                          </div>
+                                        )}
+                                        {anyReturned && d.status !== 'REVISION_REQUESTED' && fillDoc.status !== 'REVISION_REQUESTED' && (
+                                          <div style={{marginTop:4}}>
+                                            <span style={{display:'inline-flex', alignItems:'center', gap:4, background: bothReturned ? '#E7F8EE' : '#FFF6E5', color: bothReturned ? '#15803D' : '#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
+                                              {bothReturned ? <CheckCircle size={10} weight="fill" /> : <ArrowsClockwise size={10} weight="bold" />}
+                                              {bothReturned ? 'تمت الإعادة (توقيع وتعبئة)' : 'جاري الإعادة'}
+                                            </span>
                                           </div>
                                         )}
                                       </td>
@@ -610,6 +618,32 @@ for (const [base, docs] of grouped) {
                                       </td>
                                       <td style={{ textAlign: 'left', padding: '10px 8px' }}>
                                         <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                          {/* Accept — AWAITING_RETURN admin-initiated */}
+                                          {(d.status === 'AWAITING_RETURN' || fillDoc.status === 'AWAITING_RETURN') && d.requested_by === 'ADMIN' && (
+                                            <>
+                                              <button className="btn btn-ghost sm" title="قبول" onClick={async () => {
+                                                if (!window.confirm('هل تريد قبول طلب التوقيع/التعبئة من الإدارة؟')) return;
+                                                try {
+                                                  await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-accept-request`, {});
+                                                  fetchLifecycleDocs();
+                                                  showToast('تم قبول الطلب', 'success');
+                                                } catch { showToast('فشل قبول الطلب', 'error'); }
+                                              }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
+                                                <CheckCircle size={14} />
+                                              </button>
+                                              <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {
+                                                const reason = window.prompt('سبب طلب إعادة الرفع:');
+                                                if (reason === null) return;
+                                                try {
+                                                  await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
+                                                  fetchLifecycleDocs();
+                                                  showToast('تم طلب إعادة الرفع', 'success');
+                                                } catch { showToast('فشل إرسال الطلب', 'error'); }
+                                              }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                                <ArrowsClockwise size={14} />
+                                              </button>
+                                            </>
+                                          )}
                                           {/* View latest document */}
                                           <button className="btn btn-ghost sm" title={fileDoc ? "معاينة" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleViewFile(api.downloadDocument(fileDoc.id) + (anyReturned ? '&returned=1' : ''), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
                                             <Eye size={14} />
@@ -618,8 +652,8 @@ for (const [base, docs] of grouped) {
                                           <button className="btn btn-ghost sm" title={fileDoc ? "تحميل" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleDownloadFile(api.downloadDocument(fileDoc.id) + (anyReturned ? '&returned=1' : ''), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
                                             <DownloadSimple size={14} />
                                           </button>
-                                          {/* Cancel request if awaiting admin */}
-                                          {(d.status === 'AWAITING_ADMIN' || fillDoc.status === 'AWAITING_ADMIN') && (
+                                          {/* Cancel request if intern-initiated and awaiting admin */}
+                                          {(d.status === 'AWAITING_ADMIN' || fillDoc.status === 'AWAITING_ADMIN') && d.requested_by === 'INTERN' && (
                                             <button className="btn btn-ghost sm" title="حذف الطلب" onClick={async () => {
                                               if (!window.confirm('هل تريد حذف هذا الطلب؟')) return;
                                               try {
@@ -631,8 +665,24 @@ for (const [base, docs] of grouped) {
                                               <Trash size={14} />
                                             </button>
                                           )}
-                                          {/* Upload return if not approved, not both returned, not awaiting admin, and (not intern-initiated or revision requested) */}
-                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && !bothReturned && d.status !== 'AWAITING_ADMIN' && fillDoc.status !== 'AWAITING_ADMIN' && (d.requested_by !== 'INTERN' || d.status === 'REVISION_REQUESTED' || fillDoc.status === 'REVISION_REQUESTED') && (
+                                          {/* AWAITING_ADMIN admin-initiated — intern uploaded, admin should accept, intern can request revision */}
+                                          {(d.status === 'AWAITING_ADMIN' || fillDoc.status === 'AWAITING_ADMIN') && d.requested_by === 'ADMIN' && (
+                                            <>
+                                              <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {
+                                                const reason = window.prompt('سبب طلب إعادة الرفع:');
+                                                if (reason === null) return;
+                                                try {
+                                                  await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
+                                                  fetchLifecycleDocs();
+                                                  showToast('تم طلب إعادة الرفع', 'success');
+                                                } catch { showToast('فشل إرسال الطلب', 'error'); }
+                                              }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                                <ArrowsClockwise size={14} />
+                                              </button>
+                                            </>
+                                          )}
+                                          {/* Upload return if not completed, not returned, and not awaiting admin/admin-return; for PENDING_REVIEW or REVISION_REQUESTED */}
+                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && !bothReturned && d.status !== 'AWAITING_ADMIN' && fillDoc.status !== 'AWAITING_ADMIN' && d.status !== 'AWAITING_RETURN' && fillDoc.status !== 'AWAITING_RETURN' && !(d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN') && !(fillDoc.status === 'REVISION_REQUESTED' && fillDoc.requested_by === 'ADMIN') && (d.status === 'PENDING_REVIEW' || d.status === 'REVISION_REQUESTED' || fillDoc.status === 'PENDING_REVIEW' || fillDoc.status === 'REVISION_REQUESTED') && (
                                             <>
                                               <input type="file" id={inputId} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => {
                                                 if (!e.target.files?.[0]) return;
@@ -651,7 +701,7 @@ for (const [base, docs] of grouped) {
                                             </>
                                           )}
                                           {/* Greyed upload if already returned but not yet approved */}
-                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && bothReturned && d.requested_by !== 'INTERN' && (
+                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && d.status !== 'AWAITING_RETURN' && fillDoc.status !== 'AWAITING_RETURN' && bothReturned && d.requested_by !== 'INTERN' && (
                                             <button className="btn btn-ink sm" style={{ padding: '4px 8px', fontSize: 11, opacity: 0.4, cursor: 'not-allowed' }} disabled>
                                               <UploadSimple size={14} /> رفع
                                             </button>
@@ -729,7 +779,7 @@ for (const [base, docs] of grouped) {
                                 const isTemplatePendingIntern = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'INTERN';
                                 const isInternInitiatedSignFill = d.requested_by === 'INTERN' && (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill');
                                 const showViewDownload = !!d.file_path && !isTemplatePendingAdmin;
-                                const canUpload = (!isInternInitiatedSignFill || d.status === 'REVISION_REQUESTED') && ((!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin);
+                                const canUpload = (!isInternInitiatedSignFill || d.status === 'REVISION_REQUESTED') && d.status !== 'AWAITING_RETURN' && !(d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN') && ((!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin);
                                 const isUploadDisabled = isTemplatePendingIntern;
                                 return (
                                   <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
@@ -749,9 +799,16 @@ for (const [base, docs] of grouped) {
                                           return label ? <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>({label})</span> : null;
                                         })()}
                                       </div>
-                                      {d.rejection_reason && d.status === 'REVISION_REQUESTED' && (
+                                      {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN') && (
                                         <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2, background: '#FFF0EE', padding: '3px 6px', borderRadius: 4 }}>
                                           <Warning size={12} weight="fill" style={{ marginLeft: 4 }} /> {d.rejection_reason}
+                                        </div>
+                                      )}
+                                      {isSignFill && d.returned_file_path && (
+                                        <div style={{marginTop:4}}>
+                                          <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
+                                            <CheckCircle size={10} weight="fill" /> تمت الإعادة
+                                          </span>
                                         </div>
                                       )}
                                       {isInternInitiatedSignFill && d.status === 'AWAITING_ADMIN' && (
@@ -800,15 +857,56 @@ for (const [base, docs] of grouped) {
                                         </>
                                       ) : (
                                         <>
-                                        {/* 1️⃣ View latest document */}
+                                        {/* 1️⃣ Accept — AWAITING_RETURN admin-initiated */}
+                                        {d.status === 'AWAITING_RETURN' && d.requested_by === 'ADMIN' && (
+                                          <>
+                                            <button className="btn btn-ghost sm" title="قبول" onClick={async () => {
+                                              if (!window.confirm('هل تريد قبول طلب التوقيع/التعبئة من الإدارة؟')) return;
+                                              try {
+                                                await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-accept-request`, {});
+                                                fetchLifecycleDocs();
+                                                showToast('تم قبول الطلب', 'success');
+                                              } catch { showToast('فشل قبول الطلب', 'error'); }
+                                            }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
+                                              <CheckCircle size={14} />
+                                            </button>
+                                            <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {
+                                              const reason = window.prompt('سبب طلب إعادة الرفع:');
+                                              if (reason === null) return;
+                                              try {
+                                                await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
+                                                fetchLifecycleDocs();
+                                                showToast('تم طلب إعادة الرفع', 'success');
+                                              } catch { showToast('فشل إرسال الطلب', 'error'); }
+                                            }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                              <ArrowsClockwise size={14} />
+                                            </button>
+                                          </>
+                                        )}
+                                        {/* 2️⃣ View latest document */}
                                         {showViewDownload && (
                                           <>
                                             <button className="btn btn-ghost sm" title="معاينة" onClick={() => handleViewFile(api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                               <Eye size={14} />
                                             </button>
-                                            {/* 2️⃣ Download latest document */}
                                             <button className="btn btn-ghost sm" title="تحميل" onClick={() => handleDownloadFile(api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''), fileLabel + '.' + (d.file_type || 'pdf'))} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                               <DownloadSimple size={14} />
+                                            </button>
+                                          </>
+                                        )}
+                                        {/* 3b. Accept + Revision — AWAITING_ADMIN admin-initiated */}
+                                        {d.status === 'AWAITING_ADMIN' && d.requested_by === 'ADMIN' && (
+                                          <>
+                                            <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {
+                                              const reason = window.prompt('سبب طلب إعادة الرفع:');
+                                              if (reason === null) return;
+                                              try {
+                                                await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
+                                                fetchLifecycleDocs();
+                                                showToast('تم طلب إعادة الرفع', 'success');
+                                              } catch { showToast('فشل إرسال الطلب', 'error'); }
+                                            }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                              <ArrowsClockwise size={14} />
                                             </button>
                                           </>
                                         )}
