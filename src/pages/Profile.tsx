@@ -1101,7 +1101,7 @@ return rows.map(row => {
                               <ArrowsClockwise size={14} />
                             </button>
                           )}
-                          {canManageDocs && (
+                          {canManageDocs && row.sign.requested_by === 'ADMIN' && (
                             <button className="btn btn-ghost sm" onClick={async () => {
                               const docsToDelete = isSignFillRow ? [d] : [d, fillDoc];
                               if (!confirm(`هل أنت متأكد من حذف ${docsToDelete.length > 1 ? 'هذه المستندات' : 'هذا المستند'}؟`)) return;
@@ -1346,7 +1346,7 @@ return rows.map(row => {
                                   </button>
                                 </>
                               )}
-                              {canManageDocs && (
+                              {canManageDocs && d.requested_by === 'ADMIN' && (
                                 <button className="btn btn-ghost sm" onClick={async () => {
                                   if (!confirm('هل أنت متأكد من حذف هذا المستند؟')) return;
                                   try {
@@ -1385,7 +1385,7 @@ return rows.map(row => {
                             <ArrowsClockwise size={14} />
                           </button>
                         )}
-                        {canManageDocs && (
+                        {canManageDocs && d.requested_by === 'ADMIN' && (
                           <button className="btn btn-ghost sm" onClick={async () => {
                             if (!confirm('هل أنت متأكد من حذف هذا المستند؟')) return;
                             try {
