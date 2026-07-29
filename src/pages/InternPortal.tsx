@@ -716,12 +716,13 @@ for (const [base, docs] of grouped) {
                                             <DownloadSimple size={14} />
                                           </button>
                                           <button className="btn btn-ghost sm" title="قبول" onClick={async () => {
-                                            try {
-                                              await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-accept`, {});
-                                              fetchLifecycleDocs();
-                                              showToast('تم قبول المستند', 'success');
-                                            } catch { showToast('فشل قبول المستند', 'error'); }
-                                          }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
+        if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله أو حذفه.')) return;
+        try {
+            await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-accept`, {});
+            fetchLifecycleDocs();
+            showToast('تم قبول المستند', 'success');
+        } catch { showToast('فشل قبول المستند', 'error'); }
+    }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
                                             <CheckCircle size={14} />
                                           </button>
                                           <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {

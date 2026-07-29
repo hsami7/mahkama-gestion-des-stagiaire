@@ -1092,7 +1092,10 @@ return rows.map(row => {
                             );
                           })()}
                           {canManageDocs && (d.status === 'RETURNED' || d.status === 'PENDING_REVIEW') && (
-                            <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                            <button className="btn btn-ghost sm" onClick={() => {
+        if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله.')) return;
+        api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle());
+    }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                               <CheckCircle size={14} />
                             </button>
                           )}
@@ -1232,12 +1235,13 @@ return rows.map(row => {
                                 </>
                               )}
                               <button className="btn btn-ghost sm" onClick={async () => {
-                                try {
-                                  await api.post(`/interns/${id}/documents/${d.id}/accept-request`, {});
-                                  toast.success('تم قبول الطلب');
-                                  fetchDocsLifecycle();
-                                } catch { toast.error('فشل قبول الطلب'); }
-                              }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+        if (!window.confirm('هل أنت متأكد من قبول هذا الطلب؟ سيتوجب عليك رفع المستند المطلوب.')) return;
+        try {
+            await api.post(`/interns/${id}/documents/${d.id}/accept-request`, {});
+            toast.success('تم قبول الطلب');
+            fetchDocsLifecycle();
+        } catch { toast.error('فشل قبول الطلب'); }
+    }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                                 <CheckCircle size={14} />
                               </button>
                             </>
@@ -1256,7 +1260,10 @@ return rows.map(row => {
                                 </>
                               )}
                               {d.action_type === 'view' && d.file_path ? (
-                                <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                                <button className="btn btn-ghost sm" onClick={() => {
+        if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله.')) return;
+        api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle());
+    }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                                   <CheckCircle size={14} />
                                 </button>
                               ) : (
@@ -1376,7 +1383,10 @@ return rows.map(row => {
                           </>
                         )}
                         {showApprove && (
-                          <button className="btn btn-ghost sm" onClick={() => api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle())} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                          <button className="btn btn-ghost sm" onClick={() => {
+        if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله.')) return;
+        api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle());
+    }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
                             <CheckCircle size={14} />
                           </button>
                         )}
