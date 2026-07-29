@@ -3772,6 +3772,100 @@ def cancel_intern_request(intern_id, doc_id):
     return jsonify({"success": True}), 200
 
 
+
+import threading
+import time
+from datetime import datetime
+import traceback
+
+def auto_complete_job():
+    while True:
+        try:
+            with app.app_context():
+                today = datetime.now().date()
+                interns = Intern.query.all()
+                for intern in interns:
+                    # 'U.UOU.U,' and 'U.OU?U^O ' (completed and disabled)
+                    if intern.end_date and intern.status != 'U.UOU.U,' and intern.status != 'U.O1U?U^O':
+                        try:
+                            # format is dd/mm/yyyy
+                            end_date_obj = datetime.strptime(intern.end_date, '%d/%m/%Y').date()
+                            if today > end_date_obj:
+                                # Check if documents are ready
+                                required_types = ['CIN', 'CV', 'DEMANDE', 'CONVENTION_SIGNED', 'FINAL_REPORT']
+                                docs = DocumentLifecycle.query.filter_by(intern_id=intern.id).all()
+                                ready = True
+                                for req in required_types:
+                                    d = next((x for x in docs if x.doc_type == req), None)
+                                    if not d or d.status != 'APPROVED_AND_SIGNED':
+                                        ready = False
+                                        break
+                                
+                                if ready:
+                                    print(f"Auto-completing internship for intern {intern.id}")
+                                    
+                                    # Copy of complete_stage logic
+                                    notif = Notification(intern_id=intern.id, type='STAGE_COMPLETE', title='تهانينا!',
+                                                         body='تم إنهاء فترة تدريبك بنجاح.')
+                                    db.session.add(notif)
+                                    
+                                    intern.status = 'U.UOU.U,' # Maktamal
+                                    db.session.commit()
+                                    
+                                    try:
+                                        from reportlab.pdfgen import canvas
+                                        from reportlab.lib.pagesizes import A4
+                                        import io
+                                        buffer = io.BytesIO()
+                                        c = canvas.Canvas(buffer, pagesize=A4)
+                                        width, height = A4
+                                        c.setFont("Helvetica-Bold", 24)
+                                        c.drawCentredString(width/2.0, height - 100, "ATTESTATION DE STAGE")
+                                        c.setFont("Helvetica", 14)
+                                        c.drawString(50, height - 200, f"Nous soussignes, certifions que Monsieur/Madame:")
+                                        c.setFont("Helvetica-Bold", 16)
+                                        c.drawString(50, height - 230, f"{intern.name_fr or '__________________'}")
+                                        c.setFont("Helvetica", 14)
+                                        c.drawString(50, height - 280, f"A effectue un stage au sein de notre departement:")
+                                        c.setFont("Helvetica-Bold", 14)
+                                        c.drawString(50, height - 310, f"{intern.department or '__________________'}")
+                                        c.setFont("Helvetica", 14)
+                                        c.drawString(50, height - 360, f"Encadre(e) par:")
+                                        c.setFont("Helvetica-Bold", 14)
+                                        c.drawString(50, height - 390, f"{intern.encadrant or '__________________'}")
+                                        c.setFont("Helvetica", 14)
+                                        c.drawString(50, height - 440, f"PAcriode: du {intern.start_date or '___'} au {intern.end_date or '___'}")
+                                        c.drawString(50, height - 500, "Cette attestation est delivree pour servir et valoir ce que de droit.")
+                                        c.drawString(width - 200, 150, "Signature et Cachet:")
+                                        c.showPage()
+                                        c.save()
+                                        
+                                        buffer.seek(0)
+                                        filename = f"Attestation_Signed_{intern.id}.pdf"
+                                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                                        with open(filepath, 'wb') as f:
+                                            f.write(buffer.read())
+                                            
+                                        file_url = f"/api/uploads/{filename}"
+                                        dl = DocumentLifecycle(
+                                            intern_id=intern.id, doc_type='ATTESTATION_SIGNED',
+                                            file_path=file_url, uploaded_by='ADMIN',
+                                            status='APPROVED_AND_SIGNED', is_visible_to_intern=True,
+                                            custom_title='شهادة التدريب'
+                                        )
+                                        db.session.add(dl)
+                                        db.session.commit()
+                                    except Exception as pdf_err:
+                                        print(f"Failed to generate certificate for {intern.id}: {pdf_err}")
+                        except Exception as e:
+                            print(f"Error checking intern {intern.id}: {e}")
+        except Exception as e:
+            print(f"Auto complete job error: {traceback.format_exc()}")
+        time.sleep(3600 * 24) # Run once a day
+
+# Start thread
+auto_complete_thread = threading.Thread(target=auto_complete_job, daemon=True)
+auto_complete_thread.start()
 if __name__ == '__main__':
     init_db()
     # Fix: records uploaded before the status-update bug was fixed

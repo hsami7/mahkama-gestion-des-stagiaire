@@ -832,11 +832,7 @@ export function Profile() {
           <button title="تعديل" onClick={handleEdit} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fef3c7', border: '1.5px solid #f59e0b', color: '#1a1a1a', transition: 'all 0.2s' }}>
             <PencilSimple weight="bold" size={18} color="#1a1a1a" />
           </button>
-          {(isAdmin || user?.role === 'Manager') && (
-            <button title="إنهاء التدريب" onClick={handleCompleteStage} style={{ width: 'auto', padding: '0 12px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'var(--gold)', border: '1.5px solid #d4af37', color: '#fff', transition: 'all 0.2s', fontWeight: 'bold' }}>
-              إنهاء التدريب
-            </button>
-          )}
+          
           {isAdmin && (
             <button title="حذف" onClick={handleDelete} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fee2e2', border: '1.5px solid #ef4444', color: '#1a1a1a', transition: 'all 0.2s' }}>
               <Trash weight="bold" size={18} color="#1a1a1a" />
