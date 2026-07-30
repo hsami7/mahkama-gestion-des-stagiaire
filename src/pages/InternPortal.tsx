@@ -682,15 +682,19 @@ for (const [base, docs] of grouped) {
                                             </>
                                           )}
                                           {/* Upload return if not completed, not returned, and not awaiting admin/admin-return; for PENDING_REVIEW or REVISION_REQUESTED */}
-                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && !bothReturned && d.status !== 'AWAITING_ADMIN' && fillDoc.status !== 'AWAITING_ADMIN' && d.status !== 'AWAITING_RETURN' && fillDoc.status !== 'AWAITING_RETURN' && !(d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN') && !(fillDoc.status === 'REVISION_REQUESTED' && fillDoc.requested_by === 'ADMIN') && (d.status === 'PENDING_REVIEW' || d.status === 'REVISION_REQUESTED' || fillDoc.status === 'PENDING_REVIEW' || fillDoc.status === 'REVISION_REQUESTED') && (
+                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && !bothReturned && d.status !== 'AWAITING_ADMIN' && fillDoc.status !== 'AWAITING_ADMIN' && d.status !== 'AWAITING_RETURN' && fillDoc.status !== 'AWAITING_RETURN' && !(d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN') && !(fillDoc.status === 'REVISION_REQUESTED' && fillDoc.requested_by === 'ADMIN') && (d.status === 'PENDING_REVIEW' || d.status === 'REVISION_REQUESTED' || fillDoc.status === 'PENDING_REVIEW' || fillDoc.status === 'REVISION_REQUESTED') && (d.requested_by !== 'INTERN' || ((d.status === 'REVISION_REQUESTED' && !d.returned_file_path) || (fillDoc.status === 'REVISION_REQUESTED' && !fillDoc.returned_file_path))) && (
                                             <>
                                               <input type="file" id={inputId} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => {
                                                 if (!e.target.files?.[0]) return;
                                                 const file = e.target.files[0];
                                                 [d, fillDoc].forEach(doc => {
-                                                  const fd = new FormData();
-                                                  fd.append('file', file);
-                                                  api.post(`/interns/${internData?.id}/documents/${doc.id}/return-upload`, fd);
+                                                  if (doc.requested_by === 'INTERN' && !doc.returned_file_path) {
+                                                    api.uploadInternDocument(internData?.id || 0, doc.doc_type, file, doc.id);
+                                                  } else {
+                                                    const fd = new FormData();
+                                                    fd.append('file', file);
+                                                    api.post(`/interns/${internData?.id}/documents/${doc.id}/return-upload`, fd);
+                                                  }
                                                 });
                                                 showToast('تم استلام النسخة المعبأة', 'success');
                                                 setTimeout(() => fetchLifecycleDocs(), 500);
@@ -779,7 +783,7 @@ for (const [base, docs] of grouped) {
                                 const isTemplatePendingIntern = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'INTERN';
                                 const isInternInitiatedSignFill = d.requested_by === 'INTERN' && (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill');
                                 const showViewDownload = !!d.file_path && !isTemplatePendingAdmin;
-                                const canUpload = (!isInternInitiatedSignFill || d.status === 'REVISION_REQUESTED') && d.status !== 'AWAITING_RETURN' && !(d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN') && ((!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin);
+                                const canUpload = (!isInternInitiatedSignFill || (d.status === 'REVISION_REQUESTED' && !d.returned_file_path)) && d.status !== 'AWAITING_RETURN' && !(d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN') && ((!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin);
                                 const isUploadDisabled = isTemplatePendingIntern;
                                 return (
                                   <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
@@ -917,7 +921,11 @@ for (const [base, docs] of grouped) {
                                               if (!e.target.files?.[0]) return;
                                               const file = e.target.files[0];
                                               if (isSignFill) {
-                                                handleSignFillUpload(d.id, file);
+                                                if (d.requested_by === 'INTERN' && !d.returned_file_path) {
+                                                  handleProactiveUpload(d.id, d.doc_type, file);
+                                                } else {
+                                                  handleSignFillUpload(d.id, file);
+                                                }
                                               } else {
                                                 handleProactiveUpload(d.id, d.doc_type, file);
                                               }

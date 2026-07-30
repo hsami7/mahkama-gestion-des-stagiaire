@@ -2683,8 +2683,8 @@ def upload_intern_document(intern_id):
         db.session.flush()
     else:
         # Preserve AWAITING_ADMIN status for intern-initiated sign/fill requests
-        if record.requested_by == 'INTERN' and record.action_type in ('sign', 'fill', 'sign_fill') and record.status == 'AWAITING_ADMIN':
-            pass
+        if record.requested_by == 'INTERN' and record.action_type in ('sign', 'fill', 'sign_fill') and record.status in ('AWAITING_ADMIN', 'REVISION_REQUESTED'):
+            record.status = 'AWAITING_ADMIN'
         else:
             record.status = 'PENDING_REVIEW'
         record.uploaded_by = 'INTERN'

@@ -1179,7 +1179,7 @@ return rows.map(row => {
                               <UploadSimple size={14} />
                             </button>
                           )}
-                          {canManageDocs && d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN' && (
+                          {canManageDocs && d.status === 'REVISION_REQUESTED' && (d.requested_by === 'ADMIN' || !!d.returned_file_path) && (
                             <button className="btn btn-ghost sm" onClick={() => {
                               const input = document.createElement('input');
                               input.type = 'file';
@@ -1428,6 +1428,36 @@ return rows.map(row => {
                               </button>
                             </>
                           )}
+                          {/* RETURNED — intern re-uploaded after a revision request */}
+                          {d.status === 'RETURNED' && (
+                            <>
+                              {(d.returned_file_path || d.file_path) && (
+                                <>
+                                  <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, !!d.returned_file_path)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <Eye size={14} />
+                                  </button>
+                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <DownloadSimple size={14} />
+                                  </button>
+                                </>
+                              )}
+                              <button className="btn btn-ghost sm" onClick={async () => {
+                                  if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟')) return;
+                                  try {
+                                      await api.approveDocument(Number(id), d.id);
+                                      toast.success('تم قبول المستند');
+                                      fetchDocsLifecycle();
+                                  } catch { toast.error('فشل قبول المستند'); }
+                              }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
+                                <CheckCircle size={14} />
+                              </button>
+                              {isSignFill && (
+                                <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
+                                  <ArrowsClockwise size={14} />
+                                </button>
+                              )}
+                            </>
+                          )}
                           {/* REVISION_REQUESTED — intern asked for re-upload */}
                           {d.status === 'REVISION_REQUESTED' && (
                               <>
@@ -1440,6 +1470,25 @@ return rows.map(row => {
                                       <DownloadSimple size={14} />
                                     </button>
                                   </>
+                                )}
+                                {!!d.returned_file_path && canManageDocs && (
+                                  <button className="btn btn-ghost sm" onClick={() => {
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                    input.onchange = async () => {
+                                      const file = input.files?.[0];
+                                      if (!file) return;
+                                      try {
+                                        await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                        toast.success('تم رفع النسخة');
+                                        fetchDocsLifecycle();
+                                      } catch { toast.error('فشل رفع النسخة'); }
+                                    };
+                                    input.click();
+                                  }} title="إعادة الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
+                                    <UploadSimple size={14} />
+                                  </button>
                                 )}
                               </>
                             )}
