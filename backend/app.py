@@ -784,6 +784,7 @@ def reset_user_password(user_id):
 @app.route('/api/interns', methods=['GET'])
 @jwt_required()
 def get_interns():
+    from sqlalchemy import or_, and_
     interns = Intern.query.all()
     activity_statuses = {'PENDING_REVIEW', 'RETURNED', 'AWAITING_ADMIN'}
     return jsonify([{
@@ -802,8 +803,16 @@ def get_interns():
         "has_final_report": DocumentLifecycle.query.filter_by(intern_id=i.id, doc_type='FINAL_REPORT').first() is not None,
         "has_pending_activity": DocumentLifecycle.query.filter(
             DocumentLifecycle.intern_id == i.id,
-            DocumentLifecycle.status.in_(activity_statuses),
-            DocumentLifecycle.uploaded_by != 'ADMIN'
+            or_(
+                and_(
+                    DocumentLifecycle.status.in_(activity_statuses),
+                    DocumentLifecycle.uploaded_by != 'ADMIN'
+                ),
+                and_(
+                    DocumentLifecycle.status == 'REVISION_REQUESTED',
+                    DocumentLifecycle.revision_requested_by == 'INTERN'
+                )
+            )
         ).first() is not None
     } for i in interns])
 
