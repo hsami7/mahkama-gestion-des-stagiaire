@@ -707,7 +707,7 @@ for (const [base, docs] of grouped) {
                                             </>
                                           )}
                                           {/* Upload return if not completed, not returned, and not awaiting admin; for PENDING_REVIEW, AWAITING_RETURN or REVISION_REQUESTED */}
-                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && !bothReturned && d.status !== 'AWAITING_ADMIN' && fillDoc.status !== 'AWAITING_ADMIN' && (d.status === 'PENDING_REVIEW' || d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN' || fillDoc.status === 'PENDING_REVIEW' || fillDoc.status === 'REVISION_REQUESTED' || fillDoc.status === 'AWAITING_RETURN') && (d.requested_by !== 'INTERN' || ((d.status === 'REVISION_REQUESTED' && !d.returned_file_path) || (fillDoc.status === 'REVISION_REQUESTED' && !fillDoc.returned_file_path))) && (
+                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && (!bothReturned || d.status === 'AWAITING_RETURN' || fillDoc.status === 'AWAITING_RETURN') && d.status !== 'AWAITING_ADMIN' && fillDoc.status !== 'AWAITING_ADMIN' && (d.status === 'PENDING_REVIEW' || d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN' || fillDoc.status === 'PENDING_REVIEW' || fillDoc.status === 'REVISION_REQUESTED' || fillDoc.status === 'AWAITING_RETURN') && (d.requested_by !== 'INTERN' || ((d.status === 'REVISION_REQUESTED' && !d.returned_file_path) || (fillDoc.status === 'REVISION_REQUESTED' && !fillDoc.returned_file_path))) && (d.status !== 'REVISION_REQUESTED' || d.revision_requested_by !== 'INTERN') && (fillDoc.status !== 'REVISION_REQUESTED' || fillDoc.revision_requested_by !== 'INTERN') && (
                                             <>
                                               <input type="file" id={inputId} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => {
                                                 if (!e.target.files?.[0]) return;
@@ -808,7 +808,7 @@ for (const [base, docs] of grouped) {
                                 const isTemplatePendingIntern = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'INTERN';
                                 const isInternInitiatedSignFill = d.requested_by === 'INTERN' && (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill');
                                 const showViewDownload = !!d.file_path && !isTemplatePendingAdmin;
-                                const canUpload = (!isInternInitiatedSignFill || (d.status === 'REVISION_REQUESTED' && !d.returned_file_path)) && ((!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'AWAITING_RETURN') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin);
+                                const canUpload = (!isInternInitiatedSignFill || (d.status === 'REVISION_REQUESTED' && !d.returned_file_path)) && ((!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'AWAITING_RETURN') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin) && (d.status !== 'REVISION_REQUESTED' || d.revision_requested_by !== 'INTERN');
                                 const isUploadDisabled = isTemplatePendingIntern;
                                 return (
                                   <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>

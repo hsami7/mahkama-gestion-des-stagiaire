@@ -1097,9 +1097,10 @@ export function Profile() {
                                       (d.status === 'PENDING_REVIEW' || fillDoc.status === 'PENDING_REVIEW') ? <span className="badge badge-warning" style={{ fontSize: 11 }}>قيد المراجعة</span> :
                                         (d.status === 'AWAITING_RETURN' || fillDoc.status === 'AWAITING_RETURN') ? <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>بانتظار التوقيع والتعبئة</span> :
                                           (d.status === 'AWAITING_ADMIN' || fillDoc.status === 'AWAITING_ADMIN') ? <span className="badge" style={{ fontSize: 11, background: '#FEF3C7', color: '#B45309' }}>بانتظار الإدارة</span> :
-                                            bothReturned ? <span className="badge badge-success" style={{ fontSize: 11 }}>مكتمل</span> :
-                                              anyReturned ? <span className="badge badge-warning" style={{ fontSize: 11 }}>قيد الإجراء</span> :
-                                                <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>بانتظار الرفع</span>}
+                                            (d.status === 'AWAITING_INTERN' || fillDoc.status === 'AWAITING_INTERN') ? <span className="badge badge-warning" style={{ fontSize: 11 }}>بانتظار المتدرب</span> :
+                                              bothReturned ? <span className="badge badge-success" style={{ fontSize: 11 }}>مكتمل</span> :
+                                                anyReturned ? <span className="badge badge-warning" style={{ fontSize: 11 }}>قيد الإجراء</span> :
+                                                  <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>بانتظار الرفع</span>}
                                 </td>
                                 <td style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--slate)', fontSize: 11 }}>
                                   {(d.file_path || fillDoc.file_path) ? formatDate((d.file_path ? d : fillDoc).updated_at || (d.file_path ? d : fillDoc).created_at) : '—'}
@@ -1224,7 +1225,7 @@ export function Profile() {
                                         <ArrowsClockwise size={14} />
                                       </button>
                                     )}
-                                    {canManageDocs && row.sign.requested_by === 'ADMIN' && (
+                                    {canManageDocs && row.sign.requested_by === 'ADMIN' && d.status !== 'AWAITING_INTERN' && fillDoc.status !== 'AWAITING_INTERN' && (
                                       <button className="btn btn-ghost sm" onClick={async () => {
                                         const docsToDelete = isSignFillRow ? [d] : [d, fillDoc];
                                         if (!confirm(`هل أنت متأكد من حذف ${docsToDelete.length > 1 ? 'هذه المستندات' : 'هذا المستند'}؟`)) return;
@@ -1524,7 +1525,7 @@ export function Profile() {
                                               </button>
                                             </>
                                           )}
-                                          {canManageDocs && d.requested_by === 'ADMIN' && (
+                                      {canManageDocs && d.requested_by === 'ADMIN' && (
                                             <button className="btn btn-ghost sm" onClick={async () => {
                                               if (!confirm('هل أنت متأكد من حذف هذا المستند؟')) return;
                                               try {
