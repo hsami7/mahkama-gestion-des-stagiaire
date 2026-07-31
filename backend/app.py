@@ -1374,11 +1374,16 @@ def generate_daily_attendance_record():
 
     doc = docx.Document(template_path)
     
-    # Update date in paragraph 1
-    if len(doc.paragraphs) > 1:
-        date_formatted = dt.strftime('%d/%m/%Y')
-        doc.paragraphs[1].text = f"ورقة الحضور بتاريخ {date_formatted}"
-        doc.paragraphs[1].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+    # Find the paragraph with the date and update it while preserving style
+    date_formatted = dt.strftime('%d/%m/%Y')
+    for p in doc.paragraphs:
+        if "ورقة الحضور بتاريخ" in p.text:
+            new_text = p.text.replace(".../.../2026", date_formatted)
+            if p.runs:
+                p.runs[0].text = new_text
+                for r in p.runs[1:]:
+                    r.text = ""
+            break
         
     if len(doc.tables) > 0:
         table = doc.tables[0]
@@ -1387,12 +1392,16 @@ def generate_daily_attendance_record():
             row = table.rows[1]
             row._element.getparent().remove(row._element)
             
+        from docx.shared import Pt
         # Add new rows for active interns
         for intern in active_interns:
             row_cells = table.add_row().cells
-            # Setting text, preserving basic styling (right aligned if possible)
-            row_cells[0].text = intern.name
-            row_cells[0].paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+            # Setting text with specific font and size
+            p = row_cells[0].paragraphs[0]
+            run = p.add_run(intern.name)
+            run.font.name = 'Samir_Khouaja_Maghribi'
+            run.font.size = Pt(20)
+            p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
             row_cells[1].text = ""
             row_cells[2].text = ""
 

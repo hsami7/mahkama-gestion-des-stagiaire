@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Trash, PencilSimple, UserList, LockKey } from '@phosphor-icons/react';
+import { UserPlus, Trash, PencilSimple, UserList, LockKey, Info } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
 import {
@@ -8,6 +8,7 @@ import {
   DEFAULT_PERMISSIONS,
   ADMIN_PERMISSIONS,
   PERMISSION_GROUPS,
+  PERMISSION_HELP,
   mergePermissions,
 } from '../permissions';
 import type { PermissionAction, PermissionMap } from '../permissions';
@@ -15,7 +16,6 @@ import type { PermissionAction, PermissionMap } from '../permissions';
 const newUserDefaults = {
   name: '', email: '', role: '', password: 'password123',
   permissions: JSON.stringify(DEFAULT_PERMISSIONS),
-  can_manage_documents: false
 };
 
 export function UsersPermissions() {
@@ -24,6 +24,7 @@ export function UsersPermissions() {
   const [users, setUsers] = useState<any[]>([]);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [newUser, setNewUser] = useState({ ...newUserDefaults });
+  const [openHelp, setOpenHelp] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -62,7 +63,6 @@ export function UsersPermissions() {
       role: user.role,
       password: '',
       permissions: user.permissions || JSON.stringify(DEFAULT_PERMISSIONS),
-      can_manage_documents: user.can_manage_documents || false
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -153,15 +153,6 @@ export function UsersPermissions() {
             </div>
           </div>
 
-          {newUser.role === 'Manager' && (
-            <div style={{marginBottom:16}}>
-              <label style={{display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:13, fontWeight:600}}>
-                <input type="checkbox" checked={newUser.can_manage_documents} onChange={e => setNewUser({...newUser, can_manage_documents: e.target.checked})} style={{width:16,height:16}} />
-                التحكم في المستندات — يمكنه إنشاء طلبات للمستندات وعرض/قبول/رفض مستندات المتدربين
-              </label>
-            </div>
-          )}
-
           {newUser.role && newUser.role !== 'Intern' && (
           <div style={{ marginTop: '32px', marginBottom: '24px' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '8px' }}>
@@ -182,17 +173,41 @@ export function UsersPermissions() {
                   </tr>
                 </thead>
                 <tbody>
-                  {PERMISSION_GROUPS.map((group) => (
+                  {PERMISSION_GROUPS.map((group, gi) => (
                     <React.Fragment key={group.title}>
-                      <tr style={{ background: 'var(--paper)' }}>
-                        <td colSpan={PERMISSION_ACTIONS.length + 1} style={{ fontWeight: 'bold', color: 'var(--gold-dark)', fontSize: '0.85rem', padding: '8px 12px' }}>
-                          {group.title}
-                        </td>
-                      </tr>
+                      {gi === 0 ? (
+                        <tr style={{ background: 'var(--paper)' }}>
+                          <td colSpan={PERMISSION_ACTIONS.length + 1} style={{ fontWeight: 'bold', color: 'var(--gold-dark)', fontSize: '0.85rem', padding: '8px 12px' }}>
+                            {group.title}
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr style={{ background: 'var(--paper)' }}>
+                          <td style={{ fontWeight: 'bold', color: 'var(--gold-dark)', fontSize: '0.85rem', padding: '8px 12px' }}>
+                            {group.title}
+                          </td>
+                          {PERMISSION_ACTIONS.map(act => (
+                            <td key={act} style={{ fontWeight: 600, color: 'var(--slate)', fontSize: '0.8rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              {ACTION_LABELS[act]}
+                            </td>
+                          ))}
+                        </tr>
+                      )}
                       {group.modules.map((mod) => (
-                        <tr key={mod.key}>
+                        <React.Fragment key={mod.key}>
+                        <tr>
                           <td>
-                            <div style={{ fontWeight: 600 }}>{mod.label}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ fontWeight: 600 }}>{mod.label}</div>
+                              <button
+                                type="button"
+                                onClick={() => setOpenHelp(openHelp === mod.key ? null : mod.key)}
+                                title="شرح الصلاحية"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--slate)', padding: 2, display: 'flex', alignItems: 'center' }}
+                              >
+                                <Info size={15} weight="fill" />
+                              </button>
+                            </div>
                             {mod.description && (
                               <div style={{ fontSize: '0.78rem', color: 'var(--slate)', fontWeight: 400, marginTop: 2 }}>
                                 {mod.description}
@@ -210,6 +225,27 @@ export function UsersPermissions() {
                             </td>
                           ))}
                         </tr>
+                        {openHelp === mod.key && PERMISSION_HELP[mod.key] && (
+                          <tr>
+                            <td colSpan={PERMISSION_ACTIONS.length + 1} style={{ background: '#FDFAF2', borderBottom: '1px solid var(--line)' }}>
+                              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', padding: '12px 14px' }}>
+                                <div style={{ flex: '1 1 240px', minWidth: 220 }}>
+                                  <div style={{ fontWeight: 'bold', marginBottom: 4, fontSize: '0.85rem' }}>ماذا يفعل هذا القسم</div>
+                                  <div style={{ fontSize: '0.82rem', color: 'var(--slate)', lineHeight: 1.7 }}>{PERMISSION_HELP[mod.key].desc}</div>
+                                </div>
+                                <div style={{ flex: '1.2 1 260px', minWidth: 280 }}>
+                                  <div style={{ fontWeight: 'bold', marginBottom: 6, fontSize: '0.85rem' }}>معنى كل صلاحية</div>
+                                  {PERMISSION_ACTIONS.map(act => (
+                                    <div key={act} style={{ fontSize: '0.82rem', color: 'var(--slate)', padding: '2px 0', lineHeight: 1.6 }}>
+                                      <strong style={{ color: 'var(--ink)' }}>{ACTION_LABELS[act]}:</strong> {PERMISSION_HELP[mod.key].actions[act]}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       ))}
                     </React.Fragment>
                   ))}
