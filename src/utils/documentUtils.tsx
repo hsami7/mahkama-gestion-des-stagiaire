@@ -80,7 +80,7 @@ export const isTemplateInternPending = (d: DocumentRowType) => isTemplateDoc(d) 
 
 // UI Helpers for Action Buttons
 export const canAdminApprove = (d: DocumentRowType, canManageDocs: boolean) => {
-  return canManageDocs && (d.status === 'RETURNED' || (d.status === 'PENDING_REVIEW' && !isTemplateAdminPending(d)));
+  return canManageDocs && d.action_type !== 'fill' && (d.status === 'RETURNED' || (d.status === 'PENDING_REVIEW' && !isTemplateAdminPending(d)));
 };
 
 export const canAdminRequestRevision = (d: DocumentRowType, canManageDocs: boolean) => {

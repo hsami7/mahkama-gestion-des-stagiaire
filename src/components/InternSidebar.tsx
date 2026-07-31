@@ -1,5 +1,5 @@
 import React from 'react';
-import { House, FileText, User, SignOut } from '@phosphor-icons/react';
+import { House, FileText, User, SignOut, Gear } from '@phosphor-icons/react';
 
 interface InternSidebarProps {
   activeTab: string;
@@ -21,6 +21,7 @@ export function InternSidebar({ activeTab, setActiveTab, internData, user, missi
   if (!isRejected) {
     navItems.splice(1, 0, { id: 'documents', name: 'المستندات', icon: <FileText size={24} />, badge: pendingCount > 0 });
   }
+  navItems.push({ id: 'settings', name: 'الإعدادات', icon: <Gear size={24} /> });
 
   return (
     <div className="sidebar">

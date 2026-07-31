@@ -67,11 +67,11 @@ const RotDateInput = React.memo(({ value, onChange, placeholder }: { value: stri
     } else onChange('');
   };
   return (
-    <div style={{position:'relative'}}>
-      <input type="text" inputMode="numeric" className="input" style={{fontSize:12, width:'100%', paddingLeft:46}} value={text} onChange={e => commit(e.target.value)} onBlur={e => commit(e.target.value)} placeholder={placeholder} />
-      <button type="button" onClick={() => hiddenRef.current?.showPicker()} style={{position:'absolute',left:4,top:'50%',transform:'translateY(-50%)',width:28,height:28,borderRadius:6,border:'none',background:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--slate)'}}><CalendarBlank size={16} /></button>
-      <input type="date" ref={hiddenRef} onChange={e => { const iso = e.target.value; if (iso) { onChange(iso); setText(formatDate(iso)); }}}
-        style={{position:'absolute',left:0,top:'50%',transform:'translateY(-50%)',width:28,height:28,opacity:0,pointerEvents:'none'}} />
+    <div style={{ position: 'relative' }}>
+      <input type="text" inputMode="numeric" className="input" style={{ fontSize: 12, width: '100%', paddingLeft: 46 }} value={text} onChange={e => commit(e.target.value)} onBlur={e => commit(e.target.value)} placeholder={placeholder} />
+      <button type="button" onClick={() => hiddenRef.current?.showPicker()} style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--slate)' }}><CalendarBlank size={16} /></button>
+      <input type="date" ref={hiddenRef} onChange={e => { const iso = e.target.value; if (iso) { onChange(iso); setText(formatDate(iso)); } }}
+        style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, opacity: 0, pointerEvents: 'none' }} />
     </div>
   );
 });
@@ -156,8 +156,8 @@ export function Profile() {
       let done = false;
       const cleanup = () => {
         setTimeout(() => {
-          try { document.body.removeChild(iframe); } catch (e) {}
-          try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+          try { document.body.removeChild(iframe); } catch (e) { }
+          try { URL.revokeObjectURL(blobUrl); } catch (e) { }
         }, 60000);
       };
       iframe.onload = () => {
@@ -183,8 +183,8 @@ export function Profile() {
 
   const [evalPeriodFrom, setEvalPeriodFrom] = useState('');
   const [evalPeriodTo, setEvalPeriodTo] = useState('');
-  const [evalRotations, setEvalRotations] = useState<{supervisor:string;department:string;from:string;to:string}[]>([]);
-  const [evalCriteria, setEvalCriteria] = useState<Record<string,{yes:boolean;no:boolean}>>({});
+  const [evalRotations, setEvalRotations] = useState<{ supervisor: string; department: string; from: string; to: string }[]>([]);
+  const [evalCriteria, setEvalCriteria] = useState<Record<string, { yes: boolean; no: boolean }>>({});
   const [evalComments, setEvalComments] = useState('');
   const [savingEval, setSavingEval] = useState(false);
   const [uploadingSigned, setUploadingSigned] = useState(false);
@@ -196,8 +196,8 @@ export function Profile() {
       const start = new Date(approveStartDate);
       const end = new Date(approveEndDate);
       const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-      
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
       if (end < start) {
         setDurationStr('تاريخ النهاية يجب أن يكون بعد تاريخ البداية');
       } else {
@@ -249,7 +249,7 @@ export function Profile() {
       if (perms?.assign_encadrant?.edit) canAssignEncadrant = true;
       if (perms?.approve_interns?.edit) canApproveInterns = true;
       if (perms?.evaluate_interns?.edit) canEvaluateInterns = true;
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const saveEncadrant = async () => {
@@ -276,7 +276,7 @@ export function Profile() {
         if (evalSection) {
           evalSection.scrollIntoView({ behavior: 'smooth' });
           if (!intern.evaluation?.criteria) {
-             setShowEvalForm(true);
+            setShowEvalForm(true);
           }
         }
       }, 500);
@@ -369,11 +369,11 @@ export function Profile() {
     }
 
     try {
-      await api.put(`/interns/${id}`, { 
-        ...intern, 
+      await api.put(`/interns/${id}`, {
+        ...intern,
         status: 'نشط',
         start_date: approveStartDate,
-        end_date: approveEndDate 
+        end_date: approveEndDate
       });
       setShowApproveModal(false);
       fetchInternAndAttendance();
@@ -607,7 +607,7 @@ export function Profile() {
       return `
       <tr class="content-row">
         <td>
-          الفترة ${i+1}<br>
+          الفترة ${i + 1}<br>
           من: ${r.from || '...................'} إلى: ${r.to || '...................'}
         </td>
         <td>${r.department || '<br>'}</td>
@@ -670,8 +670,8 @@ export function Profile() {
     let done = false;
     const cleanup = () => {
       setTimeout(() => {
-        try { document.body.removeChild(iframe); } catch (e) {}
-        try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+        try { document.body.removeChild(iframe); } catch (e) { }
+        try { URL.revokeObjectURL(blobUrl); } catch (e) { }
       }, 60000);
     };
     iframe.onload = () => {
@@ -716,20 +716,20 @@ export function Profile() {
         from: r.from ? formatDate(r.from) : '—',
         to: r.to ? formatDate(r.to) : '—'
       }));
-      
+
       doc.render({
         name: intern?.name || '',
         from: pFrom,
         to: pTo,
         rots: formattedRots,
-        
+
         c1_no: crit['punctuality']?.no ? '☑' : '☐',
         c1_yes: crit['punctuality']?.yes ? '☑' : '☐',
         c2_no: crit['conduct']?.no ? '☑' : '☐',
         c2_yes: crit['conduct']?.yes ? '☑' : '☐',
         c3_no: crit['seriousness']?.no ? '☑' : '☐',
         c3_yes: crit['seriousness']?.yes ? '☑' : '☐',
-        
+
         notes: comments,
       });
 
@@ -749,13 +749,13 @@ export function Profile() {
   const handleViewDocument = (docId: number, filePath: string, returned: boolean = false) => {
     const isWord = filePath && (filePath.toLowerCase().endsWith('.doc') || filePath.toLowerCase().endsWith('.docx'));
     if (isWord) {
-        toast.info('جاري فتح المستند في برنامج Word...');
-        api.openDocument(docId, returned).catch(err => {
-            console.error("Error opening document:", err);
-            toast.error("حدث خطأ أثناء فتح الملف");
-        });
+      toast.info('جاري فتح المستند في برنامج Word...');
+      api.openDocument(docId, returned).catch(err => {
+        console.error("Error opening document:", err);
+        toast.error("حدث خطأ أثناء فتح الملف");
+      });
     } else {
-        window.open(api.downloadDocument(docId) + (returned ? '&returned=1' : ''), '_blank');
+      window.open(api.downloadDocument(docId) + (returned ? '&returned=1' : ''), '_blank');
     }
   };
 
@@ -764,7 +764,7 @@ export function Profile() {
 
     const container = document.createElement('div');
     container.innerHTML = html;
-    
+
     const opt = {
       margin: 10,
       filename: `بطاقة_تقييم_${intern?.name || 'متدرب'}.pdf`,
@@ -808,7 +808,7 @@ export function Profile() {
 
       <div className="profile-head">
         <div className="profile-photo-wrap">
-          {intern.photo_path ? <img src={intern.photo_path} alt="Profile" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'100%', height:'100%', padding:'15%', color:'var(--slate)'}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
+          {intern.photo_path ? <img src={intern.photo_path} alt="Profile" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '100%', height: '100%', padding: '15%', color: 'var(--slate)' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>}
         </div>
         <div>
           <h2 className="profile-name" style={{ margin: 0 }}>{intern.name}</h2>
@@ -822,17 +822,17 @@ export function Profile() {
         </div>
         <div className="profile-actions" style={{ display: 'flex', gap: '8px' }}>
           {intern.status !== 'مرفوض' && (
-          <button title="تحميل شهادة التدريب" onClick={() => setShowAttestationModal(true)} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#e0e7ff', border: '1.5px solid #6366f1', color: '#1a1a1a', transition: 'all 0.2s' }}>
-            <Certificate weight="bold" size={18} color="#1a1a1a" />
-          </button>
+            <button title="تحميل شهادة التدريب" onClick={() => setShowAttestationModal(true)} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#e0e7ff', border: '1.5px solid #6366f1', color: '#1a1a1a', transition: 'all 0.2s' }}>
+              <Certificate weight="bold" size={18} color="#1a1a1a" />
+            </button>
           )}
-           <button title="تصدير PDF" onClick={() => { setExportMode('summary'); setShowExportModal(true); }} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#1E5631', border: '1.5px solid #1E5631', color: '#fff', transition: 'all 0.2s' }}>
-             <FilePdf weight="bold" size={18} color="#fff" />
-           </button>
+          <button title="تصدير PDF" onClick={() => { setExportMode('summary'); setShowExportModal(true); }} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#1E5631', border: '1.5px solid #1E5631', color: '#fff', transition: 'all 0.2s' }}>
+            <FilePdf weight="bold" size={18} color="#fff" />
+          </button>
           <button title="تعديل" onClick={handleEdit} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fef3c7', border: '1.5px solid #f59e0b', color: '#1a1a1a', transition: 'all 0.2s' }}>
             <PencilSimple weight="bold" size={18} color="#1a1a1a" />
           </button>
-          
+
           {isAdmin && (
             <button title="حذف" onClick={handleDelete} style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fee2e2', border: '1.5px solid #ef4444', color: '#1a1a1a', transition: 'all 0.2s' }}>
               <Trash weight="bold" size={18} color="#1a1a1a" />
@@ -904,10 +904,10 @@ export function Profile() {
               {canAssignEncadrant ? (
                 editingEncadrant || !intern.encadrant ? (
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <input 
-                      type="text" 
-                      value={encadrantInput || ''} 
-                      onChange={e => setEncadrantInput(e.target.value)} 
+                    <input
+                      type="text"
+                      value={encadrantInput || ''}
+                      onChange={e => setEncadrantInput(e.target.value)}
                       placeholder="أدخل اسم المؤطر"
                       style={{ padding: '4px 8px', border: '1px solid var(--line)', borderRadius: '4px', outline: 'none' }}
                     />
@@ -962,38 +962,38 @@ export function Profile() {
         </div>
 
         <div className="card info-card">
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, marginBottom:16}}>
-            <h3 style={{margin:0}}><FileText weight="bold" className="icon" /> مركز المستندات</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+            <h3 style={{ margin: 0 }}><FileText weight="bold" className="icon" /> مركز المستندات</h3>
           </div>
 
           {/* Filter tabs + add button */}
-          <div style={{display:'flex', gap:8, marginBottom:16, flexWrap:'wrap', alignItems:'center', justifyContent:'space-between'}}>
-            <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-            {(['all', 'pending', 'completed', 'from_intern'] as const).map(tab => {
-              const counts = {
-                all: docsLifecycle.length,
-                pending: docsLifecycle.filter(d => d.status !== 'APPROVED_AND_SIGNED').length,
-                completed: docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED').length,
-                from_intern: docsLifecycle.filter(d => d.requested_by === 'INTERN').length
-              };
-              const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل', from_intern: 'من المتدرب' };
-              return (
-                <button key={tab} onClick={() => setDocFilter(tab)} style={{
-                  padding:'6px 14px', borderRadius:20, border:'1px solid var(--line)', fontSize:12, fontWeight:600, cursor:'pointer',
-                  background: docFilter === tab ? 'var(--ink)' : 'transparent',
-                  color: docFilter === tab ? '#fff' : 'var(--slate)',
-                  display:'flex', alignItems:'center', gap:6
-                }}>
-                  {labels[tab]}
-                  {counts[tab] > 0 && <span style={{fontSize:10, background: docFilter === tab ? 'rgba(255,255,255,.2)' : 'var(--paper)', borderRadius:10, padding:'1px 7px'}}>{counts[tab]}</span>}
-                </button>
-              );
-            })}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {(['all', 'pending', 'completed', 'from_intern'] as const).map(tab => {
+                const counts = {
+                  all: docsLifecycle.length,
+                  pending: docsLifecycle.filter(d => d.status !== 'APPROVED_AND_SIGNED').length,
+                  completed: docsLifecycle.filter(d => d.status === 'APPROVED_AND_SIGNED').length,
+                  from_intern: docsLifecycle.filter(d => d.requested_by === 'INTERN').length
+                };
+                const labels = { all: 'الكل', pending: 'تحت الإجراء', completed: 'مكتمل', from_intern: 'من المتدرب' };
+                return (
+                  <button key={tab} onClick={() => setDocFilter(tab)} style={{
+                    padding: '6px 14px', borderRadius: 20, border: '1px solid var(--line)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    background: docFilter === tab ? 'var(--ink)' : 'transparent',
+                    color: docFilter === tab ? '#fff' : 'var(--slate)',
+                    display: 'flex', alignItems: 'center', gap: 6
+                  }}>
+                    {labels[tab]}
+                    {counts[tab] > 0 && <span style={{ fontSize: 10, background: docFilter === tab ? 'rgba(255,255,255,.2)' : 'var(--paper)', borderRadius: 10, padding: '1px 7px' }}>{counts[tab]}</span>}
+                  </button>
+                );
+              })}
             </div>
             {canManageDocs && (
-            <button className="btn btn-gold sm" onClick={async () => { setRequestTitle(''); setRequestActionTypes(new Set(['view'])); setRequestFiles([]); setSelectedVaultDocs([]); try { setVaultDocs(await api.get('/vault')); } catch {} setShowRequestModal(true); }} style={{fontSize:12, padding:'8px 16px'}}>
-              + طلب مستند / إضافة ملف
-            </button>
+              <button className="btn btn-gold sm" onClick={async () => { setRequestTitle(''); setRequestActionTypes(new Set(['view'])); setRequestFiles([]); setSelectedVaultDocs([]); try { setVaultDocs(await api.get('/vault')); } catch { } setShowRequestModal(true); }} style={{ fontSize: 12, padding: '8px 16px' }}>
+                + طلب مستند / إضافة ملف
+              </button>
             )}
           </div>
 
@@ -1006,616 +1006,623 @@ export function Profile() {
               return true;
             }).sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
             return (
-            <div style={{marginBottom:20}}>
-              {filtered.length === 0 ? (
-                <div className="empty-state" style={{padding:'32px 20px', border:'1px solid var(--line)', borderRadius:12}}>
-                  <div className="empty-icon"><FileText size={24} /></div>
-                  <h4>لا توجد مستندات</h4>
-                  <p>لم يتم رفع أي مستندات بعد.</p>
-                </div>
-              ) : (
-              <table className="table" style={{background:'white'}}>
-                <thead>
-                  <tr>
-                    <th style={{textAlign:'right'}}>المستند</th>
-                    <th style={{textAlign:'center', width:120}}>الحالة</th>
-                    <th style={{textAlign:'center', width:120}}>تاريخ التحديث</th>
-                    <th style={{textAlign:'left', width:180}}>إجراء</th>
-                  </tr>
-                </thead>
-                <tbody>
-              {(() => {
-                const rows: any[] = [];
-                const grouped = new Map<string, any[]>();
-                filtered.forEach(d => {
-                  const base = (d.custom_title || d.doc_type || '').replace(/\s*\((توقيع وتعبئة|توقيع|تعبئة وإرجاع|عرض فقط|مستند مطلوب)\)\s*$/, '');
-                  if (!grouped.has(base)) grouped.set(base, []);
-                  grouped.get(base)!.push(d);
-                });
-for (const [base, docs] of grouped) {
-                  const sign = docs.find(d => d.action_type === 'sign');
-                  const fill = docs.find(d => d.action_type === 'fill');
-                  const both = docs.find(d => d.action_type === 'sign_fill');
-                  if (sign && fill) {
-                    rows.push({ id: `combined-${base}`, isCombined: true, sign, fill, base });
-                    docs.forEach(d => {
-                      if (d !== sign && d !== fill) rows.push(d);
-                    });
-                  } else if (both) {
-                    // sign_fill is a single combined action - treat as combined row
-                    rows.push({ id: `combined-${base}`, isCombined: true, sign: both, fill: both, base, isSignFill: true });
-                    // Also include any other docs in this group (e.g., view-only, standalone sign/fill)
-                    docs.forEach(d => {
-                      if (d !== both) rows.push(d);
-                    });
-                  } else {
-                    docs.forEach(d => rows.push(d));
-                  }
-                }
-rows.sort((a, b) => {
-  const getLatestTime = (item: any) => {
-    if (item.isCombined) {
-      const t1 = new Date(item.sign.updated_at || item.sign.created_at || 0).getTime();
-      const t2 = new Date(item.fill.updated_at || item.fill.created_at || 0).getTime();
-      return Math.max(t1, t2);
-    }
-    return new Date(item.updated_at || item.created_at || 0).getTime();
-  };
-  return getLatestTime(a) - getLatestTime(b);
-});
-return rows.map(row => {
-                  if (row.isCombined) {
-                    const d = row.sign;
-                    const fillDoc = row.fill;
-                    const bothReturned = d.returned_file_path && fillDoc.returned_file_path;
-                    const anyReturned = d.returned_file_path || fillDoc.returned_file_path;
-                    const isSignFillRow = !!row.isSignFill;
-                    return (
-                    <tr key={row.id} style={{borderBottom:'1px solid var(--line)'}}>
-                      <td style={{padding:'10px 8px'}}>
-                        <div style={{fontWeight:600, color:'var(--ink)', maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={row.base}>
-                          {row.base}
-                          <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>{isSignFillRow ? '(توقيع وتعبئة)' : '(توقيع) و (تعبئة وإرجاع)'}</span>
-                        </div>
-                        {anyReturned && d.status !== 'REVISION_REQUESTED' && fillDoc.status !== 'REVISION_REQUESTED' && (
-                          <div style={{marginTop:4}}>
-                            <span style={{display:'inline-flex', alignItems:'center', gap:4, background: bothReturned ? '#E7F8EE' : '#FFF6E5', color: bothReturned ? '#15803D' : '#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
-                              {bothReturned ? <CheckCircle size={10} weight="fill" /> : <ArrowsClockwise size={10} weight="bold" />}
-                              {bothReturned ? 'تمت الإعادة (توقيع وتعبئة)' : 'جاري الإعادة'}
-                            </span>
-                          </div>
-                        )}
-                        {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN' || fillDoc.status === 'REVISION_REQUESTED' || fillDoc.status === 'AWAITING_RETURN') && (
-                          <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
-                            <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
-                          </div>
-                        )}
-                      </td>
- <td style={{textAlign:'center', padding:'10px 8px'}}>
-                        {(d.status === 'REVISION_REQUESTED' || fillDoc.status === 'REVISION_REQUESTED') ? <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span> :
-                         (d.status === 'APPROVED_AND_SIGNED' && fillDoc.status === 'APPROVED_AND_SIGNED') ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
-                         (d.status === 'PENDING_REVIEW' || fillDoc.status === 'PENDING_REVIEW') ? <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span> :
-                          (d.status === 'AWAITING_RETURN' || fillDoc.status === 'AWAITING_RETURN') ? <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار التوقيع والتعبئة</span> :
-                           (d.status === 'AWAITING_ADMIN' || fillDoc.status === 'AWAITING_ADMIN') ? <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار الإدارة</span> :
-                          bothReturned ? <span className="badge badge-success" style={{fontSize:11}}>مكتمل</span> :
-                         anyReturned ? <span className="badge badge-warning" style={{fontSize:11}}>قيد الإجراء</span> :
-                          <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>}
-                      </td>
-                      <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
-                        {(d.file_path || fillDoc.file_path) ? formatDate((d.file_path ? d : fillDoc).updated_at || (d.file_path ? d : fillDoc).created_at) : '—'}
-                      </td>
-                      <td style={{textAlign:'left', padding:'10px 8px'}}>
-                        <div style={{display:'flex', gap:4, justifyContent:'flex-end', flexWrap:'wrap'}}>
-                          {/* View/download latest document */}
-                          {(d.file_path || fillDoc.file_path) && (() => {
-                            const fileDoc = d.file_path ? d : fillDoc;
-                            return (
-                              <>
-                                <button className="btn btn-ghost sm" onClick={() => handleViewDocument(fileDoc.id, anyReturned ? (fileDoc.returned_file_path || fileDoc.file_path) : fileDoc.file_path, anyReturned)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                  <Eye size={14} />
-                                </button>
-                                <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(fileDoc.id) + (anyReturned ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                  <DownloadSimple size={14} />
-                                </button>
-                              </>
-                            );
-                          })()}
-                          {d.status === 'AWAITING_ADMIN' && canManageDocs && (
-                            <>
-                              {d.requested_by === 'INTERN' ? (
-                                <button className="btn btn-ghost sm" onClick={async () => {
-        if (!window.confirm('هل أنت متأكد من قبول هذا الطلب؟ سيتوجب عليك رفع المستند المطلوب.')) return;
-        try {
-            await api.post(`/interns/${id}/documents/${d.id}/accept-request`, {});
-            toast.success('تم قبول الطلب');
-            fetchDocsLifecycle();
-        } catch { toast.error('فشل قبول الطلب'); }
-    }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                                  <CheckCircle size={14} />
-                                </button>
-                              ) : (
-                                <button className="btn btn-ghost sm" onClick={async () => {
-        if (!window.confirm('هل أنت متأكد من قبول المستند؟ سيتم اعتماد المستند نهائياً.')) return;
-        try {
-            await api.post(`/interns/${id}/documents/${d.id}/approve-document`, {});
-            toast.success('تم اعتماد المستند');
-            fetchDocsLifecycle();
-        } catch { toast.error('فشل اعتماد المستند'); }
-    }} title="اعتماد" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                                  <CheckCircle size={14} />
-                                </button>
-                              )}
-                              {isSignFillRow && (
-                                <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                                  <ArrowsClockwise size={14} />
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {canManageDocs && d.status === 'RETURNED' && (
-                            <button className="btn btn-ghost sm" onClick={() => {
-        if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله.')) return;
-        api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle());
-    }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                              <CheckCircle size={14} />
-                            </button>
-                          )}
-                          {canManageDocs && d.status === 'PENDING_REVIEW' && d.action_type !== 'view' && (
-                            <button className="btn btn-ghost sm" onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                              input.onchange = async () => {
-                                const file = input.files?.[0];
-                                if (!file) return;
-                                try {
-                                  await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
-                                  toast.success('تم رفع النسخة');
-                                  fetchDocsLifecycle();
-                                } catch { toast.error('فشل رفع النسخة'); }
-                              };
-                              input.click();
-                            }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
-                              <UploadSimple size={14} />
-                            </button>
-                          )}
-                          {canManageDocs && d.status === 'REVISION_REQUESTED' && (d.requested_by === 'ADMIN' || !!d.returned_file_path) && (
-                            <button className="btn btn-ghost sm" onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                              input.onchange = async () => {
-                                const file = input.files?.[0];
-                                if (!file) return;
-                                try {
-                                  await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
-                                  toast.success('تم رفع النسخة');
-                                  fetchDocsLifecycle();
-                                } catch { toast.error('فشل رفع النسخة'); }
-                              };
-                              input.click();
-                            }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
-                              <UploadSimple size={14} />
-                            </button>
-                          )}
-                          {canManageDocs && d.status === 'AWAITING_INTERN' && anyReturned && (
-                            <button className="btn btn-ghost sm" onClick={async () => {
-                              if (!window.confirm('هل تريد حذف النسخة المرفوعة فقط (يبقى الطلب)؟')) return;
-                              try {
-                                const docsToDeleteUpload = isSignFillRow ? [d] : [d, fillDoc];
-                                await Promise.all(docsToDeleteUpload.map(doc => {
-                                  if (doc.returned_file_path) return api.post(`/interns/${id}/documents/${doc.id}/admin-delete-upload`, {});
-                                  return Promise.resolve();
-                                }));
-                                toast.success('تم حذف النسخة');
-                                fetchDocsLifecycle();
-                              } catch { toast.error('فشل حذف النسخة'); }
-                            }} title="حذف الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
-                              <Trash size={14} />
-                            </button>
-                          )}
-                              {canManageDocs && isSignFillRow && d.file_path && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && d.status !== 'AWAITING_RETURN' && d.status !== 'AWAITING_ADMIN' && d.status !== 'PENDING_REVIEW' && d.status !== 'REVISION_REQUESTED' && d.status !== 'AWAITING_INTERN' && (
-                            <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                              <ArrowsClockwise size={14} />
-                            </button>
-                          )}
-                          {canManageDocs && row.sign.requested_by === 'ADMIN' && (
-                            <button className="btn btn-ghost sm" onClick={async () => {
-                              const docsToDelete = isSignFillRow ? [d] : [d, fillDoc];
-                              if (!confirm(`هل أنت متأكد من حذف ${docsToDelete.length > 1 ? 'هذه المستندات' : 'هذا المستند'}؟`)) return;
-                              try {
-                                await Promise.all(docsToDelete.map(doc => api.delete(`/interns/${id}/documents/${doc.id}`)));
-                                toast.success('تم حذف المستندات');
-                                fetchDocsLifecycle();
-                              } catch (err) {
-                                toast.error('فشل حذف المستندات');
-                              }
-                            }} title="حذف" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
-                              <Trash size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    );
-                  }
-                  
-                  const d = row;
-                  const isTemplate = d.source === 'TEMPLATE_VIEW';
-                  const isTemplateAdminPending = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'ADMIN';
-                  const isTemplateInternPending = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'INTERN';
-                  const actionLabelMap: any = { 'view': 'عرض فقط', 'sign': 'توقيع', 'fill': 'تعبئة وإرجاع', 'sign_fill': 'توقيع وتعبئة' };
-                  const actionLabel = isTemplate ? 'مستند مطلوب' : (actionLabelMap[d.action_type] || 'رفع');
-                  const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
-                  const isView = d.action_type === 'view';
-                  
-// Determine status label based on action_type and status
-                  const getStatusBadge = () => {
-                    if (d.status === 'APPROVED_AND_SIGNED') return <span className="badge badge-success" style={{fontSize:11}}>مقبول</span>;
-                    if (d.status === 'REVISION_REQUESTED') return <span className="badge badge-danger" style={{fontSize:11}}>مطلوب إعادة</span>;
-                    if (d.status === 'RETURNED') return <span className="badge badge-warning" style={{fontSize:11}}>بانتظار المراجعة</span>;
-                    if (d.status === 'AWAITING_ADMIN') return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار الإدارة</span>;
-                    if (d.status === 'AWAITING_INTERN') return <span className="badge badge-warning" style={{fontSize:11}}>بانتظار المتدرب</span>;
-                    if (d.status === 'PENDING_REVIEW') return <span className="badge badge-warning" style={{fontSize:11}}>قيد المراجعة</span>;
-
-                    // For MISSING and AWAITING_RETURN, label depends on action_type
-                    if (d.status === 'MISSING') {
-                      if (d.file_path) return <span className="badge badge-warning" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>قيد المراجعة</span>;
-                      return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>بانتظار الرفع</span>;
-                    }
-                    if (d.action_type === 'sign') return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع</span>;
-                    if (d.action_type === 'fill') return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التعبئة</span>;
-                    if (d.action_type === 'sign_fill') return <span className="badge" style={{fontSize:11, background:'#FEF3C7', color:'#B45309'}}>بانتظار التوقيع والتعبئة</span>;
-                    return <span className="badge" style={{fontSize:11, background:'var(--paper)', color:'var(--slate)'}}>{d.status}</span>;
-                  };
-                  
-                  const showViewDownload = !!d.file_path && !isTemplateAdminPending;
-                  const showApprove = canManageDocs && (d.status === 'RETURNED' || (d.status === 'PENDING_REVIEW' && !isTemplateAdminPending));
-                  const showRevisionRequest = canManageDocs && (isSignFill || isTemplateInternPending) && d.file_path && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && d.status !== 'AWAITING_RETURN' && d.status !== 'AWAITING_ADMIN' && d.status !== 'PENDING_REVIEW' && d.status !== 'REVISION_REQUESTED' && d.status !== 'AWAITING_INTERN';
-
-                  return (
-                    <tr key={d.id} style={{borderBottom:'1px solid var(--line)'}}>
-                      <td style={{padding:'10px 8px'}}>
-                        <div style={{fontWeight:600, color:'var(--ink)', maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={d.custom_title || d.doc_type}>
-                          {d.custom_title || d.doc_type}
-                          {actionLabel && <span style={{fontSize:10, color:'var(--slate-light)', marginRight:6}}>({actionLabel})</span>}
-                        </div>
-                      {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN') && (
-                        <div style={{fontSize:11, color:'var(--danger)', marginTop:2, background:'#FFF0EE', padding:'3px 6px', borderRadius:4}}>
-                          <span style={{fontWeight:600}}>ملاحظة الإدارة:</span> {d.rejection_reason}
-                        </div>
-                      )}
-                      {isSignFill && d.file_path && !d.returned_file_path && d.requested_by !== 'INTERN' && (
-                        <div style={{marginTop:4}}>
-                          <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#FEF3C7', color:'#B45309', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
-                            في انتظار الرد من المتدرب
-                          </span>
-                        </div>
-                      )}
-                      {d.status === 'AWAITING_ADMIN' && d.requested_by === 'INTERN' && (
-                        <div style={{marginTop:4}}>
-                          <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#DBEAFE', color:'#1D4ED8', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
-                            بانتظار الإدارة
-                          </span>
-                        </div>
-                      )}
-                      {isSignFill && d.returned_file_path && (
-                        <div style={{marginTop:4}}>
-                          <span style={{display:'inline-flex', alignItems:'center', gap:4, background:'#E7F8EE', color:'#15803D', fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999}}>
-                            <CheckCircle size={10} weight="fill" /> تمت الإعادة
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td style={{textAlign:'center', padding:'10px 8px'}}>
-                      {getStatusBadge()}
-                    </td>
-                    <td style={{textAlign:'center', padding:'10px 8px', color:'var(--slate)', fontSize:11}}>
-                      {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
-                    </td>
-                    <td style={{textAlign:'left', padding:'10px 8px'}}>
-                      <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
-                      {d.requested_by === 'INTERN' ? (
-                        <>
-                          {/* Common upload file picker helper */}
-                          {(() => {
-                            const uploadFile = (endpoint: string) => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                              input.onchange = async () => {
-                                const file = input.files?.[0];
-                                if (!file) return;
-                                try {
-                                  await api.uploadFile(endpoint, file, {});
-                                  toast.success('تم رفع النسخة');
-                                  fetchDocsLifecycle();
-                                } catch { toast.error('فشل رفع النسخة'); }
-                              };
-                              input.click();
-                            };
-                            return null;
-                          })()}
-                          {/* AWAITING_ADMIN — new request, admin hasn't acted yet */}
-                          {d.status === 'AWAITING_ADMIN' && (
-                            <>
-                              {d.file_path && (
-                                <>
-                                  <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.file_path, false)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                    <Eye size={14} />
-                                  </button>
-                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                    <DownloadSimple size={14} />
-                                  </button>
-                                </>
-                              )}
-                              <button className="btn btn-ghost sm" onClick={async () => {
-        if (!window.confirm('هل أنت متأكد من قبول هذا الطلب؟ سيتوجب عليك رفع المستند المطلوب.')) return;
-        try {
-            await api.post(`/interns/${id}/documents/${d.id}/accept-request`, {});
-            toast.success('تم قبول الطلب');
-            fetchDocsLifecycle();
-        } catch { toast.error('فشل قبول الطلب'); }
-    }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                                <CheckCircle size={14} />
-                              </button>
-                              {isSignFill && (
-                                <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                                  <ArrowsClockwise size={14} />
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {/* PENDING_REVIEW — admin accepted, can upload signed version */}
-                          {d.status === 'PENDING_REVIEW' && (
-                            <>
-                              {d.file_path && (
-                                <>
-                                  <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.file_path, false)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                    <Eye size={14} />
-                                  </button>
-                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                    <DownloadSimple size={14} />
-                                  </button>
-                                </>
-                              )}
-                              {d.action_type === 'view' && d.file_path ? (
-                                <button className="btn btn-ghost sm" onClick={() => {
-        if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله.')) return;
-        api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle());
-    }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                                  <CheckCircle size={14} />
-                                </button>
-                              ) : (
-                                <button className="btn btn-ghost sm" onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                                  input.onchange = async () => {
-                                    const file = input.files?.[0];
-                                    if (!file) return;
-                                    try {
-                                      await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
-                                      toast.success('تم رفع النسخة');
-                                      fetchDocsLifecycle();
-                                    } catch { toast.error('فشل رفع النسخة'); }
-                                  };
-                                  input.click();
-                                }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
-                                  <UploadSimple size={14} />
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {/* AWAITING_INTERN — admin uploaded, waiting for intern */}
-                          {d.status === 'AWAITING_INTERN' && d.returned_file_path && (
-                            <>
-                              <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, true)} title="معاينة المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                <Eye size={14} />
-                              </button>
-                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل المرفوع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                <DownloadSimple size={14} />
-                              </button>
-                              <button className="btn btn-ghost sm" onClick={async () => {
-                                if (!confirm('هل تريد حذف النسخة المرفوعة فقط (يبقى الطلب)؟')) return;
-                                try {
-                                  await api.post(`/interns/${id}/documents/${d.id}/admin-delete-upload`, {});
-                                  toast.success('تم حذف النسخة');
-                                  fetchDocsLifecycle();
-                                } catch { toast.error('فشل حذف النسخة'); }
-                              }} title="حذف الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
-                                <Trash size={14} />
-                              </button>
-                            </>
-                          )}
-                          {/* RETURNED — intern re-uploaded after a revision request */}
-                          {d.status === 'RETURNED' && (
-                            <>
-                              {(d.returned_file_path || d.file_path) && (
-                                <>
-                                  <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, !!d.returned_file_path)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                    <Eye size={14} />
-                                  </button>
-                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                    <DownloadSimple size={14} />
-                                  </button>
-                                </>
-                              )}
-                              <button className="btn btn-ghost sm" onClick={async () => {
-                                  if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟')) return;
-                                  try {
-                                      await api.approveDocument(Number(id), d.id);
-                                      toast.success('تم قبول المستند');
-                                      fetchDocsLifecycle();
-                                  } catch { toast.error('فشل قبول المستند'); }
-                              }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                                <CheckCircle size={14} />
-                              </button>
-                              {isSignFill && (
-                                <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                                  <ArrowsClockwise size={14} />
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {/* REVISION_REQUESTED — intern asked for re-upload */}
-                          {d.status === 'REVISION_REQUESTED' && (
-                              <>
-                                {(d.returned_file_path || d.file_path) && (
-                                  <>
-                                    <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, true)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                      <Eye size={14} />
-                                    </button>
-                                    <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                      <DownloadSimple size={14} />
-                                    </button>
-                                  </>
-                                )}
-                                {!!d.returned_file_path && canManageDocs && (
-                                  <button className="btn btn-ghost sm" onClick={() => {
-                                    const input = document.createElement('input');
-                                    input.type = 'file';
-                                    input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                                    input.onchange = async () => {
-                                      const file = input.files?.[0];
-                                      if (!file) return;
-                                      try {
-                                        await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
-                                        toast.success('تم رفع النسخة');
-                                        fetchDocsLifecycle();
-                                      } catch { toast.error('فشل رفع النسخة'); }
-                                    };
-                                    input.click();
-                                  }} title="إعادة الرفع" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
-                                    <UploadSimple size={14} />
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          {/* APPROVED_AND_SIGNED — completed */}
-                          {d.status === 'APPROVED_AND_SIGNED' && (
-                            <>
-                              {(d.returned_file_path || d.file_path) && (
-                                <>
-                                  <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, !!d.returned_file_path)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                    <Eye size={14} />
-                                  </button>
-                                  <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                    <DownloadSimple size={14} />
-                                  </button>
-                                </>
-                              )}
-                              {canManageDocs && d.requested_by === 'ADMIN' && (
-                                <button className="btn btn-ghost sm" onClick={async () => {
-                                  if (!confirm('هل أنت متأكد من حذف هذا المستند؟')) return;
-                                  try {
-                                    await api.delete(`/interns/${id}/documents/${d.id}`);
-                                    toast.success('تم حذف المستند');
-                                    fetchDocsLifecycle();
-                                  } catch (err) {
-                                    toast.error('فشل حذف المستند');
-                                  }
-                                }} title="حذف" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
-                                  <Trash size={14} />
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                        {showViewDownload && (
-                          <>
-                            <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, !!d.returned_file_path)} title="معاينة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                              <Eye size={14} />
-                            </button>
-                            <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                              <DownloadSimple size={14} />
-                            </button>
-                          </>
-                        )}
-                        {showApprove && (
-                          <button className="btn btn-ghost sm" onClick={() => {
-        if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله.')) return;
-        api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle());
-    }} title="قبول" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                            <CheckCircle size={14} />
-                          </button>
-                        )}
-                        {d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN' && canManageDocs && (
-                          <button className="btn btn-ghost sm" onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
-                            input.onchange = async () => {
-                              const file = input.files?.[0];
-                              if (!file) return;
-                              try {
-                                await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
-                                toast.success('تم رفع النسخة');
-                                fetchDocsLifecycle();
-                              } catch { toast.error('فشل رفع النسخة'); }
-                            };
-                            input.click();
-                          }} title="رفع الموقع/النموذج" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563EB'}}>
-                            <UploadSimple size={14} />
-                          </button>
-                        )}
-                        {showRevisionRequest && (
-                          <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                            <ArrowsClockwise size={14} />
-                          </button>
-                        )}
-                        {/* AWAITING_ADMIN admin-initiated — accept intern's upload */}
-                        {d.status === 'AWAITING_ADMIN' && d.requested_by === 'ADMIN' && canManageDocs && (
-                          <>
-                            <button className="btn btn-ghost sm" onClick={async () => {
-        if (!window.confirm('هل أنت متأكد من اعتماد هذا المستند؟')) return;
-        try {
-            await api.post(`/interns/${id}/documents/${d.id}/approve-document`, {});
-            toast.success('تم اعتماد المستند');
-            fetchDocsLifecycle();
-        } catch { toast.error('فشل اعتماد المستند'); }
-    }} title="اعتماد" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--success)'}}>
-                              <CheckCircle size={14} />
-                            </button>
-                            <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold-dark)'}}>
-                              <ArrowsClockwise size={14} />
-                            </button>
-                          </>
-                        )}
-                        {canManageDocs && d.requested_by === 'ADMIN' && (
-                          <button className="btn btn-ghost sm" onClick={async () => {
-                            if (!confirm('هل أنت متأكد من حذف هذا المستند؟')) return;
-                            try {
-                              await api.delete(`/interns/${id}/documents/${d.id}`);
-                              toast.success('تم حذف المستند');
-                              fetchDocsLifecycle();
-                            } catch (err) {
-                              toast.error('فشل حذف المستند');
+              <div style={{ marginBottom: 20 }}>
+                {filtered.length === 0 ? (
+                  <div className="empty-state" style={{ padding: '32px 20px', border: '1px solid var(--line)', borderRadius: 12 }}>
+                    <div className="empty-icon"><FileText size={24} /></div>
+                    <h4>لا توجد مستندات</h4>
+                    <p>لم يتم رفع أي مستندات بعد.</p>
+                  </div>
+                ) : (
+                  <table className="table" style={{ background: 'white' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'right' }}>المستند</th>
+                        <th style={{ textAlign: 'center', width: 120 }}>الحالة</th>
+                        <th style={{ textAlign: 'center', width: 120 }}>تاريخ التحديث</th>
+                        <th style={{ textAlign: 'left', width: 180 }}>إجراء</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const rows: any[] = [];
+                        const grouped = new Map<string, any[]>();
+                        filtered.forEach(d => {
+                          const base = (d.custom_title || d.doc_type || '').replace(/\s*\((توقيع وتعبئة|توقيع|تعبئة وإرجاع|عرض فقط|مستند مطلوب)\)\s*$/, '');
+                          if (!grouped.has(base)) grouped.set(base, []);
+                          grouped.get(base)!.push(d);
+                        });
+                        for (const [base, docs] of grouped) {
+                          const sign = docs.find(d => d.action_type === 'sign');
+                          const fill = docs.find(d => d.action_type === 'fill');
+                          const both = docs.find(d => d.action_type === 'sign_fill');
+                          if (sign && fill) {
+                            rows.push({ id: `combined-${base}`, isCombined: true, sign, fill, base });
+                            docs.forEach(d => {
+                              if (d !== sign && d !== fill) rows.push(d);
+                            });
+                          } else if (both) {
+                            // sign_fill is a single combined action - treat as combined row
+                            rows.push({ id: `combined-${base}`, isCombined: true, sign: both, fill: both, base, isSignFill: true });
+                            // Also include any other docs in this group (e.g., view-only, standalone sign/fill)
+                            docs.forEach(d => {
+                              if (d !== both) rows.push(d);
+                            });
+                          } else {
+                            docs.forEach(d => rows.push(d));
+                          }
+                        }
+                        rows.sort((a, b) => {
+                          const getLatestTime = (item: any) => {
+                            if (item.isCombined) {
+                              const t1 = new Date(item.sign.updated_at || item.sign.created_at || 0).getTime();
+                              const t2 = new Date(item.fill.updated_at || item.fill.created_at || 0).getTime();
+                              return Math.max(t1, t2);
                             }
-                          }} title="حذف" style={{width:28,height:28,padding:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--danger)'}}>
-                            <Trash size={14} />
-                          </button>
-                        )}
-                        </>
-                      )}
-                      </div>
-                    </td>
-                  </tr>
-                  );
-                });
-              })()}
-                </tbody>
-              </table>
-              )}
-            </div>
+                            return new Date(item.updated_at || item.created_at || 0).getTime();
+                          };
+                          return getLatestTime(a) - getLatestTime(b);
+                        });
+                        return rows.map(row => {
+                          if (row.isCombined) {
+                            const d = row.sign;
+                            const fillDoc = row.fill;
+                            const bothReturned = d.returned_file_path && fillDoc.returned_file_path;
+                            const anyReturned = d.returned_file_path || fillDoc.returned_file_path;
+                            const isSignFillRow = !!row.isSignFill;
+                            return (
+                              <tr key={row.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                                <td style={{ padding: '10px 8px' }}>
+                                  <div style={{ fontWeight: 600, color: 'var(--ink)', maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.base}>
+                                    {row.base}
+                                    <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>{isSignFillRow ? '(توقيع وتعبئة)' : '(توقيع) و (تعبئة وإرجاع)'}</span>
+                                  </div>
+                                  {anyReturned && d.status !== 'REVISION_REQUESTED' && fillDoc.status !== 'REVISION_REQUESTED' && (
+                                    <div style={{ marginTop: 4 }}>
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: bothReturned ? '#E7F8EE' : '#FFF6E5', color: bothReturned ? '#15803D' : '#B45309', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 9999 }}>
+                                        {bothReturned ? <CheckCircle size={10} weight="fill" /> : <ArrowsClockwise size={10} weight="bold" />}
+                                        {bothReturned ? 'تمت الإعادة (توقيع وتعبئة)' : 'جاري الإعادة'}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN' || fillDoc.status === 'REVISION_REQUESTED' || fillDoc.status === 'AWAITING_RETURN') && (
+                                    <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2, background: '#FFF0EE', padding: '3px 6px', borderRadius: 4 }}>
+                                      <span style={{ fontWeight: 600 }}>ملاحظة الإدارة:</span> {d.rejection_reason}
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={{ textAlign: 'center', padding: '10px 8px' }}>
+                                  {(d.status === 'REVISION_REQUESTED' || fillDoc.status === 'REVISION_REQUESTED') ? <span className="badge badge-danger" style={{ fontSize: 11 }}>مطلوب إعادة</span> :
+                                    (d.status === 'APPROVED_AND_SIGNED' && fillDoc.status === 'APPROVED_AND_SIGNED') ? <span className="badge badge-success" style={{ fontSize: 11 }}>مكتمل</span> :
+                                      (d.status === 'PENDING_REVIEW' || fillDoc.status === 'PENDING_REVIEW') ? <span className="badge badge-warning" style={{ fontSize: 11 }}>قيد المراجعة</span> :
+                                        (d.status === 'AWAITING_RETURN' || fillDoc.status === 'AWAITING_RETURN') ? <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>بانتظار التوقيع والتعبئة</span> :
+                                          (d.status === 'AWAITING_ADMIN' || fillDoc.status === 'AWAITING_ADMIN') ? <span className="badge" style={{ fontSize: 11, background: '#FEF3C7', color: '#B45309' }}>بانتظار الإدارة</span> :
+                                            bothReturned ? <span className="badge badge-success" style={{ fontSize: 11 }}>مكتمل</span> :
+                                              anyReturned ? <span className="badge badge-warning" style={{ fontSize: 11 }}>قيد الإجراء</span> :
+                                                <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>بانتظار الرفع</span>}
+                                </td>
+                                <td style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--slate)', fontSize: 11 }}>
+                                  {(d.file_path || fillDoc.file_path) ? formatDate((d.file_path ? d : fillDoc).updated_at || (d.file_path ? d : fillDoc).created_at) : '—'}
+                                </td>
+                                <td style={{ textAlign: 'left', padding: '10px 8px' }}>
+                                  <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                    {/* View/download latest document */}
+                                    {(d.file_path || fillDoc.file_path) && (() => {
+                                      const fileDoc = d.file_path ? d : fillDoc;
+                                      return (
+                                        <>
+                                          <button className="btn btn-ghost sm" onClick={() => handleViewDocument(fileDoc.id, anyReturned ? (fileDoc.returned_file_path || fileDoc.file_path) : fileDoc.file_path, anyReturned)} title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Eye size={14} />
+                                          </button>
+                                          <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(fileDoc.id) + (anyReturned ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <DownloadSimple size={14} />
+                                          </button>
+                                        </>
+                                      );
+                                    })()}
+                                    {d.status === 'AWAITING_ADMIN' && canManageDocs && (
+                                      <>
+                                        <button className="btn btn-ghost sm" onClick={() => {
+                                          const input = document.createElement('input');
+                                          input.type = 'file';
+                                          input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                          input.onchange = async () => {
+                                            const file = input.files?.[0];
+                                            if (!file) return;
+                                            try {
+                                              await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                              toast.success('تم رفع النسخة');
+                                              fetchDocsLifecycle();
+                                            } catch { toast.error('فشل رفع النسخة'); }
+                                          };
+                                          input.click();
+                                        }} title="رفع الموقع/النموذج" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                                          <UploadSimple size={14} />
+                                        </button>
+                                        {isSignFillRow && (
+                                          <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                            <ArrowsClockwise size={14} />
+                                          </button>
+                                        )}
+                                      </>
+                                    )}
+                                    {canManageDocs && d.status === 'PENDING_REVIEW' && d.action_type !== 'view' && (
+                                      <button className="btn btn-ghost sm" onClick={() => {
+                                        const input = document.createElement('input');
+                                        input.type = 'file';
+                                        input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                        input.onchange = async () => {
+                                          const file = input.files?.[0];
+                                          if (!file) return;
+                                          try {
+                                            await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                            toast.success('تم رفع النسخة');
+                                            fetchDocsLifecycle();
+                                          } catch { toast.error('فشل رفع النسخة'); }
+                                        };
+                                        input.click();
+                                      }} title="رفع الموقع/النموذج" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                                        <UploadSimple size={14} />
+                                      </button>
+                                    )}
+                                    {canManageDocs && d.status === 'REVISION_REQUESTED' && d.revision_requested_by === 'INTERN' && (
+                                      <button className="btn btn-ghost sm" onClick={() => {
+                                        const input = document.createElement('input');
+                                        input.type = 'file';
+                                        input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                        input.onchange = async () => {
+                                          const file = input.files?.[0];
+                                          if (!file) return;
+                                          try {
+                                            await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                            toast.success('تم رفع النسخة');
+                                            fetchDocsLifecycle();
+                                          } catch { toast.error('فشل رفع النسخة'); }
+                                        };
+                                        input.click();
+                                      }} title="رفع الموقع/النموذج" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                                        <UploadSimple size={14} />
+                                      </button>
+                                    )}
+                                    {canManageDocs && d.status === 'AWAITING_INTERN' && anyReturned && (
+                                      <button className="btn btn-ghost sm" onClick={async () => {
+                                        if (!window.confirm('هل تريد حذف النسخة المرفوعة فقط (يبقى الطلب)؟')) return;
+                                        try {
+                                          const docsToDeleteUpload = isSignFillRow ? [d] : [d, fillDoc];
+                                          await Promise.all(docsToDeleteUpload.map(doc => {
+                                            if (doc.returned_file_path) return api.post(`/interns/${id}/documents/${doc.id}/admin-delete-upload`, {});
+                                            return Promise.resolve();
+                                          }));
+                                          toast.success('تم حذف النسخة');
+                                          fetchDocsLifecycle();
+                                        } catch { toast.error('فشل حذف النسخة'); }
+                                      }} title="حذف الرفع" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)' }}>
+                                        <Trash size={14} />
+                                      </button>
+                                    )}
+                                    {canManageDocs && d.status === 'RETURNED' && (
+                                      <button className="btn btn-ghost sm" onClick={() => {
+                                        const input = document.createElement('input');
+                                        input.type = 'file';
+                                        input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                        input.onchange = async () => {
+                                          const file = input.files?.[0];
+                                          if (!file) return;
+                                          try {
+                                            await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                            toast.success('تم رفع النسخة');
+                                            fetchDocsLifecycle();
+                                          } catch { toast.error('فشل رفع النسخة'); }
+                                        };
+                                        input.click();
+                                      }} title="رفع الموقع/النموذج" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                                        <UploadSimple size={14} />
+                                      </button>
+                                    )}
+                                    {canManageDocs && isSignFillRow && d.file_path && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && d.status !== 'AWAITING_RETURN' && d.status !== 'AWAITING_ADMIN' && d.status !== 'PENDING_REVIEW' && d.status !== 'REVISION_REQUESTED' && d.status !== 'AWAITING_INTERN' && (
+                                      <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                        <ArrowsClockwise size={14} />
+                                      </button>
+                                    )}
+                                    {canManageDocs && row.sign.requested_by === 'ADMIN' && (
+                                      <button className="btn btn-ghost sm" onClick={async () => {
+                                        const docsToDelete = isSignFillRow ? [d] : [d, fillDoc];
+                                        if (!confirm(`هل أنت متأكد من حذف ${docsToDelete.length > 1 ? 'هذه المستندات' : 'هذا المستند'}؟`)) return;
+                                        try {
+                                          await Promise.all(docsToDelete.map(doc => api.delete(`/interns/${id}/documents/${doc.id}`)));
+                                          toast.success('تم حذف المستندات');
+                                          fetchDocsLifecycle();
+                                        } catch (err) {
+                                          toast.error('فشل حذف المستندات');
+                                        }
+                                      }} title="حذف" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)' }}>
+                                        <Trash size={14} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          const d = row;
+                          const isTemplate = d.source === 'TEMPLATE_VIEW';
+                          const isTemplateAdminPending = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'ADMIN';
+                          const isTemplateInternPending = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'INTERN';
+                          const actionLabelMap: any = { 'view': 'عرض فقط', 'sign': 'توقيع', 'fill': 'تعبئة وإرجاع', 'sign_fill': 'توقيع وتعبئة' };
+                          const actionLabel = isTemplate ? 'مستند مطلوب' : (actionLabelMap[d.action_type] || 'رفع');
+                          const isSignFill = d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill';
+                          const isView = d.action_type === 'view';
+
+                          // Determine status label based on action_type and status
+                          const getStatusBadge = () => {
+                            if (d.status === 'APPROVED_AND_SIGNED') return <span className="badge badge-success" style={{ fontSize: 11 }}>مقبول</span>;
+                            if (d.status === 'REVISION_REQUESTED') return <span className="badge badge-danger" style={{ fontSize: 11 }}>مطلوب إعادة</span>;
+                            if (d.status === 'RETURNED') return <span className="badge badge-warning" style={{ fontSize: 11 }}>بانتظار المراجعة</span>;
+                            if (d.status === 'AWAITING_ADMIN') return <span className="badge" style={{ fontSize: 11, background: '#FEF3C7', color: '#B45309' }}>بانتظار الإدارة</span>;
+                            if (d.status === 'AWAITING_INTERN') return <span className="badge badge-warning" style={{ fontSize: 11 }}>بانتظار المتدرب</span>;
+                            if (d.status === 'PENDING_REVIEW') return <span className="badge badge-warning" style={{ fontSize: 11 }}>قيد المراجعة</span>;
+
+                            // For MISSING and AWAITING_RETURN, label depends on action_type
+                            if (d.status === 'MISSING') {
+                              if (d.file_path) return <span className="badge badge-warning" style={{ fontSize: 11, background: '#FEF3C7', color: '#B45309' }}>قيد المراجعة</span>;
+                              return <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>بانتظار الرفع</span>;
+                            }
+                            if (d.action_type === 'sign') return <span className="badge" style={{ fontSize: 11, background: '#FEF3C7', color: '#B45309' }}>بانتظار التوقيع</span>;
+                            if (d.action_type === 'fill') return <span className="badge" style={{ fontSize: 11, background: '#FEF3C7', color: '#B45309' }}>بانتظار التعبئة</span>;
+                            if (d.action_type === 'sign_fill') return <span className="badge" style={{ fontSize: 11, background: '#FEF3C7', color: '#B45309' }}>بانتظار التوقيع والتعبئة</span>;
+                            return <span className="badge" style={{ fontSize: 11, background: 'var(--paper)', color: 'var(--slate)' }}>{d.status}</span>;
+                          };
+
+                          const showViewDownload = !!d.file_path && !isTemplateAdminPending;
+                          const showApprove = canManageDocs && d.status === 'PENDING_REVIEW' && !isTemplateAdminPending;
+                          const showRevisionRequest = canManageDocs && (isSignFill || isTemplateInternPending) && d.file_path && d.status !== 'MISSING' && d.status !== 'APPROVED_AND_SIGNED' && d.status !== 'AWAITING_RETURN' && d.status !== 'AWAITING_ADMIN' && d.status !== 'PENDING_REVIEW' && d.status !== 'REVISION_REQUESTED' && d.status !== 'AWAITING_INTERN';
+
+                          return (
+                            <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                              <td style={{ padding: '10px 8px' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--ink)', maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.custom_title || d.doc_type}>
+                                  {d.custom_title || d.doc_type}
+                                  {actionLabel && <span style={{ fontSize: 10, color: 'var(--slate-light)', marginRight: 6 }}>({actionLabel})</span>}
+                                </div>
+                                {d.rejection_reason && (d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN') && (
+                                  <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2, background: '#FFF0EE', padding: '3px 6px', borderRadius: 4 }}>
+                                    <span style={{ fontWeight: 600 }}>ملاحظة الإدارة:</span> {d.rejection_reason}
+                                  </div>
+                                )}
+                                {isSignFill && d.file_path && !d.returned_file_path && d.requested_by !== 'INTERN' && (
+                                  <div style={{ marginTop: 4 }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#FEF3C7', color: '#B45309', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 9999 }}>
+                                      في انتظار الرد من المتدرب
+                                    </span>
+                                  </div>
+                                )}
+                                {d.status === 'AWAITING_ADMIN' && d.requested_by === 'INTERN' && (
+                                  <div style={{ marginTop: 4 }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#DBEAFE', color: '#1D4ED8', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 9999 }}>
+                                      بانتظار الإدارة
+                                    </span>
+                                  </div>
+                                )}
+                                {isSignFill && d.returned_file_path && (
+                                  <div style={{ marginTop: 4 }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#E7F8EE', color: '#15803D', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 9999 }}>
+                                      <CheckCircle size={10} weight="fill" /> تمت الإعادة
+                                    </span>
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ textAlign: 'center', padding: '10px 8px' }}>
+                                {getStatusBadge()}
+                              </td>
+                              <td style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--slate)', fontSize: 11 }}>
+                                {d.file_path ? formatDate(d.updated_at || d.created_at) : '—'}
+                              </td>
+                              <td style={{ textAlign: 'left', padding: '10px 8px' }}>
+                                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                  {d.requested_by === 'INTERN' ? (
+                                    <>
+                                      {/* Common upload file picker helper */}
+                                      {(() => {
+                                        const uploadFile = (endpoint: string) => {
+                                          const input = document.createElement('input');
+                                          input.type = 'file';
+                                          input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                          input.onchange = async () => {
+                                            const file = input.files?.[0];
+                                            if (!file) return;
+                                            try {
+                                              await api.uploadFile(endpoint, file, {});
+                                              toast.success('تم رفع النسخة');
+                                              fetchDocsLifecycle();
+                                            } catch { toast.error('فشل رفع النسخة'); }
+                                          };
+                                          input.click();
+                                        };
+                                        return null;
+                                      })()}
+                                      {/* AWAITING_ADMIN — new request, admin hasn't acted yet */}
+                                      {d.status === 'AWAITING_ADMIN' && (
+                                        <>
+                                          {d.file_path && (
+                                            <>
+                                              <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.file_path, false)} title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Eye size={14} />
+                                              </button>
+                                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <DownloadSimple size={14} />
+                                              </button>
+                                            </>
+                                          )}
+                                          {isSignFill && (
+                                            <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                              <ArrowsClockwise size={14} />
+                                            </button>
+                                          )}
+                                          <button className="btn btn-ghost sm" onClick={() => {
+                                            const input = document.createElement('input');
+                                            input.type = 'file';
+                                            input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                            input.onchange = async () => {
+                                              const file = input.files?.[0];
+                                              if (!file) return;
+                                              try {
+                                                await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                                toast.success('تم رفع النسخة');
+                                                fetchDocsLifecycle();
+                                              } catch { toast.error('فشل رفع النسخة'); }
+                                            };
+                                            input.click();
+                                          }} title="رفع الموقع/النموذج" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                                            <UploadSimple size={14} />
+                                          </button>
+                                        </>
+                                      )}
+                                      {/* PENDING_REVIEW — admin accepted, can upload signed version */}
+                                      {d.status === 'PENDING_REVIEW' && (
+                                        <>
+                                          {d.file_path && (
+                                            <>
+                                              <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.file_path, false)} title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Eye size={14} />
+                                              </button>
+                                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id); a.download = ''; a.click(); }} title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <DownloadSimple size={14} />
+                                              </button>
+                                            </>
+                                          )}
+                                          {d.action_type === 'view' && d.file_path ? (
+                                            <button className="btn btn-ghost sm" onClick={() => {
+                                              if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله.')) return;
+                                              api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle());
+                                            }} title="قبول" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
+                                              <CheckCircle size={14} />
+                                            </button>
+                                          ) : (
+                                            <button className="btn btn-ghost sm" onClick={() => {
+                                              const input = document.createElement('input');
+                                              input.type = 'file';
+                                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                              input.onchange = async () => {
+                                                const file = input.files?.[0];
+                                                if (!file) return;
+                                                try {
+                                                  await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                                  toast.success('تم رفع النسخة');
+                                                  fetchDocsLifecycle();
+                                                } catch { toast.error('فشل رفع النسخة'); }
+                                              };
+                                              input.click();
+                                            }} title="رفع الموقع/النموذج" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                                              <UploadSimple size={14} />
+                                            </button>
+                                          )}
+                                        </>
+                                      )}
+                                      {/* AWAITING_INTERN — admin uploaded, waiting for intern */}
+                                      {d.status === 'AWAITING_INTERN' && d.returned_file_path && (
+                                        <>
+                                          <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, true)} title="معاينة المرفوع" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Eye size={14} />
+                                          </button>
+                                          <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل المرفوع" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <DownloadSimple size={14} />
+                                          </button>
+                                          <button className="btn btn-ghost sm" onClick={async () => {
+                                            if (!confirm('هل تريد حذف النسخة المرفوعة فقط (يبقى الطلب)؟')) return;
+                                            try {
+                                              await api.post(`/interns/${id}/documents/${d.id}/admin-delete-upload`, {});
+                                              toast.success('تم حذف النسخة');
+                                              fetchDocsLifecycle();
+                                            } catch { toast.error('فشل حذف النسخة'); }
+                                          }} title="حذف الرفع" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)' }}>
+                                            <Trash size={14} />
+                                          </button>
+                                        </>
+                                      )}
+                                      {/* RETURNED — intern re-uploaded after a revision request */}
+                                      {d.status === 'RETURNED' && (
+                                        <>
+                                          {(d.returned_file_path || d.file_path) && (
+                                            <>
+                                              <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, !!d.returned_file_path)} title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Eye size={14} />
+                                              </button>
+                                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <DownloadSimple size={14} />
+                                              </button>
+                                            </>
+                                          )}
+                                          {isSignFill && (
+                                            <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                              <ArrowsClockwise size={14} />
+                                            </button>
+                                          )}
+                                          <button className="btn btn-ghost sm" onClick={() => {
+                                            const input = document.createElement('input');
+                                            input.type = 'file';
+                                            input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                            input.onchange = async () => {
+                                              const file = input.files?.[0];
+                                              if (!file) return;
+                                              try {
+                                                await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                                toast.success('تم رفع النسخة');
+                                                fetchDocsLifecycle();
+                                              } catch { toast.error('فشل رفع النسخة'); }
+                                            };
+                                            input.click();
+                                          }} title="رفع الموقع/النموذج" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                                            <UploadSimple size={14} />
+                                          </button>
+                                        </>
+                                      )}
+                                      {/* REVISION_REQUESTED — intern asked for re-upload */}
+                                      {d.status === 'REVISION_REQUESTED' && (
+                                        <>
+                                          {(d.returned_file_path || d.file_path) && (
+                                            <>
+                                              <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, true)} title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Eye size={14} />
+                                              </button>
+                                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + '&returned=1'; a.download = ''; a.click(); }} title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <DownloadSimple size={14} />
+                                              </button>
+                                            </>
+                                          )}
+                                          {d.revision_requested_by === 'INTERN' && canManageDocs && (
+                                            <button className="btn btn-ghost sm" onClick={() => {
+                                              const input = document.createElement('input');
+                                              input.type = 'file';
+                                              input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                              input.onchange = async () => {
+                                                const file = input.files?.[0];
+                                                if (!file) return;
+                                                try {
+                                                  await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                                  toast.success('تم رفع النسخة');
+                                                  fetchDocsLifecycle();
+                                                } catch { toast.error('فشل رفع النسخة'); }
+                                              };
+                                              input.click();
+                                            }} title="إعادة الرفع" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                                              <UploadSimple size={14} />
+                                            </button>
+                                          )}
+                                        </>
+                                      )}
+                                      {/* APPROVED_AND_SIGNED — completed */}
+                                      {d.status === 'APPROVED_AND_SIGNED' && (
+                                        <>
+                                          {(d.returned_file_path || d.file_path) && (
+                                            <>
+                                              <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, !!d.returned_file_path)} title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Eye size={14} />
+                                              </button>
+                                              <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <DownloadSimple size={14} />
+                                              </button>
+                                            </>
+                                          )}
+                                          {canManageDocs && d.requested_by === 'ADMIN' && (
+                                            <button className="btn btn-ghost sm" onClick={async () => {
+                                              if (!confirm('هل أنت متأكد من حذف هذا المستند؟')) return;
+                                              try {
+                                                await api.delete(`/interns/${id}/documents/${d.id}`);
+                                                toast.success('تم حذف المستند');
+                                                fetchDocsLifecycle();
+                                              } catch (err) {
+                                                toast.error('فشل حذف المستند');
+                                              }
+                                            }} title="حذف" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)' }}>
+                                              <Trash size={14} />
+                                            </button>
+                                          )}
+                                        </>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      {showViewDownload && (
+                                        <>
+                                          <button className="btn btn-ghost sm" onClick={() => handleViewDocument(d.id, d.returned_file_path || d.file_path, !!d.returned_file_path)} title="معاينة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Eye size={14} />
+                                          </button>
+                                          <button className="btn btn-ghost sm" onClick={() => { const a = document.createElement('a'); a.href = api.downloadDocument(d.id) + (d.returned_file_path ? '&returned=1' : ''); a.download = ''; a.click(); }} title="تحميل" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <DownloadSimple size={14} />
+                                          </button>
+                                        </>
+                                      )}
+                                      {showApprove && (
+                                        <button className="btn btn-ghost sm" onClick={() => {
+                                          if (!window.confirm('هل أنت متأكد من قبول هذا المستند؟ بعد القبول، لن تتمكن من طلب تعديله.')) return;
+                                          api.approveDocument(Number(id), d.id).then(() => fetchDocsLifecycle());
+                                        }} title="قبول" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
+                                          <CheckCircle size={14} />
+                                        </button>
+                                      )}
+                                      {canManageDocs && d.action_type !== 'view' && ((d.status === 'REVISION_REQUESTED' && d.revision_requested_by === 'INTERN') || d.status === 'AWAITING_ADMIN' || d.status === 'RETURNED') && (
+                                        <button className="btn btn-ghost sm" onClick={() => {
+                                          const input = document.createElement('input');
+                                          input.type = 'file';
+                                          input.accept = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
+                                          input.onchange = async () => {
+                                            const file = input.files?.[0];
+                                            if (!file) return;
+                                            try {
+                                              await api.uploadFile(`/interns/${id}/documents/${d.id}/admin-upload`, file, {});
+                                              toast.success('تم رفع النسخة');
+                                              fetchDocsLifecycle();
+                                            } catch { toast.error('فشل رفع النسخة'); }
+                                          };
+                                          input.click();
+                                        }} title="رفع الموقع/النموذج" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                                          <UploadSimple size={14} />
+                                        </button>
+                                      )}
+                                      {showRevisionRequest && (
+                                        <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                          <ArrowsClockwise size={14} />
+                                        </button>
+                                      )}
+                                      {/* AWAITING_ADMIN admin-initiated — accept intern's upload */}
+                                      {d.status === 'AWAITING_ADMIN' && d.requested_by === 'ADMIN' && canManageDocs && (
+                                        <button className="btn btn-ghost sm" onClick={() => { setRevisionDocId(d.id); setRevisionReason(''); setShowRevisionModal(true); }} title="طلب إعادة مع ملاحظة" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                          <ArrowsClockwise size={14} />
+                                        </button>
+                                      )}
+                                      {canManageDocs && d.requested_by === 'ADMIN' && (
+                                        <button className="btn btn-ghost sm" onClick={async () => {
+                                          if (!confirm('هل أنت متأكد من حذف هذا المستند؟')) return;
+                                          try {
+                                            await api.delete(`/interns/${id}/documents/${d.id}`);
+                                            toast.success('تم حذف المستند');
+                                            fetchDocsLifecycle();
+                                          } catch (err) {
+                                            toast.error('فشل حذف المستند');
+                                          }
+                                        }} title="حذف" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)' }}>
+                                          <Trash size={14} />
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             );
           })()}
 
-            {/* ZIP archive */}
-            <div style={{borderTop:'1px solid var(--line)', paddingTop:16}}>
-              <button className="btn btn-ghost" style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:12.5, border:'1.5px dashed var(--line)', borderRadius:8, color:'var(--slate)'}} onClick={async () => {
+          {/* ZIP archive */}
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+            <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', padding: '10px', fontSize: 12.5, border: '1.5px dashed var(--line)', borderRadius: 8, color: 'var(--slate)' }} onClick={async () => {
               if (!id) return;
               try {
                 const res = await fetch(`${API_BASE}/interns/${id}/export-zip?token=${sessionStorage.getItem('token')}`);
@@ -1627,7 +1634,7 @@ return rows.map(row => {
                 if (disposition && disposition.indexOf('attachment') !== -1) {
                   const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
                   const matches = filenameRegex.exec(disposition);
-                  if (matches != null && matches[1]) { 
+                  if (matches != null && matches[1]) {
                     filename = matches[1].replace(/['"]/g, '');
                   }
                 }
@@ -1637,7 +1644,7 @@ return rows.map(row => {
                 toast.error('فشل إنشاء الأرشيف');
               }
             }}>
-              <Package size={16} style={{marginLeft:6}} /> تحميل أرشيف ZIP لجميع ملفات المتدرب
+              <Package size={16} style={{ marginLeft: 6 }} /> تحميل أرشيف ZIP لجميع ملفات المتدرب
             </button>
           </div>
         </div>
@@ -1645,21 +1652,21 @@ return rows.map(row => {
 
       {canApproveInterns && intern.status !== 'نشط' && intern.status !== 'مرفوض' && (
         <>
-        <CoverageChart internId={Number(id)} />
-        <div className="card" style={{ padding: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '20px', borderTop: '4px solid var(--gold)', background: 'linear-gradient(to left, var(--paper), var(--bg))' }}>
-          <div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>القرار النهائي للملف</h3>
-            <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>بناءً على مراجعة المستندات والمقابلة، يرجى اتخاذ القرار النهائي.</p>
+          <CoverageChart internId={Number(id)} />
+          <div className="card" style={{ padding: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '20px', borderTop: '4px solid var(--gold)', background: 'linear-gradient(to left, var(--paper), var(--bg))' }}>
+            <div>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>القرار النهائي للملف</h3>
+              <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>بناءً على مراجعة المستندات والمقابلة، يرجى اتخاذ القرار النهائي.</p>
+            </div>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <button className="btn btn-ghost" onClick={handleReject} style={{ padding: '12px 24px', color: 'var(--danger)', border: '1.5px solid var(--danger-border)', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px' }}>
+                <X size={18} /> رفض الطلب
+              </button>
+              <button className="btn btn-primary" onClick={handleApproveClick} style={{ padding: '12px 24px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
+                <CheckCircle size={18} weight="fill" /> قبول الطلب وتنشيط الحساب
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <button className="btn btn-ghost" onClick={handleReject} style={{ padding: '12px 24px', color: 'var(--danger)', border: '1.5px solid var(--danger-border)', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px' }}>
-<X size={18} /> رفض الطلب
-            </button>
-            <button className="btn btn-primary" onClick={handleApproveClick} style={{ padding: '12px 24px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
-<CheckCircle size={18} weight="fill" /> قبول الطلب وتنشيط الحساب
-            </button>
-          </div>
-        </div>
         </>
       )}
 
@@ -1671,7 +1678,7 @@ return rows.map(row => {
               <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>تقييم أداء المتدرب وطباعة البطاقة للتوقيع.</p>
             </div>
             {canEvaluateInterns && (
-              <div style={{display:'flex', gap:8}}>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-primary" onClick={openEvalForm} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px' }}>
                   <ClipboardText size={18} weight="fill" /> {intern.evaluation?.criteria ? 'تعديل التقييم' : 'تقييم المتدرب'}
                 </button>
@@ -1681,34 +1688,34 @@ return rows.map(row => {
 
           {intern.evaluation?.criteria && (
             <div style={{ marginTop: '20px' }}>
-              <div style={{marginBottom:14, fontSize:13}}>
+              <div style={{ marginBottom: 14, fontSize: 13 }}>
                 <b>الفترة:</b> من {formatDate(intern.evaluation.period_from || intern.start_date)} إلى {formatDate(intern.evaluation.period_to || intern.end_date)}
               </div>
               {intern.evaluation.rotations?.length > 0 && (
-                <div style={{marginBottom:14, fontSize:12.5}}>
-                  <div style={{fontWeight:700, marginBottom:6}}>فترات التدريب:</div>
+                <div style={{ marginBottom: 14, fontSize: 12.5 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>فترات التدريب:</div>
                   {intern.evaluation.rotations.map((r: any, i: number) => (
-                    <div key={i} style={{background:'var(--paper)', padding:'6px 10px', borderRadius:6, marginBottom:4, border:'1px solid var(--line)'}}>
-                      <b>{(r as any).label || ('الفترة '+(i+1))}</b> — {r.supervisor} | {r.department} | من {formatDate(r.from)} إلى {formatDate(r.to)}
+                    <div key={i} style={{ background: 'var(--paper)', padding: '6px 10px', borderRadius: 6, marginBottom: 4, border: '1px solid var(--line)' }}>
+                      <b>{(r as any).label || ('الفترة ' + (i + 1))}</b> — {r.supervisor} | {r.department} | من {formatDate(r.from)} إلى {formatDate(r.to)}
                     </div>
                   ))}
                 </div>
               )}
-              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5, marginBottom:12}}>
-                <thead><tr style={{borderBottom:'1px solid var(--line)'}}>
-                  <th style={{textAlign:'right', padding:'6px 4px', width: 200}}>المعيار</th>
-                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>نعم</th>
-                  <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
-                  <th style={{width: 'auto'}}></th>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, marginBottom: 12 }}>
+                <thead><tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  <th style={{ textAlign: 'right', padding: '6px 4px', width: 200 }}>المعيار</th>
+                  <th style={{ textAlign: 'center', padding: '6px 4px', width: 60 }}>نعم</th>
+                  <th style={{ textAlign: 'center', padding: '6px 4px', width: 60 }}>لا</th>
+                  <th style={{ width: 'auto' }}></th>
                 </tr></thead>
                 <tbody>
                   {EVAL_CRITERIA.map(c => {
-                    const val = intern.evaluation.criteria?.[c.key] || {yes:false, no:false};
+                    const val = intern.evaluation.criteria?.[c.key] || { yes: false, no: false };
                     return (
-                      <tr key={c.key} style={{borderBottom:'1px solid var(--line)'}}>
-                        <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)'}}>{val.yes ? '✓' : '—'}</td>
-                        <td style={{textAlign:'center', padding:'8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)'}}>{val.no ? '✓' : '—'}</td>
+                      <tr key={c.key} style={{ borderBottom: '1px solid var(--line)' }}>
+                        <td style={{ padding: '8px 4px', fontWeight: 600 }}>{c.label}</td>
+                        <td style={{ textAlign: 'center', padding: '8px 4px', color: val.yes ? 'var(--success)' : 'var(--slate-light)' }}>{val.yes ? '✓' : '—'}</td>
+                        <td style={{ textAlign: 'center', padding: '8px 4px', color: val.no ? 'var(--danger)' : 'var(--slate-light)' }}>{val.no ? '✓' : '—'}</td>
                         <td></td>
                       </tr>
                     );
@@ -1716,35 +1723,35 @@ return rows.map(row => {
                 </tbody>
               </table>
               {intern.evaluation.comments && (
-                <div style={{ background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', marginBottom:12, fontSize:13 }}>
-                  <span style={{ fontWeight:700, display:'block', marginBottom:4 }}>ملاحظات:</span>
+                <div style={{ background: 'var(--paper)', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', marginBottom: 12, fontSize: 13 }}>
+                  <span style={{ fontWeight: 700, display: 'block', marginBottom: 4 }}>ملاحظات:</span>
                   {intern.evaluation.comments}
                 </div>
               )}
-              <div style={{fontSize:11.5, color:'var(--slate)'}}>بواسطة: {intern.evaluation.evaluator} · {formatDate(intern.evaluation.date)}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--slate)' }}>بواسطة: {intern.evaluation.evaluator} · {formatDate(intern.evaluation.date)}</div>
               {canEvaluateInterns && (
-                <div style={{marginTop:12, display:'flex', gap:8, alignItems:'center'}}>
+                <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
                   {(intern.evaluation?.signed_file_path || signedUploaded) ? (
-                    <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:12, fontWeight:600, color:'var(--success)'}}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--success)' }}>
                       <CheckCircle size={15} weight="fill" /> تم رفع النسخة الموقعة
                     </span>
                   ) : (
-                    <label className="btn btn-ghost sm" style={{cursor:'pointer', fontSize:12, display:'inline-flex', alignItems:'center', gap:6, border: uploadingSigned ? '1px dashed var(--gold)' : undefined}}>
+                    <label className="btn btn-ghost sm" style={{ cursor: 'pointer', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6, border: uploadingSigned ? '1px dashed var(--gold)' : undefined }}>
                       <UploadSimple size={14} />
                       {uploadingSigned ? 'جاري الرفع...' : 'رفع النسخة الموقعة (PDF)'}
-                      <input type="file" accept=".pdf" style={{display:'none'}} onChange={handleUploadSigned} disabled={uploadingSigned} />
+                      <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={handleUploadSigned} disabled={uploadingSigned} />
                     </label>
                   )}
                   {intern.evaluation?.signed_file_path && (
-                    <a href={intern.evaluation.signed_file_path} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{padding:'6px 12px', fontSize:12, display:'inline-flex', alignItems:'center', gap:4}}>
+                    <a href={intern.evaluation.signed_file_path} target="_blank" rel="noreferrer" className="btn btn-ghost sm" style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <Eye size={14} /> معاينة الموقع
                     </a>
                   )}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button className="btn btn-ghost sm" onClick={handleDownloadWord} title="تحميل DOCX" style={{fontSize:12, color:'#2b579a'}}>
+                    <button className="btn btn-ghost sm" onClick={handleDownloadWord} title="تحميل DOCX" style={{ fontSize: 12, color: '#2b579a' }}>
                       <FileDoc size={14} /> DOCX
                     </button>
-                    <button className="btn btn-ghost sm" onClick={handleDownloadPdf} title="تحميل PDF" style={{fontSize:12, color:'#d32f2f'}}>
+                    <button className="btn btn-ghost sm" onClick={handleDownloadPdf} title="تحميل PDF" style={{ fontSize: 12, color: '#d32f2f' }}>
                       <FilePdf size={14} /> PDF
                     </button>
                   </div>
@@ -1763,7 +1770,7 @@ return rows.map(row => {
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 'bold' }}>ختام التدريب والأرشيف</h3>
               <p style={{ margin: 0, color: 'var(--slate)', fontSize: '0.95rem' }}>إصدار شهادة التدريب وتحميل الأرشيف الكامل لملفات المتدرب.</p>
             </div>
-            <div style={{display:'flex', gap:8}}>
+            <div style={{ display: 'flex', gap: 8 }}>
               <a href={api.exportInternZip(intern.id)} download className="btn btn-ghost" style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '13px', borderRadius: '8px', border: '1px solid var(--line)' }}>
                 <Package size={18} weight="fill" /> تحميل أرشيف الملفات ZIP
               </a>
@@ -1774,10 +1781,10 @@ return rows.map(row => {
           </div>
         </div>
       )}
-      <AttestationModal 
-        isOpen={showAttestationModal} 
-        onClose={() => setShowAttestationModal(false)} 
-        intern={intern} 
+      <AttestationModal
+        isOpen={showAttestationModal}
+        onClose={() => setShowAttestationModal(false)}
+        intern={intern}
       />
 
       {showExportModal && (
@@ -1827,84 +1834,84 @@ return rows.map(row => {
 
       {showEvalForm && (
         <div className="overlay on" style={{ display: 'flex' }}>
-          <div className="modal" style={{maxWidth:700}}>
+          <div className="modal" style={{ maxWidth: 700 }}>
             <div className="modal-head">
               <h3>بطاقة تقييم المتدرب</h3>
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowEvalForm(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
-                <div style={{marginBottom:16}}>
-                <label style={{fontWeight:700, fontSize:13, display:'block', marginBottom:8}}>معلومات عن التدريب (فترات)</label>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 8 }}>معلومات عن التدريب (فترات)</label>
                 {evalRotations.map((r, i) => {
                   const isCustom = r.department && !DEPARTMENTS.includes(r.department);
                   return (
-                  <div key={i} style={{background:'var(--paper)', padding:12, borderRadius:8, border:'1px solid var(--line)', marginBottom:8}}>
-                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
-                      <b style={{fontSize:12}}>{(r as any).label || ('الفترة '+(i+1))}</b>
-                      {evalRotations.length > 1 && <button className="btn btn-ghost sm" onClick={() => removeRotation(i)} style={{fontSize:10, color:'var(--danger)', padding:'2px 6px'}}><X size={12} /> حذف</button>}
+                    <div key={i} style={{ background: 'var(--paper)', padding: 12, borderRadius: 8, border: '1px solid var(--line)', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <b style={{ fontSize: 12 }}>{(r as any).label || ('الفترة ' + (i + 1))}</b>
+                        {evalRotations.length > 1 && <button className="btn btn-ghost sm" onClick={() => removeRotation(i)} style={{ fontSize: 10, color: 'var(--danger)', padding: '2px 6px' }}><X size={12} /> حذف</button>}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label style={{ fontSize: 11 }}>الشعبة</label>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <select className="input" style={{ fontSize: 12, width: '100%' }} value={isCustom ? 'أخرى' : (r.department || '')} onChange={e => {
+                              const val = e.target.value;
+                              if (val === 'أخرى') {
+                                updateRotation(i, 'department', '');
+                              } else {
+                                updateRotation(i, 'department', val);
+                              }
+                            }}>
+                              <option value="">اختر الشعبة</option>
+                              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                              <option value="أخرى">أخرى (كتابة يدوية)</option>
+                            </select>
+                            {isCustom && (
+                              <input className="input" style={{ fontSize: 12, flex: 1 }} value={r.department} onChange={e => updateRotation(i, 'department', e.target.value)} placeholder="اكتب اسم الشعبة" />
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label style={{ fontSize: 11 }}>من</label>
+                            <RotDateInput value={r.from} onChange={v => updateRotation(i, 'from', v)} placeholder="dd/mm/yyyy" />
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label style={{ fontSize: 11 }}>إلى</label>
+                            <RotDateInput value={r.to} onChange={v => updateRotation(i, 'to', v)} placeholder="dd/mm/yyyy" />
+                          </div>
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label style={{ fontSize: 11 }}>المشرف على التكوين</label>
+                          <input className="input" style={{ fontSize: 12 }} value={r.supervisor} onChange={e => updateRotation(i, 'supervisor', e.target.value)} placeholder="المشرف" />
+                        </div>
+                      </div>
                     </div>
-                    <div style={{display:'grid', gridTemplateColumns:'1fr', gap:8}}>
-                      <div className="form-group" style={{margin:0}}>
-                        <label style={{fontSize:11}}>الشعبة</label>
-                        <div style={{display:'flex', gap:6, alignItems:'center'}}>
-                          <select className="input" style={{fontSize:12, width:'100%'}} value={isCustom ? 'أخرى' : (r.department || '')} onChange={e => {
-                            const val = e.target.value;
-                            if (val === 'أخرى') {
-                              updateRotation(i, 'department', '');
-                            } else {
-                              updateRotation(i, 'department', val);
-                            }
-                          }}>
-                            <option value="">اختر الشعبة</option>
-                            {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                            <option value="أخرى">أخرى (كتابة يدوية)</option>
-                          </select>
-                          {isCustom && (
-                            <input className="input" style={{fontSize:12, flex:1}} value={r.department} onChange={e => updateRotation(i, 'department', e.target.value)} placeholder="اكتب اسم الشعبة" />
-                          )}
-                        </div>
-                      </div>
-                      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
-                        <div className="form-group" style={{margin:0}}>
-                          <label style={{fontSize:11}}>من</label>
-                          <RotDateInput value={r.from} onChange={v => updateRotation(i, 'from', v)} placeholder="dd/mm/yyyy" />
-                        </div>
-                        <div className="form-group" style={{margin:0}}>
-                          <label style={{fontSize:11}}>إلى</label>
-                          <RotDateInput value={r.to} onChange={v => updateRotation(i, 'to', v)} placeholder="dd/mm/yyyy" />
-                        </div>
-                      </div>
-                      <div className="form-group" style={{margin:0}}>
-                        <label style={{fontSize:11}}>المشرف على التكوين</label>
-                        <input className="input" style={{fontSize:12}} value={r.supervisor} onChange={e => updateRotation(i, 'supervisor', e.target.value)} placeholder="المشرف" />
-                      </div>
-                    </div>
-                  </div>
                   );
                 })}
-                <button className="btn btn-ghost sm" onClick={addRotation} style={{fontSize:11, marginTop:8}}>+ إضافة فترة</button>
+                <button className="btn btn-ghost sm" onClick={addRotation} style={{ fontSize: 11, marginTop: 8 }}>+ إضافة فترة</button>
               </div>
 
-              <div style={{marginBottom:16}}>
-                <label style={{fontWeight:700, fontSize:13, display:'block', marginBottom:8}}>تقييم المتدرب</label>
-                <table style={{width:'100%', borderCollapse:'collapse', fontSize:12.5}}>
-                  <thead><tr style={{borderBottom:'1px solid var(--line)'}}>
-                    <th style={{textAlign:'right', padding:'6px 4px', width: 200}}>المعيار</th>
-                    <th style={{textAlign:'center', padding:'6px 4px', width:60}}>نعم</th>
-                    <th style={{textAlign:'center', padding:'6px 4px', width:60}}>لا</th>
-                    <th style={{width: 'auto'}}></th>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 8 }}>تقييم المتدرب</label>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead><tr style={{ borderBottom: '1px solid var(--line)' }}>
+                    <th style={{ textAlign: 'right', padding: '6px 4px', width: 200 }}>المعيار</th>
+                    <th style={{ textAlign: 'center', padding: '6px 4px', width: 60 }}>نعم</th>
+                    <th style={{ textAlign: 'center', padding: '6px 4px', width: 60 }}>لا</th>
+                    <th style={{ width: 'auto' }}></th>
                   </tr></thead>
                   <tbody>
                     {EVAL_CRITERIA.map(c => {
-                      const val = evalCriteria[c.key] || {yes:false, no:false};
+                      const val = evalCriteria[c.key] || { yes: false, no: false };
                       return (
-                        <tr key={c.key} style={{borderBottom:'1px solid var(--line)'}}>
-                          <td style={{padding:'8px 4px', fontWeight:600}}>{c.label}</td>
-                          <td style={{textAlign:'center', padding:'8px 4px'}}>
-                            <input type="checkbox" checked={val.yes} onChange={e => setEvalCriteria({...evalCriteria, [c.key]:{...val, yes: e.target.checked}})} style={{width:18,height:18,cursor:'pointer'}} />
+                        <tr key={c.key} style={{ borderBottom: '1px solid var(--line)' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 600 }}>{c.label}</td>
+                          <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                            <input type="checkbox" checked={val.yes} onChange={e => setEvalCriteria({ ...evalCriteria, [c.key]: { ...val, yes: e.target.checked } })} style={{ width: 18, height: 18, cursor: 'pointer' }} />
                           </td>
-                          <td style={{textAlign:'center', padding:'8px 4px'}}>
-                            <input type="checkbox" checked={val.no} onChange={e => setEvalCriteria({...evalCriteria, [c.key]:{...val, no: e.target.checked}})} style={{width:18,height:18,cursor:'pointer'}} />
+                          <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                            <input type="checkbox" checked={val.no} onChange={e => setEvalCriteria({ ...evalCriteria, [c.key]: { ...val, no: e.target.checked } })} style={{ width: 18, height: 18, cursor: 'pointer' }} />
                           </td>
                           <td></td>
                         </tr>
@@ -1916,8 +1923,8 @@ return rows.map(row => {
 
               <TextArea label="ملاحظات" value={evalComments} onChange={e => setEvalComments(e.target.value)} placeholder="ملاحظات..." />
             </div>
-            <div className="modal-foot" style={{justifyContent: 'flex-end'}}>
-              <div style={{display:'flex', gap:8}}>
+            <div className="modal-foot" style={{ justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-ghost" onClick={() => setShowEvalForm(false)}>إلغاء</button>
                 <button className="btn btn-ink" onClick={saveEvaluation} disabled={savingEval}>
                   {savingEval ? 'جاري الحفظ...' : 'حفظ التقييم'}
@@ -1930,43 +1937,43 @@ return rows.map(row => {
 
       {showApproveModal && (
         <div className="overlay on" style={{ display: 'flex' }}>
-          <div className="modal" style={{maxWidth:480}}>
-            <div className="modal-head" style={{padding:'14px 20px'}}>
-              <h3 style={{fontSize:15}}>تأكيد قبول المتدرب</h3>
+          <div className="modal" style={{ maxWidth: 480 }}>
+            <div className="modal-head" style={{ padding: '14px 20px' }}>
+              <h3 style={{ fontSize: 15 }}>تأكيد قبول المتدرب</h3>
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowApproveModal(false)}><X size={14} /></button>
             </div>
-            
-            <div className="modal-body" style={{padding:'12px 20px'}}>
-              <p style={{ color: 'var(--slate)', fontSize: '13px', margin: '0 0 16px', lineHeight:1.6 }}>
+
+            <div className="modal-body" style={{ padding: '12px 20px' }}>
+              <p style={{ color: 'var(--slate)', fontSize: '13px', margin: '0 0 16px', lineHeight: 1.6 }}>
                 أنت على وشك تنشيط حساب المتدرب وبدء فترة تدريبه. يرجى تأكيد تواريخ التدريب.
               </p>
-              
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12}}>
-                <div className="form-group" style={{margin:0}}>
-                  <label style={{fontSize:12}}>تاريخ البدء</label>
-                  <input type="text" inputMode="numeric" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveStartDisplay} onChange={e => setApproveStartDisplay(e.target.value)} placeholder="dd/mm/yyyy" />
-                  <input type="date" ref={startDateRef} style={{display:'none'}} onChange={e => { setApproveStartDate(e.target.value); setApproveStartDisplay(formatDate(e.target.value)); }} />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 12 }}>تاريخ البدء</label>
+                  <input type="text" inputMode="numeric" className="input" style={{ padding: '8px 11px', fontSize: 13 }} value={approveStartDisplay} onChange={e => setApproveStartDisplay(e.target.value)} placeholder="dd/mm/yyyy" />
+                  <input type="date" ref={startDateRef} style={{ display: 'none' }} onChange={e => { setApproveStartDate(e.target.value); setApproveStartDisplay(formatDate(e.target.value)); }} />
                 </div>
-                <div className="form-group" style={{margin:0}}>
-                  <label style={{fontSize:12}}>تاريخ الانتهاء</label>
-                  <input type="text" inputMode="numeric" className="input" style={{padding:'8px 11px', fontSize:13}} value={approveEndDisplay} onChange={e => setApproveEndDisplay(e.target.value)} placeholder="dd/mm/yyyy" />
-                  <input type="date" ref={endDateRef} style={{display:'none'}} onChange={e => { setApproveEndDate(e.target.value); setApproveEndDisplay(formatDate(e.target.value)); }} />
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 12 }}>تاريخ الانتهاء</label>
+                  <input type="text" inputMode="numeric" className="input" style={{ padding: '8px 11px', fontSize: 13 }} value={approveEndDisplay} onChange={e => setApproveEndDisplay(e.target.value)} placeholder="dd/mm/yyyy" />
+                  <input type="date" ref={endDateRef} style={{ display: 'none' }} onChange={e => { setApproveEndDate(e.target.value); setApproveEndDisplay(formatDate(e.target.value)); }} />
                 </div>
               </div>
 
               {durationStr && (
-                <div style={{ background:'var(--paper)', padding:'10px 14px', borderRadius:8, border:'1px solid var(--line)', marginTop:12, display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:13 }}>
-                  <span style={{ color:'var(--slate)' }}>مدة التدريب المحسوبة:</span>
-                  <span style={{ fontWeight:700, color:'var(--gold-dark)' }}>{durationStr}</span>
+                <div style={{ background: 'var(--paper)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--line)', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: 'var(--slate)' }}>مدة التدريب المحسوبة:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--gold-dark)' }}>{durationStr}</span>
                 </div>
               )}
             </div>
-            
-            <div className="modal-foot" style={{padding:'12px 20px'}}>
-              <button className="btn btn-ghost" style={{padding:'7px 16px', fontSize:13}} onClick={() => setShowApproveModal(false)}>
+
+            <div className="modal-foot" style={{ padding: '12px 20px' }}>
+              <button className="btn btn-ghost" style={{ padding: '7px 16px', fontSize: 13 }} onClick={() => setShowApproveModal(false)}>
                 إلغاء
               </button>
-              <button className="btn btn-success" style={{ background: 'var(--success)', color: '#fff', border: 'none', padding:'7px 16px', fontSize:13 }} onClick={confirmApprove}>
+              <button className="btn btn-success" style={{ background: 'var(--success)', color: '#fff', border: 'none', padding: '7px 16px', fontSize: 13 }} onClick={confirmApprove}>
                 تأكيد وبدء التدريب
               </button>
             </div>
@@ -1984,7 +1991,7 @@ return rows.map(row => {
             <div className="modal-body">
               <div className="form-group">
                 <label>نوع الوثيقة</label>
-                <select className="input" value={assignDocType} onChange={e => { setAssignDocType(e.target.value); setAssignCustomTitle(''); }} style={{marginBottom: 8}}>
+                <select className="input" value={assignDocType} onChange={e => { setAssignDocType(e.target.value); setAssignCustomTitle(''); }} style={{ marginBottom: 8 }}>
                   <option value="CONVENTION_SIGNED">اتفاقية التدريب الموقعة</option>
                   <option value="CIN">بطاقة التعريف الوطنية (CIN)</option>
                   <option value="CV">السيرة الذاتية (CV)</option>
@@ -1996,21 +2003,21 @@ return rows.map(row => {
                 </select>
               </div>
               {assignDocType === 'OTHER' && (
-              <div className="form-group">
-                <label>اسم المستند / العنوان</label>
-                <input type="text" className="input" value={assignCustomTitle} onChange={e => setAssignCustomTitle(e.target.value)} placeholder="اتفاقية التدريب المعدلة 2026" />
-                <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>سيظهر هذا العنوان للمتدرب. إذا ترك فارغًا، سيتم استخدام اسم نوع الوثيقة تلقائيًا.</small>
-              </div>
+                <div className="form-group">
+                  <label>اسم المستند / العنوان</label>
+                  <input type="text" className="input" value={assignCustomTitle} onChange={e => setAssignCustomTitle(e.target.value)} placeholder="اتفاقية التدريب المعدلة 2026" />
+                  <small style={{ color: 'var(--slate-light)', display: 'block', marginTop: 4 }}>سيظهر هذا العنوان للمتدرب. إذا ترك فارغًا، سيتم استخدام اسم نوع الوثيقة تلقائيًا.</small>
+                </div>
               )}
               <div className="form-group">
                 <label>الملف الموقع (PDF)</label>
                 <input type="file" className="input" accept=".pdf" onChange={e => setAssignFile(e.target.files?.[0] || null)} />
-                <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>يجب أن يكون الملف بصيغة PDF وحجم أقل من 15 ميجابايت</small>
+                <small style={{ color: 'var(--slate-light)', display: 'block', marginTop: 4 }}>يجب أن يكون الملف بصيغة PDF وحجم أقل من 15 ميجابايت</small>
               </div>
             </div>
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={() => setShowAssignModal(false)}>إلغاء</button>
-              <button className="btn btn-success" style={{background:'var(--success)',color:'#fff',border:'none'}} disabled={!assignFile} onClick={async () => {
+              <button className="btn btn-success" style={{ background: 'var(--success)', color: '#fff', border: 'none' }} disabled={!assignFile} onClick={async () => {
                 if (!assignFile) return;
                 try {
                   await api.uploadSignedDocument(Number(id), assignDocType, assignFile, assignCustomTitle);
@@ -2040,12 +2047,12 @@ return rows.map(row => {
               <div className="form-group">
                 <label>سبب طلب إعادة الرفع</label>
                 <TextArea value={revisionReason} onChange={e => setRevisionReason(e.target.value)} placeholder="يرجى توضيح سبب طلب إعادة الرفع للمتدرب..." />
-                <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>سيظهر السبب للمتدرب في لوحة المستندات الخاصة به</small>
+                <small style={{ color: 'var(--slate-light)', display: 'block', marginTop: 4 }}>سيظهر السبب للمتدرب في لوحة المستندات الخاصة به</small>
               </div>
             </div>
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={() => setShowRevisionModal(false)}>إلغاء</button>
-              <button className="btn btn-danger" style={{background:'var(--danger)',color:'#fff',border:'none'}} disabled={!revisionReason.trim() || !revisionDocId} onClick={async () => {
+              <button className="btn btn-danger" style={{ background: 'var(--danger)', color: '#fff', border: 'none' }} disabled={!revisionReason.trim() || !revisionDocId} onClick={async () => {
                 if (!revisionDocId) return;
                 try {
                   await api.rejectDocument(Number(id), revisionDocId, revisionReason);
@@ -2067,14 +2074,14 @@ return rows.map(row => {
 
       {showRequestModal && (
         <div className="overlay on" style={{ display: 'flex' }}>
-          <div className="modal" style={{maxWidth:600}}>
+          <div className="modal" style={{ maxWidth: 600 }}>
             <div className="modal-head">
               <h3>طلب مستند / إضافة ملف</h3>
               <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowRequestModal(false)}><X size={14} /></button>
             </div>
             <div className="modal-body">
               {showRequestModal && vaultDocs.length === 0 && (
-                <div style={{marginBottom:16, padding:'10px 14px', background:'#EFF6FF', borderRadius:8, border:'1px solid #BFDBFE', fontSize:13, color:'#1E40AF'}}>
+                <div style={{ marginBottom: 16, padding: '10px 14px', background: '#EFF6FF', borderRadius: 8, border: '1px solid #BFDBFE', fontSize: 13, color: '#1E40AF' }}>
                   جارٍ تحميل المستندات من الخزنة...
                 </div>
               )}
@@ -2082,75 +2089,75 @@ return rows.map(row => {
               <div className="form-group">
                 <label>اسم المستند</label>
                 <input type="text" className="input" value={requestTitle} onChange={e => setRequestTitle(e.target.value)} placeholder="اتفاقية التدريب المعدلة 2026" />
-                {requestFiles.length === 0 && selectedVaultDocs.length === 0 && <small style={{color:'var(--slate-light)',display:'block',marginTop:4}}>إذا لم تختر ملفًا، سيتم إنشاء طلب للمتدرب لرفع المستند</small>}
+                {requestFiles.length === 0 && selectedVaultDocs.length === 0 && <small style={{ color: 'var(--slate-light)', display: 'block', marginTop: 4 }}>إذا لم تختر ملفًا، سيتم إنشاء طلب للمتدرب لرفع المستند</small>}
               </div>
 
               <div className="form-group">
                 <label>الملف</label>
-                <div style={{display:'flex', gap:8, alignItems:'flex-start'}}>
-                    <div style={{flex:1}}>
-                        <input type="file" className="input" id="file-upload-input" multiple accept=".pdf,.doc,.docx" onChange={e => {
-                          if (e.target.files) {
-                            const files = Array.from(e.target.files);
-                            setRequestFiles(files);
-                            if (!requestTitle.trim() && files.length > 0) {
-                              setRequestTitle(files[0].name.replace(/\.\w+$/, ''));
-                            }
-                          }
-                        }} style={{display:'none'}} />
-                        <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('file-upload-input')?.click()} style={{width:'100%', justifyContent:'center', padding:'10px', fontSize:13, border:'1.5px dashed var(--line)', borderRadius:8}}>
-                          <UploadSimple size={16} /> {requestFiles.length > 0 ? 'تغيير الملفات' : 'اختيار ملف من الجهاز'}
-                        </button>
-                        {requestFiles.map((f, i) => (
-                          <div key={i} style={{marginTop:6, padding:'6px 10px', background:'#EFF6FF', borderRadius:6, border:'1px solid #BFDBFE', fontSize:12, display:'flex', alignItems:'center', gap:6}}>
-                            <FileText size={14} color="#2563EB" />
-                            <span style={{fontWeight:600}}>{f.name}</span>
-                            <button className="btn btn-ghost sm" onClick={() => setRequestFiles(prev => prev.filter((_, j) => j !== i))} style={{marginRight:'auto', padding:2}}><X size={14} /></button>
-                          </div>
-                        ))}
-                        {selectedVaultDocs.map((vd, i) => (
-                          <div key={'vd'+i} style={{marginTop:6, padding:'6px 10px', background:'#F5F3EE', borderRadius:6, border:'1px solid #E5DDD0', fontSize:12, display:'flex', alignItems:'center', gap:6}}>
-                            <FileText size={14} color="#9B8B6B" weight="fill" />
-                            <span style={{fontWeight:600}}>{vd}</span>
-                            <button className="btn btn-ghost sm" onClick={() => setSelectedVaultDocs(prev => prev.filter(v => v !== vd))} style={{marginRight:'auto', padding:2}}><X size={14} /></button>
-                          </div>
-                        ))}
-                    </div>
-                    <button type="button" className="btn btn-gold" onClick={() => setShowVaultModal(true)} style={{padding:'10px 14px', fontSize:13, borderRadius:8, flexShrink:0, display:'flex', alignItems:'center', gap:6}}>
-                      <Folder size={16} /> إضافة من الخزنة
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <input type="file" className="input" id="file-upload-input" multiple accept=".pdf,.doc,.docx" onChange={e => {
+                      if (e.target.files) {
+                        const files = Array.from(e.target.files);
+                        setRequestFiles(files);
+                        if (!requestTitle.trim() && files.length > 0) {
+                          setRequestTitle(files[0].name.replace(/\.\w+$/, ''));
+                        }
+                      }
+                    }} style={{ display: 'none' }} />
+                    <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('file-upload-input')?.click()} style={{ width: '100%', justifyContent: 'center', padding: '10px', fontSize: 13, border: '1.5px dashed var(--line)', borderRadius: 8 }}>
+                      <UploadSimple size={16} /> {requestFiles.length > 0 ? 'تغيير الملفات' : 'اختيار ملف من الجهاز'}
                     </button>
+                    {requestFiles.map((f, i) => (
+                      <div key={i} style={{ marginTop: 6, padding: '6px 10px', background: '#EFF6FF', borderRadius: 6, border: '1px solid #BFDBFE', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <FileText size={14} color="#2563EB" />
+                        <span style={{ fontWeight: 600 }}>{f.name}</span>
+                        <button className="btn btn-ghost sm" onClick={() => setRequestFiles(prev => prev.filter((_, j) => j !== i))} style={{ marginRight: 'auto', padding: 2 }}><X size={14} /></button>
+                      </div>
+                    ))}
+                    {selectedVaultDocs.map((vd, i) => (
+                      <div key={'vd' + i} style={{ marginTop: 6, padding: '6px 10px', background: '#F5F3EE', borderRadius: 6, border: '1px solid #E5DDD0', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <FileText size={14} color="#9B8B6B" weight="fill" />
+                        <span style={{ fontWeight: 600 }}>{vd}</span>
+                        <button className="btn btn-ghost sm" onClick={() => setSelectedVaultDocs(prev => prev.filter(v => v !== vd))} style={{ marginRight: 'auto', padding: 2 }}><X size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" className="btn btn-gold" onClick={() => setShowVaultModal(true)} style={{ padding: '10px 14px', fontSize: 13, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Folder size={16} /> إضافة من الخزنة
+                  </button>
                 </div>
               </div>
 
-              <div className="form-group" style={{marginTop:16}}>
+              <div className="form-group" style={{ marginTop: 16 }}>
                 <label>نوع الطلب للملفات المرفوعة</label>
-                <div style={{display:'flex', flexDirection:'column', gap:8, padding:'8px 12px', background:'var(--paper)', borderRadius:8, border:'1px solid var(--line)'}}>
-                   {(['view','sign','fill'] as const).map(type => {
-                      const viewLocked = type === 'view' && (requestActionTypes.has('sign') || requestActionTypes.has('fill'));
-                      return (
-                      <label key={type} style={{display:'flex', alignItems:'center', gap:10, cursor: viewLocked ? 'not-allowed' : 'pointer', fontSize:13, padding:'4px 0', opacity: viewLocked ? 0.5 : 1}}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px', background: 'var(--paper)', borderRadius: 8, border: '1px solid var(--line)' }}>
+                  {(['view', 'sign', 'fill'] as const).map(type => {
+                    const viewLocked = type === 'view' && (requestActionTypes.has('sign') || requestActionTypes.has('fill'));
+                    return (
+                      <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: viewLocked ? 'not-allowed' : 'pointer', fontSize: 13, padding: '4px 0', opacity: viewLocked ? 0.5 : 1 }}>
                         <input type="checkbox" checked={requestActionTypes.has(type)} disabled={viewLocked} onChange={e => {
                           const next = new Set(requestActionTypes);
                           if (type === 'sign' || type === 'fill') next.delete('view');
                           e.target.checked ? next.add(type) : next.delete(type);
                           if (next.size === 0) next.add('view');
                           setRequestActionTypes(next);
-                        }} style={{width:18,height:18,cursor: viewLocked ? 'not-allowed' : 'pointer', accentColor:'var(--gold-dark)'}} />
-                        <span style={{fontWeight: requestActionTypes.has(type) ? 600 : 400}}>
+                        }} style={{ width: 18, height: 18, cursor: viewLocked ? 'not-allowed' : 'pointer', accentColor: 'var(--gold-dark)' }} />
+                        <span style={{ fontWeight: requestActionTypes.has(type) ? 600 : 400 }}>
                           {type === 'view' ? 'عرض فقط — المتدرب يرى ويحمل المستند' : ''}
                           {type === 'sign' ? 'توقيع — المتدرب يوقع ويعيد النسخة' : ''}
                           {type === 'fill' ? 'تعبئة وإرجاع — المتدرب يعبي النموذج ويعيده' : ''}
                         </span>
                       </label>
-                      );
-                   })}
+                    );
+                  })}
                 </div>
               </div>
             </div>
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={() => setShowRequestModal(false)}>إلغاء</button>
               {Array.from(requestActionTypes).some(t => t === 'sign' || t === 'fill') && requestFiles.length === 0 && selectedVaultDocs.length === 0 && (
-                <div style={{color:'#DC2626', fontSize:12, marginBottom:8}}>يجب رفع ملف للمستندات التي تتطلب توقيع أو تعبئة</div>
+                <div style={{ color: '#DC2626', fontSize: 12, marginBottom: 8 }}>يجب رفع ملف للمستندات التي تتطلب توقيع أو تعبئة</div>
               )}
               <button className="btn btn-gold" disabled={
                 (!requestTitle.trim() && requestFiles.length === 0 && selectedVaultDocs.length === 0) ||
@@ -2212,60 +2219,60 @@ return rows.map(row => {
 
       {/* Vault Multiple Selection Modal */}
       {showVaultModal && (
-        <div className="overlay on" style={{display:'flex', zIndex:50}}>
-          <div className="modal" style={{maxWidth:'800px', width:'90%'}}>
-            <div className="modal-head" style={{borderBottom:'1px solid #E5E7EB', padding:'16px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#fff', borderRadius:'16px 16px 0 0'}}>
+        <div className="overlay on" style={{ display: 'flex', zIndex: 50 }}>
+          <div className="modal" style={{ maxWidth: '800px', width: '90%' }}>
+            <div className="modal-head" style={{ borderBottom: '1px solid #E5E7EB', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: '16px 16px 0 0' }}>
               <div>
-                <h3 style={{margin:0, fontSize:'16px', fontWeight:'bold', color:'#111827'}}>اختيار مستندات من الخزنة</h3>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#111827' }}>اختيار مستندات من الخزنة</h3>
               </div>
-              <button className="btn-close" onClick={() => setShowVaultModal(false)} style={{background:'#F3F4F6', border:'none', width:'32px', height:'32px', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#4B5563'}}>
+              <button className="btn-close" onClick={() => setShowVaultModal(false)} style={{ background: '#F3F4F6', border: 'none', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#4B5563' }}>
                 <X size={16} weight="bold" />
               </button>
             </div>
-            <div className="modal-body" style={{padding:'24px', maxHeight:'65vh', overflowY:'auto', background:'#F9FAFB'}}>
+            <div className="modal-body" style={{ padding: '24px', maxHeight: '65vh', overflowY: 'auto', background: '#F9FAFB' }}>
               {vaultDocs.length === 0 ? (
-                <div style={{textAlign:'center',padding:'24px 20px',color:'var(--slate-light)',fontSize:13}}>لا توجد مستندات في الخزنة</div>
+                <div style={{ textAlign: 'center', padding: '24px 20px', color: 'var(--slate-light)', fontSize: 13 }}>لا توجد مستندات في الخزنة</div>
               ) : (
-                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:16}}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
                   {vaultDocs.map((vd: any) => {
                     const isSelected = selectedVaultDocs.includes(vd.name);
                     const isPdf = vd.name.toLowerCase().endsWith('.pdf');
                     const sizeStr = vd.size ? (vd.size / 1024).toFixed(1) + ' KB' : 'مستند من الخزنة';
                     return (
                       <div key={vd.name} onClick={() => {
-                          if (isSelected) setSelectedVaultDocs(prev => prev.filter(v => v !== vd.name));
-                          else setSelectedVaultDocs(prev => [...prev, vd.name]);
-                        }} style={{
-                        display:'flex', flexDirection:'column', alignItems:'center', padding:'24px 20px', 
+                        if (isSelected) setSelectedVaultDocs(prev => prev.filter(v => v !== vd.name));
+                        else setSelectedVaultDocs(prev => [...prev, vd.name]);
+                      }} style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px',
                         border: isSelected ? '2px solid var(--gold-dark)' : '1px solid #E5E7EB',
-                        borderRadius:16, background: '#fff', cursor:'pointer', transition:'all 0.15s',
+                        borderRadius: 16, background: '#fff', cursor: 'pointer', transition: 'all 0.15s',
                         position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                       }}>
                         {/* Checkbox at top-right for RTL */}
-                        <div style={{position:'absolute', top:16, right:16}}>
-                          <input type="checkbox" checked={isSelected} onChange={() => {}} style={{width:18, height:18, cursor:'pointer', accentColor:'var(--gold-dark)'}} />
+                        <div style={{ position: 'absolute', top: 16, right: 16 }}>
+                          <input type="checkbox" checked={isSelected} onChange={() => { }} style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--gold-dark)' }} />
                         </div>
-                        
+
                         {/* File Icon */}
                         <div style={{
-                          width:72, height:72, borderRadius:20, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-                          background: isPdf ? '#FCE8E8' : '#E0F2FE', color: isPdf ? '#DC2626' : '#0284C7', marginBottom:20
+                          width: 72, height: 72, borderRadius: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          background: isPdf ? '#FCE8E8' : '#E0F2FE', color: isPdf ? '#DC2626' : '#0284C7', marginBottom: 20
                         }}>
                           {isPdf ? <FilePdf size={32} weight="fill" /> : <FileDoc size={32} weight="fill" />}
-                          <span style={{fontSize:12, fontWeight:800, marginTop:4}}>{isPdf ? 'PDF' : 'DOC'}</span>
+                          <span style={{ fontSize: 12, fontWeight: 800, marginTop: 4 }}>{isPdf ? 'PDF' : 'DOC'}</span>
                         </div>
 
                         {/* Text */}
-                        <h4 style={{margin:'0 0 8px 0', fontSize:15, fontWeight:700, color:'#111827', textAlign:'center', width:'100%', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}} title={vd.name}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: 15, fontWeight: 700, color: '#111827', textAlign: 'center', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={vd.name}>
                           {vd.name.includes('.') ? vd.name.split('.').slice(0, -1).join('.') : vd.name}
                         </h4>
-                        <div style={{fontSize:12, color:'#6B7280', marginBottom:20}}>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 20 }}>
                           {sizeStr}
                         </div>
 
                         {/* Actions */}
-                        <div style={{display:'flex', width:'100%', marginTop:'auto'}} onClick={e => e.stopPropagation()}>
-                          <button className="btn" style={{flex:1, padding:'8px 0', background:'#fff', color:'#111827', border:'1px solid #E5E7EB', borderRadius:8, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', gap:6}} onClick={() => {
+                        <div style={{ display: 'flex', width: '100%', marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
+                          <button className="btn" style={{ flex: 1, padding: '8px 0', background: '#fff', color: '#111827', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => {
                             const url = API_BASE + '/vault/' + encodeURIComponent(vd.name);
                             toast.info('جاري إعداد المستند للعرض...');
                             handleViewFile(url, vd.name).catch(() => toast.error('حدث خطأ أثناء الفتح'));
@@ -2279,8 +2286,8 @@ return rows.map(row => {
                 </div>
               )}
             </div>
-            <div className="modal-foot" style={{background:'#F9FAFB', borderTop:'1px solid #E5E7EB', padding:'16px 24px', borderRadius:'0 0 16px 16px', display:'flex', justifyContent:'center'}}>
-              <button className="btn btn-gold" style={{width:'100%', display:'flex', justifyContent:'center', alignItems:'center'}} onClick={() => {
+            <div className="modal-foot" style={{ background: '#F9FAFB', borderTop: '1px solid #E5E7EB', padding: '16px 24px', borderRadius: '0 0 16px 16px', display: 'flex', justifyContent: 'center' }}>
+              <button className="btn btn-gold" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => {
                 if (selectedVaultDocs.length > 0 && !requestTitle.trim()) {
                   const docName = selectedVaultDocs[0];
                   const title = docName.includes('.') ? docName.split('.').slice(0, -1).join('.') : docName;
@@ -2297,24 +2304,24 @@ return rows.map(row => {
 
       {/* Vault action type modal */}
       {showVaultActionModal && selectedVaultDocName && (
-        <div className="overlay on" style={{display:'flex', zIndex:50}}>
-          <div className="modal" style={{maxWidth:'480px'}}>
-            <div className="modal-head" style={{borderBottom:'1px solid #E5E7EB', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#fff', borderRadius:'16px 16px 0 0'}}>
+        <div className="overlay on" style={{ display: 'flex', zIndex: 50 }}>
+          <div className="modal" style={{ maxWidth: '480px' }}>
+            <div className="modal-head" style={{ borderBottom: '1px solid #E5E7EB', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: '16px 16px 0 0' }}>
               <div>
-                <h3 style={{margin:0, fontSize:'18px', fontWeight:'bold', color:'#111827'}}>إضافة مستند من الخزنة</h3>
-                <p style={{margin:'4px 0 0 0', fontSize:'14px', color:'#6B7280'}}>اختر نوع الطلب للمستند</p>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#111827' }}>إضافة مستند من الخزنة</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#6B7280' }}>اختر نوع الطلب للمستند</p>
               </div>
-              <button className="btn-close" onClick={() => setShowVaultActionModal(false)} style={{background:'#F3F4F6', border:'none', width:'32px', height:'32px', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#4B5563'}}>
+              <button className="btn-close" onClick={() => setShowVaultActionModal(false)} style={{ background: '#F3F4F6', border: 'none', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#4B5563' }}>
                 <X size={16} weight="bold" />
               </button>
             </div>
-            <div className="modal-body" style={{padding:'24px'}}>
-              <div style={{marginBottom:20, padding:'12px 16px', background:'#F5F3EE', borderRadius:10, border:'1px solid #E5DDD0'}}>
-                <div style={{fontWeight:700, fontSize:14, color:'#9B8B6B'}}>{selectedVaultDocName}</div>
-                <div style={{fontSize:12, color:'#6B7280', marginTop:2}}>مستند من الخزنة</div>
+            <div className="modal-body" style={{ padding: '24px' }}>
+              <div style={{ marginBottom: 20, padding: '12px 16px', background: '#F5F3EE', borderRadius: 10, border: '1px solid #E5DDD0' }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#9B8B6B' }}>{selectedVaultDocName}</div>
+                <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>مستند من الخزنة</div>
               </div>
-              <div style={{display:'grid', gridTemplateColumns:'1fr', gap:12}}>
-                {(['view','sign','sign_fill','fill'] as const).map(type => {
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                {(['view', 'sign', 'sign_fill', 'fill'] as const).map(type => {
                   const labels = {
                     view: { title: 'عرض فقط', desc: 'المتدرب يرى ويحمل المستند', icon: 'Eye', color: '#0284C7', bg: '#E0F2FE' },
                     sign: { title: 'توقيع', desc: 'المتدرب يوقع ويعيد النسخة', icon: 'Pen', color: '#7C3AED', bg: '#EDE9FE' },
@@ -2336,24 +2343,24 @@ return rows.map(row => {
                         toast.error('فشلت الإضافة من الخزنة');
                       }
                     }} style={{
-                      width:'100%', display:'flex', alignItems:'center', gap:14,
-                      padding:'16px 18px', borderRadius:12, border:'1px solid #E5E7EB',
-                      background:'#fff', cursor:'pointer', textAlign:'right',
-                      transition:'all 0.15s', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+                      padding: '16px 18px', borderRadius: 12, border: '1px solid #E5E7EB',
+                      background: '#fff', cursor: 'pointer', textAlign: 'right',
+                      transition: 'all 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
                     }}>
-                      <div style={{width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', background:labels.bg, color:labels.color, flexShrink:0}}>
+                      <div style={{ width: 48, height: 48, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: labels.bg, color: labels.color, flexShrink: 0 }}>
                         <FileText size={22} weight="fill" />
                       </div>
-                      <div style={{flex:1}}>
-                        <div style={{fontWeight:700, fontSize:14, color:'#111827'}}>{labels.title}</div>
-                        <div style={{fontSize:12, color:'#6B7280', marginTop:2}}>{labels.desc}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{labels.title}</div>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{labels.desc}</div>
                       </div>
-                      <div style={{color:'var(--gold-dark)', fontSize:13}}>+</div>
+                      <div style={{ color: 'var(--gold-dark)', fontSize: 13 }}>+</div>
                     </button>
                   );
                 })}
               </div>
-              <button className="btn btn-ghost" onClick={() => { window.open(`/api/vault/open/${selectedVaultDocName}`, '_blank'); }} style={{width:'100%', justifyContent:'center', marginTop:16, fontSize:13}}>
+              <button className="btn btn-ghost" onClick={() => { window.open(`/api/vault/open/${selectedVaultDocName}`, '_blank'); }} style={{ width: '100%', justifyContent: 'center', marginTop: 16, fontSize: 13 }}>
                 <Eye size={16} /> معاينة المستند
               </button>
             </div>

@@ -285,6 +285,7 @@ class DocumentLifecycle(db.Model):
     file_type = db.Column(db.String(20), default='pdf')
     action_type = db.Column(db.String(20), default='view')
     requested_by = db.Column(db.String(20), default='ADMIN')
+    revision_requested_by = db.Column(db.String(20), nullable=True)
     source = db.Column(db.String(20), default='ADMIN')
 
     intern = db.relationship('Intern', foreign_keys=[intern_id], backref='documents_lifecycle')
@@ -405,6 +406,8 @@ def init_db():
                     conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN action_type VARCHAR(20) DEFAULT 'view'"))
                 if 'requested_by' not in dl_cols:
                     conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN requested_by VARCHAR(20) DEFAULT 'ADMIN'"))
+                if 'revision_requested_by' not in dl_cols:
+                    conn.execute(sql_text("ALTER TABLE document_lifecycle ADD COLUMN revision_requested_by VARCHAR(20)"))
                 conn.commit()
         except Exception as e:
             print(f"document_lifecycle migration: {e}")
@@ -2051,6 +2054,7 @@ def reject_document(intern_id, doc_id):
     doc.status = 'REVISION_REQUESTED'
     doc.correction_round += 1
     doc.rejection_reason = reason
+    doc.revision_requested_by = 'ADMIN'
     
     audit = AuditEvent(actor_user_id=current_user.get('sub'), actor_role=current_user.get('role'),
                        action='REJECT_DOCUMENT', doc_id=doc.id, from_status=old_status,
@@ -2517,6 +2521,7 @@ def list_intern_documents(intern_id):
             "file_type": d.file_type or 'pdf',
             "action_type": d.action_type or 'view',
             "requested_by": d.requested_by or ('INTERN' if (d.uploaded_by or '') == 'INTERN' else 'ADMIN'),
+            "revision_requested_by": d.revision_requested_by,
             "source": d.source or 'ADMIN',
         })
     return jsonify(result), 200
@@ -2934,7 +2939,7 @@ def admin_upload_signed(intern_id, doc_id):
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
-    if doc.requested_by == 'ADMIN' and doc.status != 'REVISION_REQUESTED':
+    if doc.requested_by == 'ADMIN' and doc.status not in ('REVISION_REQUESTED', 'AWAITING_ADMIN', 'RETURNED'):
         return jsonify({"msg": "Not an intern-initiated request"}), 400
     if doc.action_type not in ('sign', 'fill', 'sign_fill', 'view', 'view_or_return'):
         return jsonify({"msg": "Document action type does not require admin upload"}), 400
@@ -3117,6 +3122,7 @@ def intern_request_revision(intern_id, doc_id):
 
     doc.status = 'REVISION_REQUESTED'
     doc.rejection_reason = reason
+    doc.revision_requested_by = 'INTERN'
     doc.updated_at = datetime.now(timezone.utc)
     db.session.commit()
 
@@ -3261,6 +3267,7 @@ def list_my_documents():
             "file_type": d.file_type or 'pdf',
             "action_type": d.action_type or 'view',
             "requested_by": d.requested_by or ('INTERN' if (d.uploaded_by or '') == 'INTERN' else 'ADMIN'),
+            "revision_requested_by": d.revision_requested_by,
             "source": d.source or 'ADMIN',
         }
         result.append(entry)

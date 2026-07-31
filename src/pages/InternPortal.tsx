@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise, ClipboardText, Trash } from '@phosphor-icons/react';
+import { X, CheckCircle, DownloadSimple, HandWaving, Confetti, Warning, UploadSimple, Eye, FileText, ArrowsClockwise, ClipboardText, Trash, Gear, LockKey } from '@phosphor-icons/react';
 import { api, API_BASE } from '../services/api';
 import { handleViewFile, handleDownloadFile } from '../utils/documentUtils';
 import { InternSidebar } from '../components/InternSidebar';
@@ -37,6 +37,11 @@ export function InternPortal() {
   const [internUploadFile, setInternUploadFile] = useState<File | null>(null);
   const [internUploadActionTypes, setInternUploadActionTypes] = useState<Set<string>>(new Set(['view']));
   const [docFilter, setDocFilter] = useState('all');
+  const [pwdOld, setPwdOld] = useState('');
+  const [pwdNew, setPwdNew] = useState('');
+  const [pwdConfirm, setPwdConfirm] = useState('');
+  const [pwdMsg, setPwdMsg] = useState<{ text: string, ok: boolean } | null>(null);
+  const [pwdSaving, setPwdSaving] = useState(false);
 
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
@@ -179,6 +184,34 @@ export function InternPortal() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pwdOld || !pwdNew || !pwdConfirm) {
+      setPwdMsg({ text: 'يرجى ملء جميع الحقول', ok: false });
+      return;
+    }
+    if (pwdNew !== pwdConfirm) {
+      setPwdMsg({ text: 'كلمتا المرور غير متطابقتين', ok: false });
+      return;
+    }
+    if (pwdNew.length < 6) {
+      setPwdMsg({ text: 'كلمة المرور الجديدة يجب أن تتكون من 6 أحرف على الأقل', ok: false });
+      return;
+    }
+    setPwdSaving(true);
+    try {
+      await api.put('/users/password', { old_password: pwdOld, new_password: pwdNew });
+      setPwdMsg({ text: 'تم تغيير كلمة المرور بنجاح', ok: true });
+      setPwdOld('');
+      setPwdNew('');
+      setPwdConfirm('');
+    } catch (err: any) {
+      setPwdMsg({ text: err?.message || 'فشل في تغيير كلمة المرور', ok: false });
+    } finally {
+      setPwdSaving(false);
+    }
+  };
+
   const totalRequests = requests.length;
 
   // Returns true if the document for a given request is already uploaded.
@@ -234,6 +267,7 @@ export function InternPortal() {
       case 'status': return 'حالة الطلب';
       case 'documents': return 'المستندات';
       case 'profile': return 'ملفي الشخصي';
+      case 'settings': return 'الإعدادات';
       default: return 'بوابة المتدرب';
     }
   };
@@ -618,32 +652,23 @@ for (const [base, docs] of grouped) {
                                       </td>
                                       <td style={{ textAlign: 'left', padding: '10px 8px' }}>
                                         <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                                          {/* Accept — AWAITING_RETURN admin-initiated */}
+                                          
+
+                                          {/* Request Revision — AWAITING_RETURN admin-initiated */}
                                           {(d.status === 'AWAITING_RETURN' || fillDoc.status === 'AWAITING_RETURN') && d.requested_by === 'ADMIN' && (
-                                            <>
-                                              <button className="btn btn-ghost sm" title="قبول" onClick={async () => {
-                                                if (!window.confirm('هل تريد قبول طلب التوقيع/التعبئة من الإدارة؟')) return;
-                                                try {
-                                                  await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-accept-request`, {});
-                                                  fetchLifecycleDocs();
-                                                  showToast('تم قبول الطلب', 'success');
-                                                } catch { showToast('فشل قبول الطلب', 'error'); }
-                                              }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
-                                                <CheckCircle size={14} />
-                                              </button>
-                                              <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {
-                                                const reason = window.prompt('سبب طلب إعادة الرفع:');
-                                                if (reason === null) return;
-                                                try {
-                                                  await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
-                                                  fetchLifecycleDocs();
-                                                  showToast('تم طلب إعادة الرفع', 'success');
-                                                } catch { showToast('فشل إرسال الطلب', 'error'); }
-                                              }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
-                                                <ArrowsClockwise size={14} />
-                                              </button>
-                                            </>
+                                            <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {
+                                              const reason = window.prompt('سبب طلب إعادة الرفع:');
+                                              if (reason === null) return;
+                                              try {
+                                                await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
+                                                fetchLifecycleDocs();
+                                                showToast('تم طلب إعادة الرفع', 'success');
+                                              } catch { showToast('فشل إرسال الطلب', 'error'); }
+                                            }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                              <ArrowsClockwise size={14} />
+                                            </button>
                                           )}
+                                          
                                           {/* View latest document */}
                                           <button className="btn btn-ghost sm" title={fileDoc ? "معاينة" : "لا يوجد ملف مرفق من الإدارة"} disabled={!fileDoc} onClick={() => fileDoc && handleViewFile(api.downloadDocument(fileDoc.id) + (anyReturned ? '&returned=1' : ''), fileLabel + '.pdf')} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: fileDoc ? 1 : 0.3 }}>
                                             <Eye size={14} />
@@ -681,8 +706,8 @@ for (const [base, docs] of grouped) {
                                               </button>
                                             </>
                                           )}
-                                          {/* Upload return if not completed, not returned, and not awaiting admin/admin-return; for PENDING_REVIEW or REVISION_REQUESTED */}
-                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && !bothReturned && d.status !== 'AWAITING_ADMIN' && fillDoc.status !== 'AWAITING_ADMIN' && d.status !== 'AWAITING_RETURN' && fillDoc.status !== 'AWAITING_RETURN' && !(d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN') && !(fillDoc.status === 'REVISION_REQUESTED' && fillDoc.requested_by === 'ADMIN') && (d.status === 'PENDING_REVIEW' || d.status === 'REVISION_REQUESTED' || fillDoc.status === 'PENDING_REVIEW' || fillDoc.status === 'REVISION_REQUESTED') && (d.requested_by !== 'INTERN' || ((d.status === 'REVISION_REQUESTED' && !d.returned_file_path) || (fillDoc.status === 'REVISION_REQUESTED' && !fillDoc.returned_file_path))) && (
+                                          {/* Upload return if not completed, not returned, and not awaiting admin; for PENDING_REVIEW, AWAITING_RETURN or REVISION_REQUESTED */}
+                                          {d.status !== 'APPROVED_AND_SIGNED' && fillDoc.status !== 'APPROVED_AND_SIGNED' && !bothReturned && d.status !== 'AWAITING_ADMIN' && fillDoc.status !== 'AWAITING_ADMIN' && (d.status === 'PENDING_REVIEW' || d.status === 'REVISION_REQUESTED' || d.status === 'AWAITING_RETURN' || fillDoc.status === 'PENDING_REVIEW' || fillDoc.status === 'REVISION_REQUESTED' || fillDoc.status === 'AWAITING_RETURN') && (d.requested_by !== 'INTERN' || ((d.status === 'REVISION_REQUESTED' && !d.returned_file_path) || (fillDoc.status === 'REVISION_REQUESTED' && !fillDoc.returned_file_path))) && (
                                             <>
                                               <input type="file" id={inputId} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => {
                                                 if (!e.target.files?.[0]) return;
@@ -783,7 +808,7 @@ for (const [base, docs] of grouped) {
                                 const isTemplatePendingIntern = isTemplate && d.status === 'PENDING_REVIEW' && d.uploaded_by === 'INTERN';
                                 const isInternInitiatedSignFill = d.requested_by === 'INTERN' && (d.action_type === 'sign' || d.action_type === 'fill' || d.action_type === 'sign_fill');
                                 const showViewDownload = !!d.file_path && !isTemplatePendingAdmin;
-                                const canUpload = (!isInternInitiatedSignFill || (d.status === 'REVISION_REQUESTED' && !d.returned_file_path)) && d.status !== 'AWAITING_RETURN' && !(d.status === 'REVISION_REQUESTED' && d.requested_by === 'ADMIN') && ((!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin);
+                                const canUpload = (!isInternInitiatedSignFill || (d.status === 'REVISION_REQUESTED' && !d.returned_file_path)) && ((!isView && !isReturned) || (d.status === 'REVISION_REQUESTED') || (d.status === 'AWAITING_RETURN') || (d.status === 'MISSING' && !d.file_path) || isTemplatePendingAdmin);
                                 const isUploadDisabled = isTemplatePendingIntern;
                                 return (
                                   <tr key={d.id} style={{ borderBottom: '1px solid var(--line)' }}>
@@ -861,32 +886,23 @@ for (const [base, docs] of grouped) {
                                         </>
                                       ) : (
                                         <>
-                                        {/* 1️⃣ Accept — AWAITING_RETURN admin-initiated */}
+                                        
+
+                                        {/* 1️⃣ Request Revision — AWAITING_RETURN admin-initiated */}
                                         {d.status === 'AWAITING_RETURN' && d.requested_by === 'ADMIN' && (
-                                          <>
-                                            <button className="btn btn-ghost sm" title="قبول" onClick={async () => {
-                                              if (!window.confirm('هل تريد قبول طلب التوقيع/التعبئة من الإدارة؟')) return;
-                                              try {
-                                                await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-accept-request`, {});
-                                                fetchLifecycleDocs();
-                                                showToast('تم قبول الطلب', 'success');
-                                              } catch { showToast('فشل قبول الطلب', 'error'); }
-                                            }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
-                                              <CheckCircle size={14} />
-                                            </button>
-                                            <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {
-                                              const reason = window.prompt('سبب طلب إعادة الرفع:');
-                                              if (reason === null) return;
-                                              try {
-                                                await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
-                                                fetchLifecycleDocs();
-                                                showToast('تم طلب إعادة الرفع', 'success');
-                                              } catch { showToast('فشل إرسال الطلب', 'error'); }
-                                            }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
-                                              <ArrowsClockwise size={14} />
-                                            </button>
-                                          </>
+                                          <button className="btn btn-ghost sm" title="طلب إعادة رفع" onClick={async () => {
+                                            const reason = window.prompt('سبب طلب إعادة الرفع:');
+                                            if (reason === null) return;
+                                            try {
+                                              await api.post(`/interns/${internData?.id}/documents/${d.id}/intern-request-revision`, { reason });
+                                              fetchLifecycleDocs();
+                                              showToast('تم طلب إعادة الرفع', 'success');
+                                            } catch { showToast('فشل إرسال الطلب', 'error'); }
+                                          }} style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dark)' }}>
+                                            <ArrowsClockwise size={14} />
+                                          </button>
                                         )}
+                                        
                                         {/* 2️⃣ View latest document */}
                                         {showViewDownload && (
                                           <>
@@ -991,7 +1007,7 @@ for (const [base, docs] of grouped) {
               <div className="info-row"><div className="k">تاريخ الانتهاء</div><div className="v">{formatDate(internData?.end_date)}</div></div>
               <div className="info-row"><div className="k">الجامعة أو المعهد</div><div className="v">{internData?.university || 'غير محدد'}</div></div>
               <div className="info-row"><div className="k">التخصص</div><div className="v">{internData?.specialty || 'غير محدد'}</div></div>
-              <div className="info-row" style={{ borderBottom: 'none', paddingBottom: 0 }}><div className="k">تغيير كلمة المرور</div><div className="v" style={{ paddingLeft: '8px' }}>يرجى الذهاب إلى الإعدادات لتغيير كلمة المرور</div></div>
+              <div className="info-row" style={{ borderBottom: 'none', paddingBottom: 0 }}><div className="k">تغيير كلمة المرور</div><div className="v" style={{ paddingLeft: '8px' }}><span style={{ color: 'var(--gold-dark)', cursor: 'pointer', fontWeight: 600 }} onClick={() => setActiveTab('settings')}>اضغط لتغيير كلمة المرور</span></div></div>
             </div>
 
             {internData?.evaluation?.criteria && (
@@ -1056,6 +1072,64 @@ for (const [base, docs] of grouped) {
             )}
           </div>
 
+          {/* SETTINGS */}
+          <div className={`view ${activeTab === 'settings' ? 'on' : ''} p-wrap`}>
+            <div className="card" style={{ padding: '24px 28px', maxWidth: 600 }}>
+              <div className="section-title">
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Gear size={16} weight="bold" />تغيير كلمة المرور</h3>
+                <span className="hint">حافظ على أمان حسابك</span>
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--slate)', margin: '0 0 20px' }}>اختر كلمة مرور قوية لا تقل عن 6 أحرف.</p>
+              <form onSubmit={handleChangePassword}>
+                <div className="form-group">
+                  <label>كلمة المرور الحالية *</label>
+                  <div style={{ position: 'relative' }}>
+                    <LockKey size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-light)' }} />
+                    <input
+                      type="password"
+                      placeholder="أدخل كلمة المرور الحالية"
+                      value={pwdOld}
+                      onChange={e => setPwdOld(e.target.value)}
+                      style={{ paddingRight: '38px' }}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>كلمة المرور الجديدة *</label>
+                  <div style={{ position: 'relative' }}>
+                    <LockKey size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-light)' }} />
+                    <input
+                      type="password"
+                      placeholder="أدخل كلمة المرور الجديدة"
+                      value={pwdNew}
+                      onChange={e => setPwdNew(e.target.value)}
+                      style={{ paddingRight: '38px' }}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>تأكيد كلمة المرور الجديدة *</label>
+                  <div style={{ position: 'relative' }}>
+                    <LockKey size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-light)' }} />
+                    <input
+                      type="password"
+                      placeholder="أعد إدخال كلمة المرور"
+                      value={pwdConfirm}
+                      onChange={e => setPwdConfirm(e.target.value)}
+                      style={{ paddingRight: '38px' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 20, flexWrap: 'wrap' }}>
+                  <button type="submit" className="btn btn-gold" style={{ padding: '11px 28px' }} disabled={pwdSaving}>
+                    {pwdSaving ? 'جاري الحفظ...' : 'تغيير كلمة المرور'}
+                  </button>
+                  {pwdMsg && <span style={{ fontWeight: 'bold', color: pwdMsg.ok ? 'var(--success)' : 'var(--danger)' }}>{pwdMsg.text}</span>}
+                </div>
+              </form>
+            </div>
+          </div>
+
         </div>
 
         {/* MOBILE BOTTOM NAV */}
@@ -1071,6 +1145,9 @@ for (const [base, docs] of grouped) {
           )}
           <div className={`bn-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
             <svg className="icon" viewBox="0 0 24 24" style={{ width: 20, height: 20 }}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg>ملفي
+          </div>
+          <div className={`bn-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+            <Gear size={20} />الإعدادات
           </div>
         </div>
       </div>
