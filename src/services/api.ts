@@ -12,6 +12,18 @@ async function safeJson(response: Response): Promise<any> {
   }
 }
 
+// Surface a clear notice when a Manager hits a permission-denied endpoint.
+function showForbiddenNotice() {
+  const userStr = sessionStorage.getItem('user');
+  if (!userStr) return;
+  try {
+    const user = JSON.parse(userStr);
+    if (user.role === 'Manager') {
+      notify('رفض الوصول (403) — لا تملك صلاحية لهذا الإجراء', 'error');
+    }
+  } catch {}
+}
+
 function getAuthHeaders(isFormData: boolean = false) {
   const token = sessionStorage.getItem('token');
   const headers: any = {};
@@ -49,6 +61,8 @@ export const api = {
           sessionStorage.removeItem('user');
           window.dispatchEvent(new Event('storage'));
           window.location.href = '/';
+        } else if (response.status === 403) {
+          showForbiddenNotice();
         }
       }
       const err = new Error(`API Error: ${errMsg}`) as any;
@@ -74,6 +88,8 @@ export const api = {
           sessionStorage.removeItem('user');
           window.dispatchEvent(new Event('storage'));
           window.location.href = '/';
+        } else if (response.status === 403) {
+          showForbiddenNotice();
         }
       }
       throw new Error(typeof resData === 'object' && resData?.msg ? resData.msg : 'حدث خطأ أثناء العملية');
@@ -97,6 +113,8 @@ export const api = {
           sessionStorage.removeItem('user');
           window.dispatchEvent(new Event('storage'));
           window.location.href = '/';
+        } else if (response.status === 403) {
+          showForbiddenNotice();
         }
       }
       throw new Error(typeof resData === 'object' && resData?.msg ? resData.msg : 'حدث خطأ أثناء العملية');
@@ -127,6 +145,8 @@ export const api = {
           sessionStorage.removeItem('user');
           window.dispatchEvent(new Event('storage'));
           window.location.href = '/';
+        } else if (response.status === 403) {
+          showForbiddenNotice();
         }
       }
       throw new Error(resData.msg || 'Upload failed');
@@ -140,6 +160,7 @@ export const api = {
       headers: getAuthHeaders(),
     });
     if (!response.ok) {
+      if (response.status === 403) showForbiddenNotice();
       throw new Error(`API Error: ${response.statusText}`);
     }
     return response.json();

@@ -13,6 +13,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta, timezone, date
 import re
 import base64
+import functools
 import email_service
 import google_sheets_service
 import microsoft_excel_service
@@ -326,6 +327,78 @@ def log_action(user, action):
     except Exception as e:
         db.session.rollback()
         print(f"Failed to log action: {e}")
+
+
+# --- ROLE-BASED ACCESS CONTROL (RBAC) ---
+# Granular permission matrix stored as JSON in User.permissions.
+# Modules mirror the UI groups; actions: view / add / edit / delete / approve.
+PERMISSION_ACTIONS = ('view', 'add', 'edit', 'delete', 'approve')
+
+DEFAULT_PERMISSIONS = {
+    # إدارة المتدربين والطلبات
+    "interns":          {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": True},
+    "forms":            {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": False},
+    "approve_interns":  {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": True},
+    "assign_encadrant": {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": False},
+    # الوثائق والمستندات
+    "vault":            {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": False},
+    "doc_reupload":     {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": True},
+    "attestation":      {"view": True,  "add": False, "edit": False, "delete": False, "approve": True},
+    # المتابعة والتقييم
+    "attendance":       {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": False},
+    "evaluate_interns": {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": False},
+    "tasks_projects":   {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": False},
+    # النظام والإعدادات (مقيدة افتراضياً للمشرفين)
+    "roles":            {"view": False, "add": False, "edit": False, "delete": False, "approve": False},
+    "system_settings":  {"view": False, "add": False, "edit": False, "delete": False, "approve": False},
+    "activity_logs":    {"view": False, "add": False, "edit": False, "delete": False, "approve": False},
+    "statistics":       {"view": True,  "add": False, "edit": False, "delete": False, "approve": False},
+}
+
+def merge_permissions(permissions_json):
+    """Merge stored permissions JSON over the defaults so every module/action has a value."""
+    stored = {}
+    if permissions_json:
+        try:
+            stored = json.loads(permissions_json)
+        except Exception:
+            stored = {}
+    if not isinstance(stored, dict):
+        stored = {}
+    merged = {}
+    for mod, acts in DEFAULT_PERMISSIONS.items():
+        mod_map = stored.get(mod, {}) if isinstance(stored.get(mod), dict) else {}
+        merged[mod] = {act: bool(mod_map.get(act, default)) for act, default in acts.items()}
+    return merged
+
+def user_permissions(user):
+    """Return the effective permission map for a user. None = full access (Admin)."""
+    if user.role == 'Admin':
+        return None
+    return merge_permissions(user.permissions)
+
+def has_permission(user, module, action):
+    perms = user_permissions(user)
+    if perms is None:
+        return True
+    return bool(perms.get(module, {}).get(action))
+
+def check_permission(module, action):
+    """Decorator enforcing real-time RBAC against the DB. Admin always bypasses; Interns are denied."""
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            role = get_jwt().get('role')
+            if role == 'Admin':
+                return fn(*args, **kwargs)
+            if role != 'Manager':
+                return jsonify({"msg": "Unauthorized"}), 403
+            user = db.session.get(User, get_jwt_identity())
+            if not user or not has_permission(user, module, action):
+                return jsonify({"msg": "Access Denied: لا تملك صلاحية لهذا الإجراء"}), 403
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 # Old smtp logic removed. We now use email_service.py for Gmail integration.
 def send_email(to_email: str, subject: str, body_html: str):
@@ -649,24 +722,35 @@ def login():
     return jsonify({"msg": "اسم المستخدم أو كلمة المرور غير صحيحة"}), 401
 
 
+@app.route('/api/auth/me', methods=['GET'])
+@jwt_required()
+def get_me():
+    """Return fresh identity + effective permissions (bypasses stale JWT claims)."""
+    user = db.session.get(User, get_jwt_identity())
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+    perms = user_permissions(user)
+    return jsonify({
+        "id": user.id, "name": user.name, "username": user.username,
+        "email": user.email, "role": user.role,
+        "permissions": perms,
+        "can_manage_documents": user.can_manage_documents
+    }), 200
+
+
 # --- USERS ROUTES (Admin Only) ---
 @app.route('/api/users', methods=['GET'])
 @jwt_required()
+@check_permission('roles', 'view')
 def get_users():
-    current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-        
     users = User.query.all()
     return jsonify([{"id": u.id, "name": u.name, "username": u.username, "email": u.email, "role": u.role, "permissions": u.permissions, "can_manage_documents": u.can_manage_documents} for u in users])
 
 @app.route('/api/users', methods=['POST'])
 @jwt_required()
+@check_permission('roles', 'add')
 def add_user():
     current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-        
     data = request.json
     
     # Check if username exists
@@ -693,11 +777,9 @@ def add_user():
 
 @app.route('/api/users/<int:user_id>', methods=['PUT'])
 @jwt_required()
+@check_permission('roles', 'edit')
 def update_user(user_id):
     current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-        
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"msg": "User not found"}), 404
@@ -750,11 +832,9 @@ def change_password():
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
 @jwt_required()
+@check_permission('roles', 'delete')
 def delete_user(user_id):
     current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-        
     user = db.session.get(User, user_id)
     if user:
         name_deleted = user.name
@@ -765,11 +845,9 @@ def delete_user(user_id):
 
 @app.route('/api/users/<int:user_id>/reset-password', methods=['POST'])
 @jwt_required()
+@check_permission('roles', 'edit')
 def reset_user_password(user_id):
     current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"msg": "User not found"}), 404
@@ -783,6 +861,7 @@ def reset_user_password(user_id):
 # --- INTERN ROUTES ---
 @app.route('/api/interns', methods=['GET'])
 @jwt_required()
+@check_permission('interns', 'view')
 def get_interns():
     from sqlalchemy import or_, and_
     interns = Intern.query.all()
@@ -843,6 +922,7 @@ def create_user_for_intern(intern_obj):
 
 @app.route('/api/interns/<int:intern_id>', methods=['GET'])
 @jwt_required()
+@check_permission('interns', 'view')
 def get_intern(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
@@ -886,6 +966,7 @@ def get_intern(intern_id):
 
 @app.route('/api/interns', methods=['POST'])
 @jwt_required()
+@check_permission('interns', 'add')
 def add_intern():
     data = request.json
     import json
@@ -937,6 +1018,7 @@ def add_intern():
 
 @app.route('/api/interns/<int:intern_id>', methods=['PUT'])
 @jwt_required()
+@check_permission('interns', 'edit')
 def update_intern(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
@@ -946,6 +1028,9 @@ def update_intern(intern_id):
     import json
     
     current_user = get_jwt()
+    if 'encadrant' in data and data['encadrant'] != intern.encadrant:
+        if not has_permission(db.session.get(User, get_jwt_identity()), 'assign_encadrant', 'edit'):
+            return jsonify({"msg": "Access Denied: لا تملك صلاحية تعيين المؤطر/المشرف"}), 403
     if 'status' in data and data['status'] != intern.status:
         if current_user.get('role') != 'Admin':
             return jsonify({"msg": "Unauthorized: Only Admins can change intern status"}), 403
@@ -1000,6 +1085,7 @@ def update_intern(intern_id):
 
 @app.route('/api/interns/<int:intern_id>/evaluation', methods=['POST'])
 @jwt_required()
+@check_permission('evaluate_interns', 'add')
 def save_evaluation(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
@@ -1034,13 +1120,12 @@ def save_evaluation(intern_id):
 
 @app.route('/api/interns/<int:intern_id>/evaluation/signed-upload', methods=['POST'])
 @jwt_required()
+@check_permission('evaluate_interns', 'edit')
 def upload_signed_evaluation(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
     current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
 
     if 'file' not in request.files:
         return jsonify({"msg": "No file part"}), 400
@@ -1075,12 +1160,14 @@ def upload_signed_evaluation(intern_id):
 
 @app.route('/api/interns/<int:intern_id>/attendance', methods=['GET'])
 @jwt_required()
+@check_permission('attendance', 'view')
 def get_attendance(intern_id):
     records = Attendance.query.filter_by(intern_id=intern_id).order_by(Attendance.date.desc()).all()
     return jsonify([{"id": r.id, "date": r.date, "status": r.status} for r in records])
 
 @app.route('/api/interns/<int:intern_id>/attendance', methods=['POST'])
 @jwt_required()
+@check_permission('attendance', 'add')
 def mark_attendance(intern_id):
     data = request.json
     date = data.get('date')
@@ -1102,6 +1189,7 @@ def mark_attendance(intern_id):
 
 @app.route('/api/forms/sync-microsoft', methods=['POST'])
 @jwt_required()
+@check_permission('forms', 'add')
 def sync_microsoft_forms():
     import microsoft_excel_service
     settings = email_service.get_settings()
@@ -1160,6 +1248,7 @@ def sync_microsoft_forms():
 
 @app.route('/api/forms/generate', methods=['POST'])
 @jwt_required()
+@check_permission('forms', 'add')
 def generate_google_form_endpoint():
     data = request.json
     title = data.get("title", "نموذج جديد")
@@ -1225,6 +1314,7 @@ def oauth_callback():
 
 @app.route('/api/attendance/by-date', methods=['GET'])
 @jwt_required()
+@check_permission('attendance', 'view')
 def get_attendance_by_date():
     from datetime import date as dt_date
     date_str = request.args.get('date')
@@ -1238,8 +1328,91 @@ def get_attendance_by_date():
 import io
 from flask import send_file
 
+
+@app.route('/api/attendance/generate-daily-record', methods=['GET'])
+@jwt_required()
+@check_permission('attendance', 'view')
+def generate_daily_attendance_record():
+    date_str = request.args.get('date')
+    if not date_str:
+        return jsonify({"msg": "Date is required"}), 400
+        
+    try:
+        from datetime import datetime
+        dt = datetime.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({"msg": "Invalid date format"}), 400
+
+    try:
+        import docx
+    except ImportError:
+        return jsonify({"msg": "python-docx library not installed"}), 500
+
+    template_path = os.path.join(os.path.dirname(__file__), '..', 'stagaires.docx')
+    if not os.path.exists(template_path):
+        return jsonify({"msg": "Template file stagaires.docx not found"}), 404
+
+    # Get active interns whose dates overlap with the selected date
+    all_interns = Intern.query.filter_by(status='نشط').all()
+    active_interns = []
+    for intern in all_interns:
+        if intern.start_date:
+            try:
+                start_dt = datetime.strptime(intern.start_date, '%Y-%m-%d')
+                if dt < start_dt:
+                    continue
+            except ValueError:
+                pass
+        if intern.end_date:
+            try:
+                end_dt = datetime.strptime(intern.end_date, '%Y-%m-%d')
+                if dt > end_dt:
+                    continue
+            except ValueError:
+                pass
+        active_interns.append(intern)
+
+    doc = docx.Document(template_path)
+    
+    # Update date in paragraph 1
+    if len(doc.paragraphs) > 1:
+        date_formatted = dt.strftime('%d/%m/%Y')
+        doc.paragraphs[1].text = f"ورقة الحضور بتاريخ {date_formatted}"
+        doc.paragraphs[1].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+        
+    if len(doc.tables) > 0:
+        table = doc.tables[0]
+        # Keep header, remove other rows
+        for _ in range(len(table.rows) - 1):
+            row = table.rows[1]
+            row._element.getparent().remove(row._element)
+            
+        # Add new rows for active interns
+        for intern in active_interns:
+            row_cells = table.add_row().cells
+            # Setting text, preserving basic styling (right aligned if possible)
+            row_cells[0].text = intern.name
+            row_cells[0].paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+            row_cells[1].text = ""
+            row_cells[2].text = ""
+
+    import io
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    
+    filename = f"سجل_الحضور_اليومي_{date_str}.docx"
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    )
+
+
 @app.route('/api/interns/<int:intern_id>/attestation', methods=['GET'])
 @jwt_required()
+@check_permission('attestation', 'approve')
 def generate_attestation(intern_id):
     try:
         from reportlab.pdfgen import canvas
@@ -1299,11 +1472,8 @@ def generate_attestation(intern_id):
 
 @app.route('/api/interns/<int:intern_id>', methods=['DELETE'])
 @jwt_required()
+@check_permission('interns', 'delete')
 def delete_intern(intern_id):
-    current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
@@ -1330,6 +1500,7 @@ os.makedirs(VAULT_FOLDER, exist_ok=True)
 
 @app.route('/api/vault', methods=['GET'])
 @jwt_required()
+@check_permission('vault', 'view')
 def list_vault_documents():
     files = []
     if os.path.exists(VAULT_FOLDER):
@@ -1344,6 +1515,7 @@ def list_vault_documents():
 
 @app.route('/api/vault', methods=['POST'])
 @jwt_required()
+@check_permission('vault', 'add')
 def upload_vault_document():
     if 'file' not in request.files:
         return jsonify({"msg": "No file part"}), 400
@@ -1408,6 +1580,7 @@ def open_vault_document(filename):
 
 @app.route('/api/vault/<filename>', methods=['DELETE'])
 @jwt_required()
+@check_permission('vault', 'delete')
 def delete_vault_document(filename):
     filepath = os.path.join(VAULT_FOLDER, filename)
     if os.path.exists(filepath):
@@ -1421,13 +1594,8 @@ def delete_vault_document(filename):
 
 @app.route('/api/interns/<int:intern_id>/vault-attach', methods=['POST'])
 @jwt_required()
+@check_permission('doc_reupload', 'add')
 def attach_vault_to_intern(intern_id):
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    if current_user.get('role') == 'Manager':
-        if not current_user.get('can_manage_documents', False):
-            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
@@ -1469,6 +1637,7 @@ def attach_vault_to_intern(intern_id):
             related_doc_id=record.id)
         db.session.add(notif)
         db.session.commit()
+    current_user = get_jwt()
     log_action(current_user.get('name'), f"أضاف مستند من الخزنة ({vault_name}){' مع طلب التعبئة' if requires_return else ''} للمتدرب {intern.name}")
     return jsonify({"msg": "تمت الإضافة من الخزنة", "doc_id": record.id}), 200
 
@@ -1541,11 +1710,8 @@ def serve_upload(filename):
 # --- SYSTEM LOGS ROUTE ---
 @app.route('/api/logs', methods=['GET'])
 @jwt_required()
+@check_permission('activity_logs', 'view')
 def get_logs():
-    current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-        
     logs = SystemLog.query.order_by(SystemLog.timestamp.desc()).limit(50).all()
     return jsonify([{
         "id": l.id, 
@@ -1557,11 +1723,8 @@ def get_logs():
 # --- DOCUMENT REQUESTS ROUTES ---
 @app.route('/api/documents/queue', methods=['GET'])
 @jwt_required()
+@check_permission('doc_reupload', 'view')
 def get_documents_queue():
-    current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-    
     docs = DocumentLifecycle.query.all()
     result = []
     for d in docs:
@@ -1584,11 +1747,10 @@ def get_documents_queue():
 
 @app.route('/api/interns/<int:intern_id>/requests', methods=['POST'])
 @jwt_required()
+@check_permission('doc_reupload', 'add')
 def create_document_request(intern_id):
     current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-        
+
     if request.is_json:
         data = request.json
     else:
@@ -1643,6 +1805,8 @@ def create_intern_document_lifecycle(intern_id):
     role = current_user.get('role')
     if role not in ('Admin', 'Manager', 'Intern'):
         return jsonify({"msg": "Unauthorized"}), 403
+    if role == 'Manager' and not has_permission(db.session.get(User, get_jwt_identity()), 'doc_reupload', 'add'):
+        return jsonify({"msg": "Access Denied: لا تملك صلاحية إدارة المستندات"}), 403
 
     intern = db.session.get(Intern, intern_id)
     if not intern:
@@ -1968,10 +2132,8 @@ def read_notification(nid):
 
 @app.route('/api/admin/pending-sign-fill-count', methods=['GET'])
 @jwt_required()
+@check_permission('statistics', 'view')
 def pending_sign_fill_count():
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
     count = DocumentLifecycle.query.filter(
         DocumentLifecycle.action_type.in_(['sign', 'fill', 'sign_fill']),
         DocumentLifecycle.file_path.isnot(None),
@@ -1982,10 +2144,8 @@ def pending_sign_fill_count():
 
 @app.route('/api/admin/pending-review-count', methods=['GET'])
 @jwt_required()
+@check_permission('statistics', 'view')
 def pending_review_count():
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
     count = DocumentLifecycle.query.filter(
         DocumentLifecycle.status == 'PENDING_REVIEW',
         DocumentLifecycle.uploaded_by == 'INTERN'
@@ -2028,10 +2188,8 @@ def mark_notification_read(nid):
 
 @app.route('/api/interns/<int:intern_id>/audit', methods=['GET'])
 @jwt_required()
+@check_permission('doc_reupload', 'view')
 def get_intern_audit(intern_id):
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
     events = AuditEvent.query.join(DocumentLifecycle, DocumentLifecycle.id == AuditEvent.doc_id)\
             .filter(DocumentLifecycle.intern_id == intern_id).order_by(AuditEvent.created_at.desc()).all()
     return jsonify([{
@@ -2044,14 +2202,9 @@ def get_intern_audit(intern_id):
 # --- NEW DOCUMENT WORKFLOW ROUTES ---
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/reject', methods=['POST'])
 @jwt_required()
+@check_permission('doc_reupload', 'approve')
 def reject_document(intern_id, doc_id):
     current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    if current_user.get('role') == 'Manager':
-        if not current_user.get('can_manage_documents', False):
-            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
-        
     data = request.json or {}
     reason = data.get('reason') or data.get('rejection_reason')
     if not reason: return jsonify({"msg": "Reason required"}), 400
@@ -2080,14 +2233,9 @@ def reject_document(intern_id, doc_id):
 
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>', methods=['DELETE'])
 @jwt_required()
+@check_permission('doc_reupload', 'delete')
 def delete_intern_document(intern_id, doc_id):
     current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    if current_user.get('role') == 'Manager':
-        if not current_user.get('can_manage_documents', False):
-            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
-
     doc = db.session.get(DocumentLifecycle, doc_id)
     if not doc or doc.intern_id != intern_id:
         return jsonify({"msg": "Document not found"}), 404
@@ -2100,11 +2248,9 @@ def delete_intern_document(intern_id, doc_id):
 
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/assign', methods=['POST'])
 @jwt_required()
+@check_permission('doc_reupload', 'edit')
 def assign_document(intern_id, doc_id):
     current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-        
     data = request.json or {}
     assign_to_id = data.get('assign_to_id')
     if not assign_to_id: return jsonify({"msg": "assign_to_id required"}), 400
@@ -2127,11 +2273,8 @@ def assign_document(intern_id, doc_id):
 
 @app.route('/api/interns/<int:intern_id>/complete-stage', methods=['POST'])
 @jwt_required()
+@check_permission('attestation', 'approve')
 def complete_stage(intern_id):
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-        
     intern = db.session.get(Intern, intern_id)
     if not intern: return jsonify({"msg": "Not found"}), 404
     
@@ -2385,6 +2528,7 @@ def render_intern_md(intern: Intern) -> str:
 
 @app.route('/api/interns/<int:intern_id>/profile-md', methods=['GET'])
 @jwt_required()
+@check_permission('interns', 'approve')
 def download_profile_md(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
@@ -2396,6 +2540,7 @@ def download_profile_md(intern_id):
 
 @app.route('/api/interns/<int:intern_id>/profile-pdf', methods=['GET'])
 @jwt_required()
+@check_permission('interns', 'approve')
 def download_profile_pdf(intern_id):
     intern = db.session.get(Intern, intern_id)
     if not intern:
@@ -2415,11 +2560,8 @@ def download_profile_pdf(intern_id):
 
 @app.route('/api/interns/export', methods=['GET'])
 @jwt_required()
+@check_permission('interns', 'approve')
 def export_interns():
-    current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-
     fmt = request.args.get('format', 'pdf').lower()
     ids_param = request.args.get('ids')
     if ids_param:
@@ -2541,10 +2683,8 @@ def list_intern_documents(intern_id):
 # ──────────────────────────────────────────────
 @app.route('/api/admin/document-templates', methods=['GET'])
 @jwt_required()
+@check_permission('vault', 'view')
 def get_document_templates():
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
     templates = DocumentTemplate.query.order_by(DocumentTemplate.id).all()
     return jsonify([{
         "id": t.id, "label": t.label,
@@ -2555,9 +2695,8 @@ def get_document_templates():
 
 @app.route('/api/admin/document-templates', methods=['POST'])
 @jwt_required()
+@check_permission('vault', 'add')
 def create_document_template():
-    if get_jwt().get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
     label = (request.form.get('label') or (request.json or {}).get('label') or '').strip()
     if not label:
         return jsonify({"msg": "Label is required"}), 400
@@ -2581,9 +2720,8 @@ def create_document_template():
 
 @app.route('/api/admin/document-templates/<int:tid>', methods=['PUT'])
 @jwt_required()
+@check_permission('vault', 'edit')
 def update_document_template(tid):
-    if get_jwt().get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
     t = db.session.get(DocumentTemplate, tid)
     if not t: return jsonify({"msg": "Not found"}), 404
     label = request.form.get('label') or (request.json or {}).get('label')
@@ -2608,9 +2746,8 @@ def update_document_template(tid):
 
 @app.route('/api/admin/document-templates/<int:tid>', methods=['DELETE'])
 @jwt_required()
+@check_permission('vault', 'delete')
 def delete_document_template(tid):
-    if get_jwt().get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
     t = db.session.get(DocumentTemplate, tid)
     if not t: return jsonify({"msg": "Not found"}), 404
     db.session.delete(t)
@@ -2749,13 +2886,9 @@ def upload_intern_document(intern_id):
 
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/approve', methods=['POST'])
 @jwt_required()
+@check_permission('doc_reupload', 'approve')
 def approve_document(intern_id, doc_id):
     current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    if current_user.get('role') == 'Manager':
-        if not current_user.get('can_manage_documents', False):
-            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
@@ -2773,14 +2906,10 @@ def approve_document(intern_id, doc_id):
 
 @app.route('/api/interns/<int:intern_id>/documents/signed', methods=['POST'])
 @jwt_required()
+@check_permission('doc_reupload', 'add')
 def upload_signed_document(intern_id):
     """Admin uploads a signed/approved version of a document (outgoing to intern)."""
     current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-    if current_user.get('role') == 'Manager':
-        if not current_user.get('can_manage_documents', False):
-            return jsonify({"msg": "غير مصرح لك بإدارة المستندات"}), 403
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
@@ -2939,12 +3068,10 @@ def upload_returned_document(intern_id, doc_id):
 
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/admin-upload', methods=['POST'])
 @jwt_required()
+@check_permission('doc_reupload', 'add')
 def admin_upload_signed(intern_id, doc_id):
     """Admin uploads a signed/filled version in response to an intern's sign/fill request."""
     current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
@@ -3001,12 +3128,10 @@ def admin_upload_signed(intern_id, doc_id):
 
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/admin-delete-upload', methods=['POST'])
 @jwt_required()
+@check_permission('doc_reupload', 'delete')
 def admin_delete_upload(intern_id, doc_id):
     """Admin deletes only their uploaded signed/filled version (keeps the request)."""
     current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
@@ -3025,12 +3150,10 @@ def admin_delete_upload(intern_id, doc_id):
 
 @app.route('/api/interns/<int:intern_id>/documents/<int:doc_id>/accept-request', methods=['POST'])
 @jwt_required()
+@check_permission('doc_reupload', 'approve')
 def admin_accept_request(intern_id, doc_id):
     """Admin accepts the intern's sign/fill request, marking it as in progress."""
     current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
-
     doc = DocumentLifecycle.query.filter_by(id=doc_id, intern_id=intern_id).first()
     if not doc:
         return jsonify({"msg": "Document not found"}), 404
@@ -3288,10 +3411,8 @@ def list_my_documents():
 
 @app.route('/api/interns/<int:intern_id>/export-zip', methods=['GET'])
 @jwt_required()
+@check_permission('interns', 'approve')
 def export_intern_zip(intern_id):
-    current_user = get_jwt()
-    if current_user.get('role') not in ('Admin', 'Manager'):
-        return jsonify({"msg": "Unauthorized"}), 403
     intern = db.session.get(Intern, intern_id)
     if not intern:
         return jsonify({"msg": "Intern not found"}), 404
@@ -3465,6 +3586,7 @@ def export_intern_zip(intern_id):
 
 @app.route('/api/forms', methods=['GET'])
 @jwt_required()
+@check_permission('forms', 'view')
 def get_forms():
     forms = Form.query.order_by(Form.id.desc()).all()
     return jsonify([{
@@ -3477,6 +3599,7 @@ def get_forms():
 
 @app.route('/api/forms', methods=['POST'])
 @jwt_required()
+@check_permission('forms', 'add')
 def save_form():
     data = request.json
     fields = data.get('form_data', [])
@@ -3500,6 +3623,7 @@ def save_form():
 
 @app.route('/api/forms/<int:form_id>', methods=['DELETE'])
 @jwt_required()
+@check_permission('forms', 'delete')
 def delete_form(form_id):
     form = db.session.get(Form, form_id)
     if not form:
@@ -3510,6 +3634,7 @@ def delete_form(form_id):
 
 @app.route('/api/forms/<int:form_id>/toggle', methods=['POST'])
 @jwt_required()
+@check_permission('forms', 'edit')
 def toggle_form(form_id):
     form = db.session.get(Form, form_id)
     if not form:
@@ -3593,6 +3718,7 @@ def public_upload():
 
 @app.route('/api/submissions', methods=['GET'])
 @jwt_required()
+@check_permission('approve_interns', 'view')
 def get_submissions():
     status_filter = request.args.get('status', 'pending')
     submissions = FormSubmission.query.filter_by(status=status_filter).order_by(FormSubmission.id.desc()).all()
@@ -3697,11 +3823,9 @@ def _process_submission_to_intern(submission):
 
 @app.route('/api/submissions/<int:sub_id>/approve', methods=['POST'])
 @jwt_required()
+@check_permission('approve_interns', 'approve')
 def approve_submission(sub_id):
     current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-
     submission = db.session.get(FormSubmission, sub_id)
     if not submission:
         return jsonify({"msg": "الطلب غير موجود"}), 404
@@ -3733,11 +3857,9 @@ def approve_submission(sub_id):
 
 @app.route('/api/submissions/<int:sub_id>/reject', methods=['POST'])
 @jwt_required()
+@check_permission('approve_interns', 'approve')
 def reject_submission(sub_id):
     current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-
     submission = db.session.get(FormSubmission, sub_id)
     if not submission:
         return jsonify({"msg": "الطلب غير موجود"}), 404
@@ -3774,19 +3896,15 @@ def reject_submission(sub_id):
 # --- INTEGRATION API ---
 @app.route('/api/integration/settings', methods=['GET'])
 @jwt_required()
+@check_permission('system_settings', 'view')
 def get_integration_settings():
-    current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
     return jsonify(email_service.get_settings())
 
 @app.route('/api/integration/settings', methods=['POST'])
 @jwt_required()
+@check_permission('system_settings', 'edit')
 def save_integration_settings():
     current_user = get_jwt()
-    if current_user.get('role') != 'Admin':
-        return jsonify({"msg": "Unauthorized"}), 403
-        
     data = request.json
     email_service.save_settings(data)
     log_action(current_user.get('name', 'Admin'), "قام بتحديث إعدادات الربط مع Google Forms & Gmail")
@@ -3794,6 +3912,7 @@ def save_integration_settings():
 
 @app.route('/api/forms/sync-google', methods=['POST'])
 @jwt_required()
+@check_permission('forms', 'add')
 def sync_google_forms():
     settings = email_service.get_settings()
     sheet_link = settings.get('google_sheet_link')

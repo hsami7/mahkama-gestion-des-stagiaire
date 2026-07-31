@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { PermissionProvider } from './context/PermissionContext';
 import { Dashboard } from './pages/Dashboard';
 import { Interns } from './pages/Interns';
 import { FormBuilder } from './pages/FormBuilder';
@@ -38,36 +39,38 @@ function App() {
   }, []);
 
   return (
-    <Routes>
-      <Route path="/login" element={<Login setAuthToken={setToken} />} />
-      <Route path="/apply/:slug" element={<PublicForm />} />
-      
+    <PermissionProvider>
+      <Routes>
+        <Route path="/login" element={<Login setAuthToken={setToken} />} />
+        <Route path="/apply/:slug" element={<PublicForm />} />
 
-      {isIntern ? (
-        <Route path="/*" element={
-          <ProtectedRoute token={token}>
-            <InternPortal />
-          </ProtectedRoute>
-        } />
-      ) : (
-        <Route path="/" element={
-          <ProtectedRoute token={token}>
-            <Layout />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Dashboard />} />
-          <Route path="interns" element={<Interns />} />
-          <Route path="interns/:id" element={<Profile />} />
-          <Route path="form-builder" element={<FormBuilder />} />
-          <Route path="vault" element={<DocumentVault />} />
-          <Route path="attendance" element={<Attendance />} />
-          <Route path="timeline" element={<Timeline />} />
-          <Route path="users" element={<UsersPermissions />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      )}
-    </Routes>
+
+        {isIntern ? (
+          <Route path="/*" element={
+            <ProtectedRoute token={token}>
+              <InternPortal />
+            </ProtectedRoute>
+          } />
+        ) : (
+          <Route path="/" element={
+            <ProtectedRoute token={token}>
+              <Layout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<Dashboard />} />
+            <Route path="interns" element={<Interns />} />
+            <Route path="interns/:id" element={<Profile />} />
+            <Route path="form-builder" element={<FormBuilder />} />
+            <Route path="vault" element={<DocumentVault />} />
+            <Route path="attendance" element={<Attendance />} />
+            <Route path="timeline" element={<Timeline />} />
+            <Route path="users" element={<UsersPermissions />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        )}
+      </Routes>
+    </PermissionProvider>
   );
 }
 

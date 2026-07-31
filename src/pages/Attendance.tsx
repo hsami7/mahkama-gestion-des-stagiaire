@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CalendarCheck, MagnifyingGlass } from '@phosphor-icons/react';
-import { api } from '../services/api';
+import { CalendarCheck, MagnifyingGlass, FileDoc } from '@phosphor-icons/react';
+import { API_BASE, api } from '../services/api';
 import { useToast } from '../components/Toast';
 
 export function Attendance() {
@@ -129,6 +129,22 @@ export function Attendance() {
                 />
               </div>
             </div>
+              <button 
+                className="btn btn-primary sm" 
+                title="تحميل سجل الحضور"
+                onClick={() => {
+                  const url = `${API_BASE}/attendance/generate-daily-record?date=${selectedDate}&token=${sessionStorage.getItem('token')}`;
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = '';
+                  a.click();
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', borderRadius: '8px' }}
+              >
+                <FileDoc size={18} />
+                تحميل السجل
+              </button>
+
           </div>
         </div>
 

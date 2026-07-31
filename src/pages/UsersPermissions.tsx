@@ -2,27 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Trash, PencilSimple, UserList, LockKey } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
+import {
+  PERMISSION_ACTIONS,
+  ACTION_LABELS,
+  DEFAULT_PERMISSIONS,
+  ADMIN_PERMISSIONS,
+  PERMISSION_GROUPS,
+  mergePermissions,
+} from '../permissions';
+import type { PermissionAction, PermissionMap } from '../permissions';
+
+const newUserDefaults = {
+  name: '', email: '', role: '', password: 'password123',
+  permissions: JSON.stringify(DEFAULT_PERMISSIONS),
+  can_manage_documents: false
+};
 
 export function UsersPermissions() {
   const toast = useToast();
-  const defaultPermissions = {
-    interns: { view: true, add: true, edit: true, delete: false },
-    forms: { view: true, add: true, edit: true, delete: false },
-    vault: { view: true, add: true, edit: true, delete: false },
-    roles: { view: false, add: false, edit: false, delete: false },
-    assign_encadrant: { view: true, add: true, edit: true, delete: false },
-    attendance: { view: true, add: true, edit: true, delete: false },
-    approve_interns: { view: true, add: true, edit: true, delete: false },
-    evaluate_interns: { view: true, add: true, edit: true, delete: false }
-  };
 
   const [users, setUsers] = useState<any[]>([]);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
-  const [newUser, setNewUser] = useState({ 
-    name: '', email: '', role: '', password: 'password123',
-    permissions: JSON.stringify(defaultPermissions),
-    can_manage_documents: false
-  });
+  const [newUser, setNewUser] = useState({ ...newUserDefaults });
 
   const fetchUsers = async () => {
     try {
@@ -46,7 +47,7 @@ export function UsersPermissions() {
         await api.post('/users', newUser);
       }
       setEditingUserId(null);
-      setNewUser({ name: '', email: '', role: '', password: 'password123', permissions: JSON.stringify(defaultPermissions), can_manage_documents: false });
+      setNewUser({ ...newUserDefaults });
       fetchUsers();
     } catch (err: any) {
       toast.error(err.message || 'فشل حفظ المستخدم');
@@ -60,7 +61,7 @@ export function UsersPermissions() {
       email: user.email,
       role: user.role,
       password: '',
-      permissions: user.permissions || JSON.stringify(defaultPermissions),
+      permissions: user.permissions || JSON.stringify(DEFAULT_PERMISSIONS),
       can_manage_documents: user.can_manage_documents || false
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -68,7 +69,7 @@ export function UsersPermissions() {
 
   const handleCancelEdit = () => {
     setEditingUserId(null);
-    setNewUser({ name: '', email: '', role: 'Manager', password: 'password123', permissions: JSON.stringify(defaultPermissions), can_manage_documents: false });
+    setNewUser({ ...newUserDefaults, role: 'Manager' });
   };
 
   const handleResetPassword = async (id: number, name: string) => {
@@ -92,39 +93,16 @@ export function UsersPermissions() {
     }
   };
 
-  let currentPerms = defaultPermissions;
-  try {
-    currentPerms = newUser.role === 'Admin' 
-      ? {
-          interns: { view: true, add: true, edit: true, delete: true },
-          forms: { view: true, add: true, edit: true, delete: true },
-          vault: { view: true, add: true, edit: true, delete: true },
-          roles: { view: true, add: true, edit: true, delete: true },
-          assign_encadrant: { view: true, add: true, edit: true, delete: true },
-          attendance: { view: true, add: true, edit: true, delete: true },
-          approve_interns: { view: true, add: true, edit: true, delete: true },
-          evaluate_interns: { view: true, add: true, edit: true, delete: true }
-        }
-      : JSON.parse(newUser.permissions || JSON.stringify(defaultPermissions));
-  } catch (e) {}
+  const currentPerms: PermissionMap = newUser.role === 'Admin'
+    ? ADMIN_PERMISSIONS
+    : mergePermissions(newUser.permissions);
 
-  const handlePermChange = (module: string, action: string, checked: boolean) => {
+  const handlePermChange = (module: string, action: PermissionAction, checked: boolean) => {
     if (newUser.role === 'Admin') return;
-    const updated = { ...currentPerms } as any;
-    if (!updated[module]) updated[module] = { view: false, add: false, edit: false, delete: false };
+    const updated = mergePermissions(newUser.permissions);
+    if (!updated[module]) updated[module] = { view: false, add: false, edit: false, delete: false, approve: false };
     updated[module][action] = checked;
     setNewUser({ ...newUser, permissions: JSON.stringify(updated) });
-  };
-
-  const moduleNames: Record<string, string> = {
-    interns: 'ملفات المتدربين',
-    forms: 'نماذج التسجيل',
-    vault: 'خزنة الوثائق',
-    roles: 'الأدوار والصلاحيات',
-    assign_encadrant: 'تعيين المؤطر (المشرف)',
-    attendance: 'سجل الحضور اليومي',
-    approve_interns: 'قبول ورفض المتدربين',
-    evaluate_interns: 'تقييم المتدربين'
   };
 
   return (
@@ -198,49 +176,42 @@ export function UsersPermissions() {
                 <thead>
                   <tr>
                     <th>الوحدة</th>
-                    <th>عرض</th>
-                    <th>إضافة</th>
-                    <th>تعديل</th>
-                    <th>حذف</th>
+                    {PERMISSION_ACTIONS.map(act => (
+                      <th key={act}>{ACTION_LABELS[act]}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.keys(defaultPermissions).filter(mod => newUser.role === 'Manager' || mod !== 'evaluate_interns').map((mod) => (
-                    <tr key={mod}>
-                      <td style={{ fontWeight: 600 }}>{moduleNames[mod]}</td>
-                      <td>
-                        <input 
-                          type="checkbox" className="chk" 
-                          checked={(currentPerms as any)[mod]?.view || false} 
-                          disabled={newUser.role === 'Admin'}
-                          onChange={(e) => handlePermChange(mod, 'view', e.target.checked)}
-                        />
-                      </td>
-                      <td>
-                        <input 
-                          type="checkbox" className="chk" 
-                          checked={(currentPerms as any)[mod]?.add || false} 
-                          disabled={newUser.role === 'Admin'}
-                          onChange={(e) => handlePermChange(mod, 'add', e.target.checked)}
-                        />
-                      </td>
-                      <td>
-                        <input 
-                          type="checkbox" className="chk" 
-                          checked={(currentPerms as any)[mod]?.edit || false} 
-                          disabled={newUser.role === 'Admin'}
-                          onChange={(e) => handlePermChange(mod, 'edit', e.target.checked)}
-                        />
-                      </td>
-                      <td>
-                        <input 
-                          type="checkbox" className="chk" 
-                          checked={(currentPerms as any)[mod]?.delete || false} 
-                          disabled={newUser.role === 'Admin'}
-                          onChange={(e) => handlePermChange(mod, 'delete', e.target.checked)}
-                        />
-                      </td>
-                    </tr>
+                  {PERMISSION_GROUPS.map((group) => (
+                    <React.Fragment key={group.title}>
+                      <tr style={{ background: 'var(--paper)' }}>
+                        <td colSpan={PERMISSION_ACTIONS.length + 1} style={{ fontWeight: 'bold', color: 'var(--gold-dark)', fontSize: '0.85rem', padding: '8px 12px' }}>
+                          {group.title}
+                        </td>
+                      </tr>
+                      {group.modules.map((mod) => (
+                        <tr key={mod.key}>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{mod.label}</div>
+                            {mod.description && (
+                              <div style={{ fontSize: '0.78rem', color: 'var(--slate)', fontWeight: 400, marginTop: 2 }}>
+                                {mod.description}
+                              </div>
+                            )}
+                          </td>
+                          {PERMISSION_ACTIONS.map(act => (
+                            <td key={act}>
+                              <input 
+                                type="checkbox" className="chk" 
+                                checked={currentPerms[mod.key]?.[act] || false}
+                                disabled={newUser.role === 'Admin'}
+                                onChange={(e) => handlePermChange(mod.key, act, e.target.checked)}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

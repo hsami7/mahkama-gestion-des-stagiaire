@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
+import { usePermissions } from '../context/PermissionContext';
 import { PencilSimple, Trash } from '@phosphor-icons/react';
 
 export function Settings() {
@@ -20,17 +21,21 @@ export function Settings() {
   const [syncing, setSyncing] = useState(false);
   const [syncingMs, setSyncingMs] = useState(false);
 
-  const userStr = sessionStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
-  const isAdmin = user?.role === 'Admin';
+  const { isAdmin, can, ready } = usePermissions();
+  const canViewSettings = isAdmin || can('system_settings', 'view');
+  const canViewLogs = isAdmin || can('activity_logs', 'view');
+  const canViewTemplates = isAdmin || can('vault', 'view');
 
   useEffect(() => {
-    if (isAdmin) {
-      Promise.all([
-        api.get('/logs'),
-        api.get('/integration/settings')
-      ]).then(([logsData, settingsData]) => {
-        setLogs(logsData);
+    if (!ready) return;
+    const promises: Promise<any>[] = [];
+    if (canViewLogs) promises.push(api.get('/logs'));
+    if (canViewSettings) promises.push(api.get('/integration/settings'));
+    if (promises.length === 0) { setLoading(false); return; }
+    Promise.all(promises).then((results: any[]) => {
+      const [logsData, settingsData] = results;
+      if (logsData) setLogs(logsData);
+      if (settingsData) {
         setSheetLink(settingsData.google_sheet_link || '');
         setMicrosoftExcelLink(settingsData.microsoft_excel_link || '');
         setGoogleClientId(settingsData.google_client_id || '');
@@ -38,15 +43,13 @@ export function Settings() {
         setEmailProvider(settingsData.email_provider || 'gmail');
         setGmailAddress(settingsData.gmail_address || '');
         setGmailAppPassword(settingsData.gmail_app_password || '');
-        setLoading(false);
-      }).catch(err => {
-        console.error("Failed to fetch data", err);
-        setLoading(false);
-      });
-    } else {
+      }
       setLoading(false);
-    }
-  }, [isAdmin]);
+    }).catch(err => {
+      console.error("Failed to fetch data", err);
+      setLoading(false);
+    });
+  }, [ready, canViewLogs, canViewSettings]);
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -141,7 +144,7 @@ export function Settings() {
         </form>
       </div>
 
-      {isAdmin && (
+      {canViewSettings && (
         <div className="card" style={{ padding: '32px', marginBottom: '24px', maxWidth: '600px' }}>
           <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>ربط النماذج (Google & Microsoft) والبريد التلقائي</h3>
           <p style={{ color: 'var(--slate)', fontSize: '0.85rem', marginBottom: '24px' }}>
@@ -303,15 +306,15 @@ export function Settings() {
         </div>
       )}
 
-      {isAdmin && (
+      {canViewTemplates && (
         <DocumentTemplatesManager />
       )}
 
-      {!isAdmin ? (
+      {!canViewLogs && !canViewSettings ? (
         <div className="card" style={{ padding: '22px' }}>
           <p style={{ color: 'var(--slate)' }}>إعدادات النظام قيد التطوير. لا تملك صلاحية الوصول للسجلات.</p>
         </div>
-      ) : (
+      ) : canViewLogs ? (
         <div className="card" style={{ padding: '22px' }}>
           <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>سجل نشاطات النظام</h3>
           
@@ -351,7 +354,7 @@ export function Settings() {
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

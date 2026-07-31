@@ -246,17 +246,11 @@ export function FormBuilder() {
                     )}
                   </div>
                   <div style={{ fontSize: '0.82rem', color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Link size={13} />
-                    <code style={{ background: 'var(--paper)', padding: '2px 6px', borderRadius: 4, fontSize: '0.8rem' }}>
-                      /apply/{form.slug}
-                    </code>
                     {form.created_at && <span>· {formatDate(form.created_at)}</span>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn btn-ghost sm" onClick={() => copyLink(form.slug)} title="نسخ الرابط">
-                    <Copy size={15} /> نسخ الرابط
-                  </button>
+                  
                   <button className="btn btn-ghost sm" onClick={() => openEditBuilder(form)} title="تعديل">
                     <PencilSimple size={15} /> تعديل
                   </button>
@@ -308,19 +302,7 @@ export function FormBuilder() {
           />
         </div>
       </div>
-
-      {/* Generated link */}
-      {generatedSlug && (
-        <div className="card" style={{ padding: '14px 22px', marginBottom: 20, background: '#F0FDF4', borderRight: '4px solid var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontWeight: 'bold', color: 'var(--success)', marginBottom: 4 }}>رابط النموذج العام</div>
-            <code style={{ fontSize: '0.88rem', color: 'var(--ink)' }}>{publicUrl(generatedSlug)}</code>
-          </div>
-          <button className="btn btn-ghost sm" onClick={() => copyLink(generatedSlug)}>
-            <Copy size={15} /> نسخ الرابط
-          </button>
-        </div>
-      )}
+      {/* General link removed per user request */}
 
       {/* Generated Google Form link */}
       {googleFormLink && (

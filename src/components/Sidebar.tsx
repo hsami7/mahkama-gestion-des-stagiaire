@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Users, FileText, SquaresFour, Gear, Archive, SignOut, ShieldCheck, House, CalendarCheck, ChartLine } from '@phosphor-icons/react';
 import { api } from '../services/api';
+import { usePermissions } from '../context/PermissionContext';
 
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
+  const { isAdmin, can } = usePermissions();
   const [signFillCount, setSignFillCount] = useState(0);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
 
@@ -31,50 +33,17 @@ export function Sidebar() {
   }, [user?.role]);
   
   const isIntern = user?.role === 'Intern';
-  const isAdmin = user?.role === 'Admin';
-  
-  let canViewAttendance = isAdmin;
-  let canViewInterns = isAdmin;
-  let canViewForms = isAdmin;
-  let canViewVault = isAdmin;
-
-  if (!isAdmin && user?.permissions) {
-    try {
-      const perms = JSON.parse(user.permissions);
-      if (perms?.attendance?.view !== false) canViewAttendance = true;
-      if (perms?.interns?.view !== false) canViewInterns = true;
-      if (perms?.forms?.view !== false) canViewForms = true;
-      if (perms?.vault?.view !== false) canViewVault = true;
-    } catch (e) {}
-  }
-
-  if (user?.role === 'Manager') {
-    if (!user?.permissions) {
-      canViewAttendance = true;
-      canViewInterns = true;
-      canViewForms = true;
-      canViewVault = true;
-    } else {
-      try {
-        const perms = JSON.parse(user.permissions);
-        canViewAttendance = perms?.attendance?.view === true;
-        canViewInterns = perms?.interns?.view === true;
-        canViewForms = perms?.forms?.view === true;
-        canViewVault = perms?.vault?.view === true;
-      } catch (e) {}
-    }
-  }
 
   const baseNavItems = [
     { name: 'لوحة القيادة', path: '/', icon: <SquaresFour size={24} />, show: !isIntern },
-    { name: 'المتدربين', path: '/interns', icon: <Users size={24} />, show: !isIntern && canViewInterns },
-    { name: 'منشئ النماذج', path: '/form-builder', icon: <FileText size={24} />, show: !isIntern && canViewForms },
-    { name: 'خزنة المستندات', path: '/vault', icon: <Archive size={24} />, show: !isIntern && canViewVault },
-    { name: 'سجل الحضور اليومي', path: '/attendance', icon: <CalendarCheck size={24} />, show: !isIntern && canViewAttendance },
-    { name: 'مخطط التغطية', path: '/timeline', icon: <ChartLine size={24} />, show: !isIntern },
-    { name: 'المستخدمين والصلاحيات', path: '/users', icon: <ShieldCheck size={24} />, show: isAdmin },
+    { name: 'المتدربين', path: '/interns', icon: <Users size={24} />, show: !isIntern && can('interns', 'view') },
+    { name: 'منشئ النماذج', path: '/form-builder', icon: <FileText size={24} />, show: !isIntern && can('forms', 'view') },
+    { name: 'خزنة المستندات', path: '/vault', icon: <Archive size={24} />, show: !isIntern && can('vault', 'view') },
+    { name: 'سجل الحضور اليومي', path: '/attendance', icon: <CalendarCheck size={24} />, show: !isIntern && can('attendance', 'view') },
+    { name: 'مخطط التغطية', path: '/timeline', icon: <ChartLine size={24} />, show: !isIntern && can('interns', 'view') },
+    { name: 'المستخدمين والصلاحيات', path: '/users', icon: <ShieldCheck size={24} />, show: !isIntern && can('roles', 'view') },
     { name: 'بوابة المتدرب', path: '/', icon: <House size={24} />, show: isIntern },
-    { name: 'الإعدادات', path: '/settings', icon: <Gear size={24} />, show: true },
+    { name: 'الإعدادات', path: '/settings', icon: <Gear size={24} />, show: !isIntern && (isAdmin || can('system_settings', 'view') || can('activity_logs', 'view')) },
   ];
 
   const navItems = baseNavItems.filter(item => item.show);
