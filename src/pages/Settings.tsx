@@ -24,7 +24,7 @@ export function Settings() {
   const { isAdmin, can, ready } = usePermissions();
   const canViewSettings = isAdmin || can('system_settings', 'view');
   const canViewLogs = isAdmin || can('activity_logs', 'view');
-  const canViewTemplates = isAdmin || can('vault', 'view');
+  const canViewTemplates = isAdmin || can('doc_templates', 'view');
 
   useEffect(() => {
     if (!ready) return;

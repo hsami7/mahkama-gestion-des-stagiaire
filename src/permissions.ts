@@ -23,6 +23,7 @@ export const DEFAULT_PERMISSIONS: PermissionMap = {
   assign_encadrant: { view: true, add: true, edit: true, delete: false, approve: false },
   // الوثائق والمستندات
   vault: { view: true, add: true, edit: true, delete: false, approve: false },
+  doc_templates: { view: true, add: true, edit: true, delete: false, approve: false },
   doc_reupload: { view: true, add: true, edit: true, delete: false, approve: true },
   attestation: { view: true, add: false, edit: false, delete: false, approve: true },
   // المتابعة والتقييم
@@ -104,6 +105,16 @@ export const PERMISSION_HELP: Record<string, {
       edit: 'تعديل تفاصيل الطلب',
       delete: 'حذف طلب أو مستند',
       approve: 'قبول أو رفض مستندات المتدربين',
+    },
+  },
+  doc_templates: {
+    desc: 'قوالب المستندات المطلوبة: إدارة قوالب الوثائق المطلوبة من المتدربين (مثل بطاقة التعريف، اتفاقية التدريب، التأمين، السيرة الذاتية).',
+    actions: {
+      view: 'مشاهدة قوالب المستندات المطلوبة',
+      add: 'إضافة قالب مستند جديد',
+      edit: 'تعديل قالب مستند',
+      delete: 'حذف قالب مستند',
+      approve: 'اعتماد/تفعيل قالب مستند',
     },
   },
   attestation: {
@@ -202,6 +213,7 @@ export const PERMISSION_GROUPS: { title: string; modules: PermissionModule[] }[]
     title: 'الوثائق والمستندات',
     modules: [
       { key: 'vault', label: 'خزنة الوثائق والمستندات' },
+      { key: 'doc_templates', label: 'قوالب المستندات المطلوبة' },
       {
         key: 'doc_reupload',
         label: 'التحكم في المستندات',

@@ -5,6 +5,7 @@ import { api, API_BASE } from '../services/api';
 import { TestModeAutofill } from '../components/TestModeAutofill';
 import { useToast } from '../components/Toast';
 import { AttestationModal } from '../components/AttestationModal';
+import Avatar from '../components/Avatar';
 
 function parseDate(v?: string): Date | null {
   if (!v) return null;
@@ -22,6 +23,16 @@ function remainingDays(endDate?: string): number | null {
   today.setHours(0, 0, 0, 0);
   const diff = end.getTime() - today.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+function formatDateToDDMMYYYY(dateString?: string): string {
+  if (!dateString) return '';
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) return dateString;
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return dateString;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 const defaultIntern = { 
@@ -104,7 +115,10 @@ const filteredInterns = useMemo(() => {
       const intern = location.state.editIntern;
       setNewIntern({
         ...defaultIntern,
-        ...intern
+        ...intern,
+        date_of_birth: formatDateToDDMMYYYY(intern.date_of_birth),
+        start_date: formatDateToDDMMYYYY(intern.start_date),
+        end_date: formatDateToDDMMYYYY(intern.end_date)
       });
       setEditingInternId(intern.id);
       setIsFormOpen(true);
@@ -566,7 +580,7 @@ const filteredInterns = useMemo(() => {
                     </div>
 
                     <div className="dossier-top">
-                      <img src={intern.photo_path || `https://i.pravatar.cc/150?u=${intern.id}`} alt={intern.name} className="dossier-photo" />
+                      <Avatar src={intern.photo_path} name={intern.name} size={64} radius={12} className="dossier-photo" />
                       <div>
                         <div className="dossier-name">{intern.name}</div>
                         <div className="dossier-role">متدرب</div>

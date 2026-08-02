@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Users, FileText, SquaresFour, Gear, Archive, SignOut, ShieldCheck, House, CalendarCheck, ChartLine } from '@phosphor-icons/react';
+import { Users, FileText, SquaresFour, Gear, Archive, SignOut, ShieldCheck, House, CalendarCheck, ChartLine, Key } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { usePermissions } from '../context/PermissionContext';
 
@@ -44,6 +44,7 @@ export function Sidebar() {
     { name: 'المستخدمين والصلاحيات', path: '/users', icon: <ShieldCheck size={24} />, show: !isIntern && can('roles', 'view') },
     { name: 'بوابة المتدرب', path: '/', icon: <House size={24} />, show: isIntern },
     { name: 'الإعدادات', path: '/settings', icon: <Gear size={24} />, show: !isIntern && (isAdmin || can('system_settings', 'view') || can('activity_logs', 'view')) },
+    { name: 'تغيير كلمة المرور', path: '/change-password', icon: <Key size={24} />, show: user?.role === 'Manager' },
   ];
 
   const navItems = baseNavItems.filter(item => item.show);
@@ -63,7 +64,7 @@ export function Sidebar() {
         </div>
         <div>
           <b style={{ fontSize: '15px' }}>{user?.name || 'مستخدم'}</b>
-          <small>{user?.role === 'Admin' ? 'مدير النظام' : user?.role === 'Intern' ? 'متدرب' : 'مستخدم'}</small>
+          <small>{user?.role === 'Admin' ? 'مدير' : user?.role === 'Manager' ? 'مسؤل' : user?.role === 'Intern' ? 'متدرب' : 'مستخدم'}</small>
         </div>
       </div>
 

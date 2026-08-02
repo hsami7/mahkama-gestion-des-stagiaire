@@ -3,6 +3,7 @@ import { FileText, CheckCircle, WarningCircle, Plus, Eye, X, UserCirclePlus, Cha
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
+import Avatar from '../components/Avatar';
 
 function formatDate(d: string | undefined | null): string {
   if (!d) return '—';
@@ -28,6 +29,49 @@ function formatSubmittedAt(iso: string) {
   } catch { return iso; }
 }
 
+// Structured, profile-like rendering for synced submissions.
+const SUB_FIELD_LABELS: Record<string, string> = {
+  name: 'الإسم الكامل (بالعربية)',
+  name_fr: 'الإسم الكامل (بالفرنسة)',
+  email: 'البريد الإلكتروني',
+  national_id: 'رقم البطاقة الوطنية',
+  date_of_birth: 'تاريخ الميلاد',
+  phone: 'رقم الهاتف',
+  university: 'الجامعة / المؤسسة',
+  specialty: 'التخصص',
+  start_date: 'تاريخ بدء التدريب',
+  end_date: 'تاريخ إنتهاء التدريب',
+  address: 'العنوان',
+  department: 'القسم / الدائرة',
+};
+
+const SUB_FIELD_ORDER = ['name', 'name_fr', 'email', 'national_id', 'date_of_birth', 'phone', 'university', 'specialty', 'start_date', 'end_date', 'address', 'department'];
+
+function subNormalizeKey(k: string) {
+  return String(k).toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/[()\s،_-]/g, '');
+}
+
+function buildSubmissionEntries(data: Record<string, any>): { label: string; value: any }[] {
+  const normKeys: Record<string, { label: string; value: any }> = {};
+  for (const [k, v] of Object.entries(data || {})) {
+    if (k === '_source') continue;
+    normKeys[subNormalizeKey(k)] = { label: k, value: v };
+  }
+  const entries: { label: string; value: any }[] = [];
+  const used = new Set<string>();
+  for (const field of SUB_FIELD_ORDER) {
+    const match = normKeys[subNormalizeKey(field)];
+    if (match) {
+      entries.push({ label: SUB_FIELD_LABELS[field], value: match.value });
+      used.add(subNormalizeKey(field));
+    }
+  }
+  for (const [nk, entry] of Object.entries(normKeys)) {
+    if (!used.has(nk)) entries.push(entry);
+  }
+  return entries;
+}
+
 function SubmissionDrawer({ sub, onClose, onApprove, onReject, isAdmin }: {
   sub: any, onClose: () => void,
   onApprove: (id: number) => void,
@@ -37,7 +81,17 @@ function SubmissionDrawer({ sub, onClose, onApprove, onReject, isAdmin }: {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
 
-  const entries = Object.entries(sub.submitted_data || {});
+  const entries = buildSubmissionEntries(sub.submitted_data || {});
+  const applicantName = (() => {
+    const d = sub.submitted_data || {};
+    if (d.name) return d.name;
+    if (d.Name) return d.Name;
+    for (const [k, v] of Object.entries(d)) {
+      const kl = subNormalizeKey(k);
+      if (kl.includes('اسم') || kl.includes('name')) return String(v || '');
+    }
+    return sub.form_title || 'متدرب جديد';
+  })();
 
   return (
     <div style={{
@@ -56,6 +110,15 @@ function SubmissionDrawer({ sub, onClose, onApprove, onReject, isAdmin }: {
           </button>
         </div>
 
+        <div style={{ background: 'var(--gold)', borderRadius: 12, padding: '16px 18px', color: '#fff' }}>
+          <div style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: 4 }}>{applicantName}</div>
+          {entries.find(e => e.label === 'البريد الإلكتروني')?.value && (
+            <div style={{ fontSize: '0.8rem', opacity: 0.9, direction: 'ltr', textAlign: 'right' }}>
+              {entries.find(e => e.label === 'البريد الإلكتروني')?.value}
+            </div>
+          )}
+        </div>
+
         <div style={{ background: 'var(--paper)', borderRadius: 8, padding: '14px 16px' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--slate)', marginBottom: 4 }}>النموذج</div>
           <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{sub.form_title || '—'}</div>
@@ -71,16 +134,16 @@ function SubmissionDrawer({ sub, onClose, onApprove, onReject, isAdmin }: {
           {entries.length === 0 ? (
             <div style={{ color: 'var(--slate)', fontSize: '0.85rem' }}>لا توجد بيانات</div>
           ) : (
-            entries.map(([key, val]: [string, any]) => (
-              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--slate)', fontWeight: 600 }}>{key}</div>
-                {typeof val === 'string' && val.startsWith('/api/uploads/') ? (
-                  <a href={val} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: 'var(--gold-dark)', textDecoration: 'underline' }}>
+            entries.map((entry, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--slate)', fontWeight: 600 }}>{entry.label}</div>
+                {typeof entry.value === 'string' && entry.value.startsWith('/api/uploads/') ? (
+                  <a href={entry.value} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: 'var(--gold-dark)', textDecoration: 'underline' }}>
                     عرض الملف
                   </a>
                 ) : (
                   <div style={{ fontSize: '0.9rem', color: 'var(--ink)', background: 'var(--paper)', padding: '6px 10px', borderRadius: 6 }}>
-                    {String(val) || '—'}
+                    {String(entry.value) || '—'}
                   </div>
                 )}
               </div>
@@ -174,13 +237,23 @@ export function Dashboard() {
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [photoError, setPhotoError] = useState<Record<number, boolean>>({});
   const [showCoverage, setShowCoverage] = useState(false);
+  const [zoomPhoto, setZoomPhoto] = useState<{ src: string; name: string } | null>(null);
 
   const loadInterns = async () => {
     try { setInterns(await api.get('/interns')); } catch (e) { console.error(e); }
   };
 
   const loadSubmissions = async () => {
-    try { setSubmissions(await api.get('/submissions?status=pending')); } catch (e) { console.error(e); }
+    try {
+      const raw = await api.get('/submissions?status=pending');
+      const parsed = raw.map((r: any) => {
+        if (typeof r.submitted_data === 'string') {
+          try { r.submitted_data = JSON.parse(r.submitted_data); } catch (e) { r.submitted_data = {}; }
+        }
+        return r;
+      });
+      setSubmissions(parsed);
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
@@ -245,8 +318,24 @@ export function Dashboard() {
   };
 
   const pendingCount = pendingInterns.length;
-  const missingCount = interns.filter(i => i.status === 'مستندات ناقصة').length;
+  const missingCount = interns.filter(i => i.has_missing_documents).length;
   const activeCount = interns.filter(i => i.status === 'نشط').length;
+
+  const getApplicantName = (sub: any) => {
+    if (!sub || !sub.submitted_data) return sub?.form_title || 'متدرب جديد';
+    const d = sub.submitted_data;
+    if (d.name) return d.name;
+    if (d.Name) return d.Name;
+    
+    for (const key of Object.keys(d)) {
+      if (key === '_source') continue;
+      const kl = String(key).toLowerCase().replace(/أ|إ|آ/g, 'ا').replace(/ة/g, 'ه');
+      if (kl.includes('اسم') || kl.includes('name')) {
+        return d[key];
+      }
+    }
+    return sub?.form_title || 'متدرب جديد';
+  };
 
   const recentInterns = [...interns].reverse().slice(0, 5);
 
@@ -338,10 +427,10 @@ export function Dashboard() {
                       <td>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                           <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gold)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}>
-                            {(sub.submitted_data?.name || sub.submitted_data?.Name || '?').charAt(0)}
+                            {getApplicantName(sub).charAt(0)}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: '0.9rem' }}>{sub.submitted_data?.name || sub.submitted_data?.Name || sub.form_title || 'متدرب جديد'}</div>
+                            <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: '0.9rem' }}>{getApplicantName(sub)}</div>
                           </div>
                         </div>
                       </td>
@@ -383,7 +472,8 @@ export function Dashboard() {
                             <img
                               src={intern.photo_path}
                               alt=""
-                              style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                              style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, cursor: 'pointer' }}
+                              onClick={() => setZoomPhoto({ src: intern.photo_path, name: intern.name })}
                               onError={() => setPhotoError(p => ({...p, [intern.id]: true}))}
                             />
                           ) : (
@@ -469,7 +559,9 @@ export function Dashboard() {
                 <tr key={intern.id}>
                   <td>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                      <img src={intern.photo_path || `https://i.pravatar.cc/150?u=${intern.id}`} alt={intern.name} className="avatar-zoom" style={{ width: 32, height: 32 }} />
+                      <div onClick={() => intern.photo_path && setZoomPhoto({ src: intern.photo_path, name: intern.name })} style={{ cursor: intern.photo_path ? 'pointer' : 'default' }}>
+                        <Avatar src={intern.photo_path} name={intern.name} size={32} />
+                      </div>
                       <div>
                         <div style={{ fontWeight: 'bold', color: 'var(--ink)', fontSize: '0.9rem' }}>{intern.name}</div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--slate)' }}>{intern.email || 'لا يوجد بريد'}</div>
@@ -577,6 +669,17 @@ export function Dashboard() {
                 إغلاق
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {zoomPhoto && (
+        <div className="overlay on" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }} onClick={() => setZoomPhoto(null)}>
+          <div style={{ position: 'relative', background: '#fff', padding: '8px', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setZoomPhoto(null)} style={{ position: 'absolute', top: '-14px', left: '-14px', background: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={20} weight="bold" />
+            </button>
+            <img src={zoomPhoto.src} alt="Zoom" style={{ display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 16px)', borderRadius: '16px', objectFit: 'contain' }} />
           </div>
         </div>
       )}

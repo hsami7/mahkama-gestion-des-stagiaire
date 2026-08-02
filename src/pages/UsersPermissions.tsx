@@ -16,8 +16,8 @@ import type { PermissionAction, PermissionMap } from '../permissions';
 const newUserDefaults = {
   name: '', email: '', role: '', password: 'password123',
   permissions: JSON.stringify(DEFAULT_PERMISSIONS),
+  username: '',
 };
-
 export function UsersPermissions() {
   const toast = useToast();
 
@@ -59,6 +59,7 @@ export function UsersPermissions() {
     setEditingUserId(user.id);
     setNewUser({
       name: user.name,
+      username: user.username || '',
       email: user.email,
       role: user.role,
       password: '',
@@ -127,6 +128,14 @@ export function UsersPermissions() {
               <input 
                 type="text" placeholder="الاسم الكامل" required
                 value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})}
+                className="input"
+              />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>اسم المستخدم</label>
+              <input 
+                type="text" placeholder="اسم المستخدم" required={!editingUserId}
+                value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})}
                 className="input"
               />
             </div>

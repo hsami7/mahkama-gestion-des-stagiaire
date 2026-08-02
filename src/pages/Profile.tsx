@@ -126,6 +126,7 @@ export function Profile() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showAttestationModal, setShowAttestationModal] = useState(false);
   const [exportMode, setExportMode] = useState<'summary' | 'full'>('summary');
+  const [zoomPhoto, setZoomPhoto] = useState(false);
 
   const handleExportAction = async (disposition: 'attachment' | 'inline') => {
     const url = api.exportInternPdf(intern.id, exportMode, disposition);
@@ -239,7 +240,7 @@ export function Profile() {
   const userStr = sessionStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
   const isAdmin = user?.role === 'Admin';
-  const canManageDocs = isAdmin || (user?.role === 'Manager' && user?.can_manage_documents);
+  const canManageDocs = isAdmin || user?.role === 'Manager';
   let canAssignEncadrant = isAdmin;
   let canApproveInterns = isAdmin;
   let canEvaluateInterns = isAdmin;
@@ -807,7 +808,7 @@ export function Profile() {
       </div>
 
       <div className="profile-head">
-        <div className="profile-photo-wrap">
+        <div className="profile-photo-wrap" style={{ cursor: intern.photo_path ? 'pointer' : 'default' }} onClick={() => intern.photo_path && setZoomPhoto(true)}>
           {intern.photo_path ? <img src={intern.photo_path} alt="Profile" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '100%', height: '100%', padding: '15%', color: 'var(--slate)' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>}
         </div>
         <div>
@@ -2365,6 +2366,16 @@ export function Profile() {
                 <Eye size={16} /> معاينة المستند
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {zoomPhoto && intern.photo_path && (
+        <div className="overlay on" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }} onClick={() => setZoomPhoto(false)}>
+          <div style={{ position: 'relative', background: '#fff', padding: '8px', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setZoomPhoto(false)} style={{ position: 'absolute', top: '-14px', left: '-14px', background: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={20} weight="bold" />
+            </button>
+            <img src={intern.photo_path} alt="Zoom" style={{ display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 16px)', borderRadius: '16px', objectFit: 'contain' }} />
           </div>
         </div>
       )}

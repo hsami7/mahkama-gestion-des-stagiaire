@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Users, MagnifyingGlass, Funnel, X, CaretLeft, CaretRight, CalendarBlank, Check, Warning } from '@phosphor-icons/react';
 import { api } from '../services/api';
+import Avatar from './Avatar';
 
 const COLORS = [
   '#2563EB', '#F59E0B', '#10B981', '#8B5CF6', '#EF4444',
@@ -343,7 +344,7 @@ export default function CoverageChart({ internId }: CoverageChartProps) {
                       {isSel && <Check size={12} weight="bold" color="#fff" />}
                     </div>
                     <div style={{ width: 8, height: 8, borderRadius: 3, background: color || 'transparent', border: color ? 'none' : '1px solid var(--line)', flexShrink: 0 }} />
-                    <img src={i.photo_path || `https://i.pravatar.cc/150?u=${i.id}`} alt="" style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
+                    <Avatar src={i.photo_path} name={i.name} size={26} radius={7} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.name}</div>
                       <span style={{ display: 'inline-block', fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: sb.bg, color: sb.fg, marginTop: 1 }}>{sb.s}</span>

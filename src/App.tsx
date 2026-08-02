@@ -10,6 +10,7 @@ import { Login } from './pages/Login';
 import { UsersPermissions } from './pages/UsersPermissions';
 import { InternPortal } from './pages/InternPortal';
 import { Settings } from './pages/Settings';
+import { ChangePassword } from './pages/ChangePassword';
 import { Profile } from './pages/Profile';
 import { Attendance } from './pages/Attendance';
 import { Timeline } from './pages/Timeline';
@@ -66,6 +67,7 @@ function App() {
             <Route path="timeline" element={<Timeline />} />
             <Route path="users" element={<UsersPermissions />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="change-password" element={<ChangePassword />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         )}

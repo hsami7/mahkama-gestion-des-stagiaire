@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MagnifyingGlass, Calendar, Users, X } from '@phosphor-icons/react';
 import { api } from '../services/api';
+import Avatar from '../components/Avatar';
 
 type Intern = {
   id: number;
@@ -57,7 +58,7 @@ export function Scheduling() {
   const [toFilter, setToFilter] = useState('');
   const [selected, setSelected] = useState<number[]>([]);
   const [compared, setCompared] = useState<number[]>([]);
-  const [zoomPhoto, setZoomPhoto] = useState<{ src: string; name: string } | null>(null);
+  const [zoomPhoto, setZoomPhoto] = useState<{ src: string | null | undefined; name: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -146,7 +147,7 @@ export function Scheduling() {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const photoSrc = (i: Intern) => i.photo_path || `https://i.pravatar.cc/150?u=${i.id}`;
+  const photoSrc = (i: Intern) => i.photo_path;
 
   const clearFilters = () => {
     setQuery(''); setStatusFilter(''); setFromFilter(''); setToFilter('');
@@ -218,11 +219,12 @@ export function Scheduling() {
                   }}
                 >
                   <input type="checkbox" checked={isSel} readOnly style={{ pointerEvents: 'none' }} />
-                  <img
+                  <Avatar
                     src={photoSrc(i)}
-                    alt={i.name}
+                    name={i.name}
+                    size={38}
                     onClick={e => { e.stopPropagation(); setZoomPhoto({ src: photoSrc(i), name: i.name }); }}
-                    style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', cursor: 'zoom-in', border: colorMap[i.id] ? `2px solid ${colorMap[i.id]}` : '1px solid var(--line)' }}
+                    border={colorMap[i.id] ? `2px solid ${colorMap[i.id]}` : '1px solid var(--line)'}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 'bold', fontSize: '13.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.name}</div>
@@ -278,11 +280,12 @@ export function Scheduling() {
                   const meta = STATUS_META[intern.status];
                   return (
                     <div key={intern.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <img
+                      <Avatar
                         src={photoSrc(intern)}
-                        alt={intern.name}
+                        name={intern.name}
+                        size={32}
                         onClick={() => setZoomPhoto({ src: photoSrc(intern), name: intern.name })}
-                        style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', cursor: 'zoom-in', border: `2px solid ${colorMap[intern.id]}` }}
+                        border={`2px solid ${colorMap[intern.id]}`}
                       />
                       <div style={{ width: '110px', fontSize: '12.5px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={intern.name}>
                         {intern.name}
@@ -312,9 +315,9 @@ export function Scheduling() {
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'var(--danger-bg)', borderRadius: '8px', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex' }}>
                           {g.members.map(m => (
-                            <img key={m.id} src={photoSrc(m)} alt={m.name} title={m.name}
+                            <Avatar key={m.id} src={photoSrc(m)} name={m.name} size={28}
                               onClick={() => setZoomPhoto({ src: photoSrc(m), name: m.name })}
-                              style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${colorMap[m.id]}`, marginRight: '-8px', cursor: 'zoom-in' }} />
+                              border={`2px solid ${colorMap[m.id]}`} style={{ marginRight: '-8px' }} />
                           ))}
                         </div>
                         <span style={{ fontSize: '12.5px', fontWeight: 'bold' }}>
@@ -339,7 +342,7 @@ export function Scheduling() {
             <button onClick={() => setZoomPhoto(null)} style={{ position: 'absolute', top: '-14px', left: '-14px', background: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
               <X weight="bold" />
             </button>
-            <img src={zoomPhoto.src} alt={zoomPhoto.name} style={{ maxWidth: '80vw', maxHeight: '75vh', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }} />
+            <Avatar src={zoomPhoto.src} name={zoomPhoto.name} size={240} radius={12} />
             <div style={{ color: '#fff', marginTop: '12px', fontWeight: 'bold', fontSize: '1.1rem' }}>{zoomPhoto.name}</div>
           </div>
         </div>

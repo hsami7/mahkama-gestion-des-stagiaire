@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CalendarCheck, MagnifyingGlass, FileDoc } from '@phosphor-icons/react';
 import { API_BASE, api } from '../services/api';
 import { useToast } from '../components/Toast';
+import Avatar from '../components/Avatar';
 
 export function Attendance() {
   const toast = useToast();
@@ -173,7 +174,7 @@ export function Attendance() {
                       <tr key={intern.id}>
                         <td>
                           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            <img src={intern.photo_path || `https://i.pravatar.cc/150?u=${intern.id}`} alt={intern.name} className="avatar-zoom" />
+                            <Avatar src={intern.photo_path} name={intern.name} size={40} />
                             <div>
                               <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{intern.name}</div>
                               <div style={{ fontSize: '12px', color: 'var(--slate)' }}>{intern.email || 'لا يوجد بريد'}</div>

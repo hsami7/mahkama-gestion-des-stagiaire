@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { MagnifyingGlass, Funnel, X, Check, CaretLeft, CaretRight, CalendarBlank, Users, Warning, WarningCircle } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
+import Avatar from '../components/Avatar';
 
 const COLORS = [
   '#2563EB', '#F59E0B', '#10B981', '#8B5CF6', '#EF4444',
@@ -358,7 +359,7 @@ export function Timeline() {
                     {isSel && <Check size={14} weight="bold" color="#fff" />}
                   </div>
                   <div style={{ width: 9, height: 9, borderRadius: 3, background: color || 'transparent', border: color ? 'none' : '1px solid var(--line)', flexShrink: 0 }} />
-                  <img src={i.photo_path || `https://i.pravatar.cc/150?u=${i.id}`} alt="" style={{ width: 30, height: 30, borderRadius: 9, objectFit: 'cover' }} />
+                  <Avatar src={i.photo_path} name={i.name} size={30} radius={9} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.name}</div>
                     <span style={{ display: 'inline-block', fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: sb.bg, color: sb.fg, marginTop: 2 }}>{sb.s}</span>

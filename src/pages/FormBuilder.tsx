@@ -71,6 +71,7 @@ export function FormBuilder() {
   const [view, setView] = useState<'list' | 'builder'>('list');
   const [savedForms, setSavedForms] = useState<SavedForm[]>([]);
   const [editingForm, setEditingForm] = useState<SavedForm | null>(null);
+  const [showManualGuide, setShowManualGuide] = useState(false);
 
   // Builder state
   const [formTitle, setFormTitle] = useState('نموذج تسجيل المتدربين');
@@ -79,7 +80,7 @@ export function FormBuilder() {
   const [newType, setNewType] = useState<FieldType>('text');
   const [newRequired, setNewRequired] = useState(false);
   const [newMapsTo, setNewMapsTo] = useState<MapsTo>('');
-  
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('auth') === 'success') {
@@ -219,17 +220,27 @@ export function FormBuilder() {
             <h2 style={{ marginTop: 0 }}>منشئ النماذج</h2>
             <p>إنشاء نماذج التقديم وإدارة طلبات التسجيل</p>
           </div>
-          <button className="btn btn-gold" onClick={openNewBuilder}>
-            <Plus size={18} weight="bold" /> إنشاء نموذج جديد
-          </button>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button className="btn btn-ghost" onClick={() => setShowManualGuide(true)} style={{ color: 'var(--blue)' }}>
+              <FileText size={18} /> دليل حقول Google Form
+            </button>
+            <button className="btn btn-gold" onClick={openNewBuilder}>
+              <Plus size={18} weight="bold" /> إنشاء نموذج جديد
+            </button>
+          </div>
         </div>
 
         {savedForms.length === 0 ? (
           <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>
             <p style={{ fontSize: '1.1rem', marginBottom: 16 }}>لا توجد نماذج بعد</p>
-            <button className="btn btn-gold" onClick={openNewBuilder}>
-              <Plus size={18} /> إنشاء أول نموذج
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button className="btn btn-gold" onClick={openNewBuilder}>
+                <Plus size={18} /> إنشاء أول نموذج
+              </button>
+              <button className="btn btn-ghost" onClick={() => setShowManualGuide(true)} style={{ color: 'var(--blue)' }}>
+                <FileText size={18} /> دليل حقول Google Form
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -250,7 +261,7 @@ export function FormBuilder() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  
+
                   <button className="btn btn-ghost sm" onClick={() => openEditBuilder(form)} title="تعديل">
                     <PencilSimple size={15} /> تعديل
                   </button>
@@ -264,6 +275,37 @@ export function FormBuilder() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Manual Guide Modal */}
+        {showManualGuide && (
+          <div onClick={() => setShowManualGuide(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: 'white', padding: 30, borderRadius: 12, width: '90%', maxWidth: 500, maxHeight: '80vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+              <h3 style={{ marginTop: 0, marginBottom: 10 }}>دليل حقول Google Form اليدوي</h3>
+              <p style={{ fontSize: '0.9rem', color: 'var(--slate)', marginBottom: 20 }}>
+                إذا كنت تريد إنشاء نموذج Google الخاص بك بشكل يدوي، انسخ هذه الأسماء بالضبط واستخدمها كـ "عناوين للأسئلة" في نموذجك. هكذا سيتمكن النظام من التعرف عليها ومزامنتها تلقائياً.
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto' }}>
+                {Object.entries(MAPS_TO_LABELS).filter(([k]) => k !== '').map(([key, label]) => (
+                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--paper)', borderRadius: 8, border: '1px solid var(--line)' }}>
+                    <span style={{ fontWeight: 500 }}>{label}</span>
+                    <button 
+                      className="btn sm btn-ghost" 
+                      onClick={() => { navigator.clipboard.writeText(label); toast.success('تم نسخ: ' + label); }}
+                      style={{ padding: '4px 12px', gap: 6, display: 'flex', alignItems: 'center' }}
+                    >
+                      <Copy size={16} /> نسخ
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              <div style={{ marginTop: 20, textAlign: 'left' }}>
+                <button className="btn" onClick={() => setShowManualGuide(false)}>إغلاق</button>
+              </div>
+            </div>
           </div>
         )}
       </div>

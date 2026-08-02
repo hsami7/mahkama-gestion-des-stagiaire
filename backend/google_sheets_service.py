@@ -29,9 +29,18 @@ def fetch_google_form_responses(sheet_link):
         response.encoding = 'utf-8'
         csv_data = response.text
         
-        reader = csv.DictReader(io.StringIO(csv_data))
-        rows = list(reader)
-        return {"success": True, "data": rows}
+        parsed = list(csv.reader(io.StringIO(csv_data)))
+        if not parsed:
+            return {"success": True, "data": [], "headers": [], "raw": []}
+        headers = parsed[0]
+        raw = parsed[1:]
+        rows = [dict(zip(headers, row)) for row in raw]
+        return {
+            "success": True,
+            "data": rows,
+            "headers": headers,
+            "raw": raw
+        }
         
     except Exception as e:
         return {"success": False, "msg": f"خطأ في الاتصال: {str(e)}"}

@@ -302,8 +302,11 @@ class DocumentTemplate(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
-def _parse_date(val):
-    """Safely convert a date string to a Python date object for SQLite."""
+def _parse_date(val, us_format=False):
+    """Safely convert a date string to a Python date object for SQLite.
+
+    us_format=True prefers US order (mm/dd/yyyy) used by Google Forms.
+    """
     if not val:
         return None
     if isinstance(val, date):
@@ -311,7 +314,11 @@ def _parse_date(val):
     if not isinstance(val, str):
         return None
     val = val.strip()
-    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y/%m/%d'):
+    if us_format:
+        formats = ('%m/%d/%Y', '%m-%d-%Y', '%m/%d/%y', '%Y-%m-%d', '%d/%m/%Y')
+    else:
+        formats = ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y/%m/%d')
+    for fmt in formats:
         try:
             return datetime.strptime(val, fmt).date()
         except ValueError:
@@ -342,6 +349,7 @@ DEFAULT_PERMISSIONS = {
     "assign_encadrant": {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": False},
     # الوثائق والمستندات
     "vault":            {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": False},
+    "doc_templates":    {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": False},
     "doc_reupload":     {"view": True,  "add": True,  "edit": True,  "delete": False, "approve": True},
     "attestation":      {"view": True,  "add": False, "edit": False, "delete": False, "approve": True},
     # المتابعة والتقييم
@@ -754,14 +762,27 @@ def add_user():
     data = request.json
     
     # Check if username exists
-    if User.query.filter_by(username=data.get('username')).first():
+    username = (data.get('username') or '').strip()
+    if not username:
+        email = (data.get('email') or '').strip()
+        username = email.split('@')[0] if email else f"user_{User.query.count() + 1}"
+        base_username = username
+        counter = 1
+        while User.query.filter_by(username=username).first():
+            username = f"{base_username}{counter}"
+            counter += 1
+    if User.query.filter_by(username=username).first():
         return jsonify({"msg": "اسم المستخدم موجود بالفعل"}), 400
+
+    email = (data.get('email') or '').strip()
+    if email and User.query.filter_by(email=email).first():
+        return jsonify({"msg": "البريد الإلكتروني مستخدم بالفعل"}), 400
 
     hashed_pw = generate_password_hash(data.get('password', 'password123'))
     new_user = User(
-        username=data.get('username'),
+        username=username,
         name=data.get('name'), 
-        email=data.get('email', ''), 
+        email=email, 
         password=hashed_pw, 
         role=data.get('role'), 
         permissions=data.get('permissions', ''),
@@ -883,6 +904,7 @@ def get_interns():
         "has_pending_activity": DocumentLifecycle.query.filter(
             DocumentLifecycle.intern_id == i.id,
             or_(
+                DocumentLifecycle.status == 'AWAITING_ADMIN',
                 and_(
                     DocumentLifecycle.status.in_(activity_statuses),
                     DocumentLifecycle.uploaded_by != 'ADMIN'
@@ -892,6 +914,10 @@ def get_interns():
                     DocumentLifecycle.revision_requested_by == 'INTERN'
                 )
             )
+        ).first() is not None,
+        "has_missing_documents": DocumentLifecycle.query.filter(
+            DocumentLifecycle.intern_id == i.id,
+            DocumentLifecycle.status.in_(['MISSING', 'AWAITING_INTERN', 'AWAITING_RETURN'])
         ).first() is not None
     } for i in interns])
 
@@ -969,46 +995,8 @@ def get_intern(intern_id):
 @check_permission('interns', 'add')
 def add_intern():
     data = request.json
-    import json
-    new_intern = Intern(
-        name=data.get('name'), 
-        name_fr=data.get('name_fr'),
-        email=data.get('email'), 
-        national_id=data.get('national_id'),
-        department=data.get('department'),
-        encadrant=data.get('encadrant'),
-        phone=data.get('phone'),
-        start_date=_parse_date(data.get('start_date')),
-        end_date=_parse_date(data.get('end_date')),
-        date_of_birth=_parse_date(data.get('date_of_birth')),
-        university=data.get('university'),
-        specialty=data.get('specialty'),
-        address=data.get('address'),
-        photo_path=data.get('photo_path'),
-        status=data.get('status', 'قيد المراجعة'),
-        source='إضافة يدوية',
-        documents=json.dumps(data.get('documents', {}))
-    )
-    db.session.add(new_intern)
+    new_intern = create_intern_record(data, 'إضافة يدوية')
     db.session.commit()
-    
-    # Create user account automatically
-    create_user_for_intern(new_intern)
-
-    # Auto-create DocumentLifecycle entries for active templates
-    templates = DocumentTemplate.query.filter_by(is_active=True).all()
-    now = datetime.now(timezone.utc)
-    for t in templates:
-        record = DocumentLifecycle(
-            intern_id=new_intern.id, doc_type='OTHER', status='MISSING',
-            uploaded_by='ADMIN', is_visible_to_intern=True,
-            custom_title=t.label, action_type='view',
-            created_at=now, updated_at=now,
-            source='TEMPLATE_VIEW'
-        )
-        db.session.add(record)
-    if templates:
-        db.session.commit()
 
     current_user = get_jwt()
     user_name = current_user.get('name') if current_user else 'Unknown'
@@ -2155,9 +2143,22 @@ def pending_sign_fill_count():
 @jwt_required()
 @check_permission('statistics', 'view')
 def pending_review_count():
+    from sqlalchemy import or_, and_
     count = DocumentLifecycle.query.filter(
-        DocumentLifecycle.status == 'PENDING_REVIEW',
-        DocumentLifecycle.uploaded_by == 'INTERN'
+        or_(
+            DocumentLifecycle.status == 'AWAITING_ADMIN',
+            and_(
+                DocumentLifecycle.status.in_(['PENDING_REVIEW', 'RETURNED']),
+                or_(
+                    DocumentLifecycle.uploaded_by != 'ADMIN',
+                    DocumentLifecycle.uploaded_by == None
+                )
+            ),
+            and_(
+                DocumentLifecycle.status == 'REVISION_REQUESTED',
+                DocumentLifecycle.revision_requested_by == 'INTERN'
+            )
+        )
     ).with_entities(DocumentLifecycle.intern_id).distinct().count()
     return jsonify({"count": count})
 
@@ -2692,7 +2693,7 @@ def list_intern_documents(intern_id):
 # ──────────────────────────────────────────────
 @app.route('/api/admin/document-templates', methods=['GET'])
 @jwt_required()
-@check_permission('vault', 'view')
+@check_permission('doc_templates', 'view')
 def get_document_templates():
     templates = DocumentTemplate.query.order_by(DocumentTemplate.id).all()
     return jsonify([{
@@ -2704,7 +2705,7 @@ def get_document_templates():
 
 @app.route('/api/admin/document-templates', methods=['POST'])
 @jwt_required()
-@check_permission('vault', 'add')
+@check_permission('doc_templates', 'add')
 def create_document_template():
     label = (request.form.get('label') or (request.json or {}).get('label') or '').strip()
     if not label:
@@ -2729,7 +2730,7 @@ def create_document_template():
 
 @app.route('/api/admin/document-templates/<int:tid>', methods=['PUT'])
 @jwt_required()
-@check_permission('vault', 'edit')
+@check_permission('doc_templates', 'edit')
 def update_document_template(tid):
     t = db.session.get(DocumentTemplate, tid)
     if not t: return jsonify({"msg": "Not found"}), 404
@@ -2755,7 +2756,7 @@ def update_document_template(tid):
 
 @app.route('/api/admin/document-templates/<int:tid>', methods=['DELETE'])
 @jwt_required()
-@check_permission('vault', 'delete')
+@check_permission('doc_templates', 'delete')
 def delete_document_template(tid):
     t = db.session.get(DocumentTemplate, tid)
     if not t: return jsonify({"msg": "Not found"}), 404
@@ -3743,6 +3744,7 @@ def get_submissions():
             "form_id": s.form_id,
             "form_title": form.title if form else "—",
             "submitted_data": data,
+            "source": data.get('_source', 'إضافة يدوية'),
             "status": s.status,
             "submitted_at": s.submitted_at,
             "rejection_reason": s.rejection_reason,
@@ -3750,34 +3752,70 @@ def get_submissions():
         })
     return jsonify(result)
 
-def _process_submission_to_intern(submission):
-    try:
-        data = json.loads(submission.submitted_data)
-    except Exception:
-        data = {}
+def _map_submission_fields(data, mapping=None):
+    """Turn a raw submission row (Arabic titles or canonical keys) into an intern field dict.
 
-    form = db.session.get(Form, submission.form_id)
-    fields = []
-    if form:
-        try:
-            fields = json.loads(form.form_data)
-        except Exception:
-            pass
+    Uses the same exact-mapping + generic fallback logic for both Google Form rows
+    and form-builder submissions.
+    """
+    mapping = mapping or {}
 
-    # Map form fields to intern model
-    mapping = {f['label']: f.get('maps_to') for f in fields if f.get('maps_to')}
+    # Add exact mapping for the manual Google Forms guide
+    exact_mapping = {
+        "الإسم الكامل (بالعربية)": "name",
+        "الإسم الكامل (بالفرنسة)": "name_fr",
+        "البريد الإلكتروني": "email",
+        "رقم البطاقة الوطنية": "national_id",
+        "رقم الهاتف": "phone",
+        "الجامعة / المؤسسة": "university",
+        "التخصص": "specialty",
+        "تاريخ بدء التدريب": "start_date",
+        "تاريخ إنتهاء التدريب": "end_date",
+        "تاريخ الميلاد": "date_of_birth",
+        "العنوان": "address",
+        "القسم / الدائرة": "department",
+        "الصورة الشخصية": "photo_path"
+    }
+
     intern_data = {'name': None, 'name_fr': None, 'email': None, 'national_id': None,
                    'phone': None, 'university': None, 'specialty': None, 'start_date': None, 'end_date': None,
                    'date_of_birth': None, 'address': None, 'department': None, 'photo_path': None}
 
     for label, value in data.items():
-        mapped_field = mapping.get(label)
+        mapped_field = mapping.get(label) or exact_mapping.get(label.strip())
         if mapped_field and mapped_field in intern_data:
             intern_data[mapped_field] = value
-            
-    # Use any text field as name fallback
+
+    # Use generic fallbacks if mapping missed something
+    for k, v in data.items():
+        if k == '_source': continue
+        kl = str(k).lower().replace('إ', 'ا').replace('أ', 'ا').replace('آ', 'ا').replace('ة', 'ه')
+        if not intern_data['name'] and ('name' in kl or ('اسم' in kl and 'عرب' in kl)):
+            intern_data['name'] = v
+        elif not intern_data['name'] and ('اسم' in kl or 'name' in kl):
+            intern_data['name'] = v
+
+        if not intern_data['name_fr'] and ('name_fr' in kl or 'فرنس' in kl or 'nom' in kl):
+            intern_data['name_fr'] = v
+        if not intern_data['email'] and ('email' in kl or 'بريد' in kl):
+            intern_data['email'] = v
+        if not intern_data['national_id'] and ('national' in kl or 'بطاق' in kl or 'cin' in kl):
+            intern_data['national_id'] = v
+        if not intern_data['phone'] and ('phone' in kl or 'هاتف' in kl or 'tel' in kl):
+            intern_data['phone'] = v
+        if not intern_data['university'] and ('university' in kl or 'جامع' in kl or 'مؤسس' in kl or 'معهد' in kl):
+            intern_data['university'] = v
+        if not intern_data['specialty'] and ('specialty' in kl or 'تخصص' in kl or 'شعب' in kl):
+            intern_data['specialty'] = v
+        if not intern_data['start_date'] and ('start' in kl or 'بدء' in kl or 'بداي' in kl):
+            intern_data['start_date'] = v
+        if not intern_data['end_date'] and ('end' in kl or 'نهاي' in kl or 'إنتهاء' in kl or 'انتهاء' in kl):
+            intern_data['end_date'] = v
+        if not intern_data['date_of_birth'] and ('birth' in kl or 'ميلاد' in kl or 'ازدياد' in kl):
+            intern_data['date_of_birth'] = v
+
     if not intern_data['name']:
-        intern_data['name'] = data.get(list(data.keys())[0], 'متدرب جديد') if data else 'متدرب جديد'
+        intern_data['name'] = 'متدرب جديد'
 
     # Fallback for photo_path
     if not intern_data['photo_path']:
@@ -3785,34 +3823,45 @@ def _process_submission_to_intern(submission):
             if 'photo' in k.lower() or 'صورة' in k:
                 intern_data['photo_path'] = v
                 break
-                
+
     # Convert Google Drive URL to direct image link
     photo_path = intern_data.get('photo_path')
     if photo_path and isinstance(photo_path, str) and 'drive.google.com/open?id=' in photo_path:
         intern_data['photo_path'] = photo_path.replace('open?id=', 'uc?export=view&id=')
 
-    now = datetime.now(timezone.utc).isoformat()
+    return intern_data
+
+
+def create_intern_record(data, source):
+    """Create an Intern using the SAME code as the manual add (add_intern).
+
+    Shared by the manual 'إضافة يدوية' route and the Google Form sync so both
+    write to the same table/fields, differing only in `source`.
+    """
+    us_format = source == 'نمازج جوجل'
     new_intern = Intern(
-        name=intern_data['name'] or 'متدرب جديد',
-        name_fr=intern_data['name_fr'],
-        email=intern_data['email'],
-        national_id=intern_data['national_id'],
-        phone=intern_data['phone'],
-        university=intern_data['university'],
-        specialty=intern_data['specialty'],
-        start_date=intern_data['start_date'],
-        end_date=intern_data['end_date'],
-        date_of_birth=intern_data['date_of_birth'],
-        address=intern_data['address'],
-        department=intern_data['department'],
-        photo_path=intern_data['photo_path'],
-        status='قيد المراجعة',
-        source='نماذج جوجل'
+        name=data.get('name') or 'متدرب جديد',
+        name_fr=data.get('name_fr'),
+        email=data.get('email'),
+        national_id=data.get('national_id'),
+        department=data.get('department'),
+        encadrant=data.get('encadrant'),
+        phone=data.get('phone'),
+        start_date=_parse_date(data.get('start_date'), us_format=us_format),
+        end_date=_parse_date(data.get('end_date'), us_format=us_format),
+        date_of_birth=_parse_date(data.get('date_of_birth'), us_format=us_format),
+        university=data.get('university'),
+        specialty=data.get('specialty'),
+        address=data.get('address'),
+        photo_path=data.get('photo_path'),
+        status=data.get('status', 'قيد المراجعة'),
+        source=source,
+        documents=json.dumps(data.get('documents', {}))
     )
     db.session.add(new_intern)
     db.session.flush()
 
-    # Automatically create user account for the new intern
+    # Create user account automatically
     create_user_for_intern(new_intern)
 
     # Auto-create DocumentLifecycle entries for active templates
@@ -3829,6 +3878,25 @@ def _process_submission_to_intern(submission):
         db.session.add(record)
 
     return new_intern
+
+
+def _process_submission_to_intern(submission):
+    try:
+        data = json.loads(submission.submitted_data)
+    except Exception:
+        data = {}
+
+    form = db.session.get(Form, submission.form_id)
+    mapping = {}
+    if form:
+        try:
+            fields = json.loads(form.form_data)
+            mapping = {f['label']: f.get('maps_to') for f in fields if f.get('maps_to')}
+        except Exception:
+            pass
+
+    intern_data = _map_submission_fields(data, mapping)
+    return create_intern_record(intern_data, 'نمازج جوجل')
 
 @app.route('/api/submissions/<int:sub_id>/approve', methods=['POST'])
 @jwt_required()
@@ -3919,6 +3987,71 @@ def save_integration_settings():
     log_action(current_user.get('name', 'Admin'), "قام بتحديث إعدادات الربط مع Google Forms & Gmail")
     return jsonify({"success": True})
 
+# --- GOOGLE SHEET ROW NORMALIZATION ---
+# Used when a manually-created sheet has degenerate headers (e.g. all columns
+# named "Timestamp"): we fall back to mapping columns by position.
+# Column order matches the manual Google Sheets guide:
+#   col0 Timestamp (skipped), col1 name, col2 name_fr, col3 email,
+#   col4 national_id, col5 date_of_birth, col6 phone, col7 university,
+#   col8 specialty, col9 start_date, col10 end_date
+GOOGLE_COLUMN_FALLBACK = {
+    1: 'name', 2: 'name_fr', 3: 'email', 4: 'national_id', 5: 'date_of_birth',
+    6: 'phone', 7: 'university', 8: 'specialty', 9: 'start_date', 10: 'end_date',
+}
+
+def _norm_key(k):
+    return str(k).lower().replace('إ', 'ا').replace('أ', 'ا').replace('آ', 'ا').replace('ة', 'ه')
+
+def extract_email_from_row(row):
+    email = ''
+    for k, v in row.items():
+        if 'email' in k.lower() or 'بريد' in k:
+            email = v or ''
+            break
+    return str(email).strip()
+
+def has_meaningful_data(row):
+    """Skip rows with no name and no email (e.g. empty/timestamp-only rows)."""
+    values = [str(v or '').strip() for k, v in row.items() if k != '_source']
+    if not any(values):
+        return False
+    email = extract_email_from_row(row)
+    if email:
+        return True
+    for k, v in row.items():
+        kl = _norm_key(k)
+        if ('اسم' in kl or 'name' in kl) and str(v or '').strip():
+            return True
+    return False
+
+def normalize_google_rows(res):
+    """Convert fetched Google Sheet rows into usable dicts.
+
+    If headers are degenerate (all identical or all empty), rebuild the rows
+    positionally using GOOGLE_COLUMN_FALLBACK.
+    """
+    rows = res.get('data') or []
+    headers = [str(h or '').strip() for h in (res.get('headers') or [])]
+    raw = res.get('raw') or []
+
+    # Detect degenerate headers: all cells equal (e.g. "Timestamp" repeated) or all empty.
+    non_empty_headers = [h for h in headers if h]
+    degenerate = (not non_empty_headers) or len(set(non_empty_headers)) == 1
+
+    if not degenerate:
+        return rows
+
+    normalized = []
+    for raw_row in raw:
+        row = {}
+        for idx, value in enumerate(raw_row):
+            field = GOOGLE_COLUMN_FALLBACK.get(idx)
+            if field:
+                row[field] = value
+        if row:
+            normalized.append(row)
+    return normalized
+
 @app.route('/api/forms/sync-google', methods=['POST'])
 @jwt_required()
 @check_permission('forms', 'add')
@@ -3932,50 +4065,25 @@ def sync_google_forms():
     if not res['success']:
         return jsonify(res), 400
         
-    rows = res['data']
+    rows = normalize_google_rows(res)
     added_count = 0
-    # To avoid duplicates, we check if we already have this data based on email or timestamp.
-    # Simple deduplication: Hash the row JSON and check if it exists
+    # To avoid duplicates, skip if an intern with this email already exists.
     for row in rows:
-        row_json = json.dumps(row, ensure_ascii=False)
-        existing = FormSubmission.query.filter_by(submitted_data=row_json).first()
-        if not existing:
-            # Try to find email
-            email = row.get('Email', '') or row.get('بريد', '') or row.get('البريد الإلكتروني', '')
-            for k, v in row.items():
-                if 'email' in k.lower() or 'بريد' in k:
-                    email = v
-                    break
-            
-            # Try to find name
-            name = row.get('Name', '') or row.get('الاسم', '') or row.get('الاسم الكامل', '')
-            for k, v in row.items():
-                if 'name' in k.lower() or 'اسم' in k:
-                    name = v
-                    break
-            default_form = Form.query.first()
-            sub = FormSubmission(
-                form_id=default_form.id if default_form else 1,
-                submitted_data=row_json,
-                status='pending' # Will be approved instantly below
-            )
-            db.session.add(sub)
-            db.session.flush() # So it gets an ID
-            
-            # AUTO APPROVE IT
-            new_intern = _process_submission_to_intern(sub)
-            new_intern.status = 'قيد المراجعة'
-            new_intern.source = 'نماذج جوجل'
-            
-            # Since we just created it and it's attached to session, just flush
-            db.session.flush()
-            log_action(get_jwt_identity(), f"تم المزامنة التلقائية للطلب #{sub.id} كمتدرب #{new_intern.id}")
-            
-            added_count += 1
-    db.session.commit()
+        if not has_meaningful_data(row):
+            continue
+        email = extract_email_from_row(row)
+        if email and Intern.query.filter_by(email=email).first():
+            continue
+        intern_data = _map_submission_fields(row)
+        new_intern = create_intern_record(intern_data, 'نمازج جوجل')
+        db.session.commit()
+
+        log_action(get_jwt_identity(), f"تم استيراد متدرب جديد من نماذج جوجل: {new_intern.name}")
+
+        added_count += 1
     if added_count > 0:
-        log_action(get_jwt_identity(), f"تم مزامنة {added_count} طلب جديد من Google Forms")
-        
+        log_action(get_jwt_identity(), f"تم مزامنة {added_count} متدرب جديد من Google Forms")
+
     return jsonify({"success": True, "added": added_count})
 
 # --- BACKGROUND AUTO-SYNC LOOP ---
@@ -3994,28 +4102,22 @@ def auto_sync_loop():
                     if sheet_link:
                         res = google_sheets_service.fetch_google_form_responses(sheet_link)
                         if res['success']:
-                            rows = res['data']
+                            rows = normalize_google_rows(res)
                             added_count = 0
                             for row in rows:
-                                row_json = json.dumps(row, ensure_ascii=False)
-                                existing = FormSubmission.query.filter_by(submitted_data=row_json).first()
-                                if not existing:
-                                    default_form = Form.query.first()
-                                    sub = FormSubmission(
-                                        form_id=default_form.id if default_form else 1,
-                                        submitted_data=row_json,
-                                        status='pending'
-                                    )
-                                    db.session.add(sub)
-                                    db.session.flush()
-                                    new_intern = _process_submission_to_intern(sub)
-                                    new_intern.status = 'قيد المراجعة'
-                                    new_intern.source = 'نماذج جوجل'
-                                    db.session.flush()
-                                    added_count += 1
+                                if not has_meaningful_data(row):
+                                    continue
+                                email = extract_email_from_row(row)
+                                if email and Intern.query.filter_by(email=email).first():
+                                    continue
+                                intern_data = _map_submission_fields(row)
+                                new_intern = create_intern_record(intern_data, 'نمازج جوجل')
+                                db.session.commit()
+
+                                added_count += 1
                             if added_count > 0:
                                 db.session.commit()
-                                log_action("النظام", f"تم مزامنة {added_count} طلب جديد من Google Forms تلقائيا")
+                                log_action("النظام", f"تم مزامنة {added_count} متدرب جديد من Google Forms تلقائيا")
                 except Exception as e:
                     print(f"Auto-Sync Google Error: {e}")
 
@@ -4030,6 +4132,7 @@ def auto_sync_loop():
                             rows = res['data']
                             added_count = 0
                             for row in rows:
+                                row['_source'] = 'نماذج مايكروسوفت'
                                 row_json = json.dumps(row, ensure_ascii=False)
                                 
                                 # Duplicate check
@@ -4052,10 +4155,7 @@ def auto_sync_loop():
                                     )
                                     db.session.add(new_sub)
                                     db.session.flush()
-                                    new_intern = _process_submission_to_intern(new_sub)
-                                    new_intern.status = 'قيد المراجعة'
-                                    new_intern.source = 'نماذج مايكروسوفت'
-                                    db.session.flush()
+
                                     added_count += 1
                             
                             if added_count > 0:
@@ -4114,8 +4214,12 @@ def auto_complete_job():
                     # 'U.UOU.U,' and 'U.OU?U^O ' (completed and disabled)
                     if intern.end_date and intern.status != 'U.UOU.U,' and intern.status != 'U.O1U?U^O':
                         try:
-                            # format is dd/mm/yyyy
-                            end_date_obj = datetime.strptime(intern.end_date, '%d/%m/%Y').date()
+                            # end_date may be a date object or a dd/mm/yyyy string
+                            end_val = intern.end_date
+                            if isinstance(end_val, str):
+                                end_date_obj = datetime.strptime(end_val, '%d/%m/%Y').date()
+                            else:
+                                end_date_obj = end_val
                             if today > end_date_obj:
                                 # Check if documents are ready
                                 required_types = ['CIN', 'CV', 'DEMANDE', 'CONVENTION_SIGNED', 'FINAL_REPORT']
