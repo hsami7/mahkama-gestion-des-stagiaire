@@ -1,0 +1,49 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Python
+__pycache__/
+*.pyc
+
+# Databases (local data)
+*.sqlite
+database.sqlite
+instance/
+
+# Uploaded files / generated assets
+backend/uploads/
+backend/vault/
+interns_output.json
+
+# Local agent/skills dir
+.agents/
+backend/google_token.pickle
+backend/integration_settings.json
+
+# Added by agent
+backenduploads/
+.env
+venv/
+.pytest_cache/
