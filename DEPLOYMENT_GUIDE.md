@@ -30,6 +30,14 @@ Since the Windows Server will act as the "Host" for the application, it needs tw
    - Copy the folder: `instance/` (contains `interns.db` - your entire database).
    - Paste both folders directly inside the `C:\Mahkama_App` folder on the Server.
 
+3. **Set the Secret Security Key**:
+   - Inside `C:\Mahkama_App\backend`, right-click and create a new text file named **`.env`** (make sure it doesn't end in .txt).
+   - Open it in Notepad and paste the following line:
+     ```text
+     JWT_SECRET_KEY=mhk_492f8a7e!9b2c_41d3_a891_74f2e9d8b1c4_COURT2026
+     ```
+   - Save the file. (This secures the login sessions).
+
 ---
 
 ## Phase 3: Building and Running the Server
