@@ -4221,7 +4221,7 @@ def serve_react_app(path):
     else:
         return send_from_directory(app.static_folder, 'index.html')
 
-if __name__ == '__main__':
+def setup_app():
     init_db()
     # Fix: records uploaded before the status-update bug was fixed
     with app.app_context():
@@ -4253,5 +4253,9 @@ if __name__ == '__main__':
             db.session.rollback()
             print(f"Notification migration: {e}")
 
+# Run setup unconditionally so Waitress initializes the DB tables
+setup_app()
+
+if __name__ == '__main__':
     # Start the application
     app.run(host='0.0.0.0', port=5055, debug=False)
