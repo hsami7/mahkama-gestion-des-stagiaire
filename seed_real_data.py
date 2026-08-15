@@ -6,7 +6,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 
 from datetime import date, datetime, timedelta, timezone
 from werkzeug.security import generate_password_hash
-from app import app, db, User, Intern, Attendance, DocumentRequest, SystemLog, Form
+from app import app, db, User, Intern, Attendance, DocumentRequest, DocumentLifecycle, SystemLog, Form
 
 def seed():
     with app.app_context():
@@ -121,10 +121,84 @@ def seed():
         db.session.add_all([intern1, intern2, intern3])
         db.session.commit()
         
+        # User accounts for interns
         u1 = User(username=intern1.email, name=intern1.name, email=intern1.email, password=generate_password_hash('password123'), role='Intern')
         u2 = User(username=intern2.email, name=intern2.name, email=intern2.email, password=generate_password_hash('password123'), role='Intern')
         u3 = User(username=intern3.email, name=intern3.name, email=intern3.email, password=generate_password_hash('password123'), role='Intern')
         db.session.add_all([u1, u2, u3])
+
+        print("Seeding Document Lifecycle Records...")
+        # Document Center files for Youssef El Idrissi
+        d1 = DocumentLifecycle(
+            intern_id=intern1.id,
+            doc_type='CIN',
+            custom_title='بطاقة التعريف الوطنية (CNI)',
+            file_path='/api/uploads/intern1.png',
+            uploaded_by='INTERN',
+            status='APPROVED_AND_SIGNED',
+            is_visible_to_intern=True,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        d2 = DocumentLifecycle(
+            intern_id=intern1.id,
+            doc_type='CONVENTION_SIGNED',
+            custom_title='اتفاقية التدريب الموقعة',
+            file_path='/api/uploads/intern1.png',
+            uploaded_by='INTERN',
+            status='APPROVED_AND_SIGNED',
+            is_visible_to_intern=True,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        d3 = DocumentLifecycle(
+            intern_id=intern1.id,
+            doc_type='INSURANCE',
+            custom_title='شهادة التأمين الصحي ضد الحوادث',
+            file_path='/api/uploads/intern1.png',
+            uploaded_by='INTERN',
+            status='APPROVED_AND_SIGNED',
+            is_visible_to_intern=True,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        d4 = DocumentLifecycle(
+            intern_id=intern1.id,
+            doc_type='CV',
+            custom_title='السيرة الذاتية (Curriculum Vitae)',
+            file_path='/api/uploads/intern1.png',
+            uploaded_by='INTERN',
+            status='PENDING_REVIEW',
+            is_visible_to_intern=True,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        
+        # Documents for Sara El Alami
+        d5 = DocumentLifecycle(
+            intern_id=intern2.id,
+            doc_type='CIN',
+            custom_title='بطاقة التعريف الوطنية',
+            file_path='/api/uploads/intern2.png',
+            uploaded_by='INTERN',
+            status='APPROVED_AND_SIGNED',
+            is_visible_to_intern=True,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+
+        db.session.add_all([d1, d2, d3, d4, d5])
+
+        print("Seeding Document Requests...")
+        req1 = DocumentRequest(
+            intern_id=intern1.id,
+            document_type='other',
+            custom_title='كشف النقط للسنة الأخيرة',
+            note='يرجى رفع كشف النقط لسنة 2025/2026 المصادق عليه',
+            status='pending',
+            created_at=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')
+        )
+        db.session.add(req1)
 
         print("Seeding Attendance Logs...")
         today = date.today()
@@ -140,7 +214,7 @@ def seed():
         db.session.add_all([log1, log2])
         
         db.session.commit()
-        print("Successfully seeded Moroccan court data into database!")
+        print("Successfully seeded full document center and intern portal data!")
 
 if __name__ == '__main__':
     seed()

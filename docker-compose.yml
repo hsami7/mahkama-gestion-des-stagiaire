@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  mahkama-app:
+    build: .
+    container_name: mahkama_intern_manager
+    ports:
+      - "5055:5055"
+    volumes:
+      - ./backend/instance:/app/backend/instance
+      - ./backend/uploads:/app/backend/uploads
+    restart: unless-stopped
+    environment:
+      - JWT_SECRET_KEY=mhk_492f8a7e!9b2c_41d3_a891_74f2e9d8b1c4_COURT2026

@@ -4,16 +4,21 @@ This guide explains step-by-step how to deploy the application on the Court's Wi
 
 ---
 
-## Phase 1: Preparing the Windows Server
+## ⚡ Recommended One-Click Deployment (Docker)
 
-Since the Windows Server will act as the "Host" for the application, it needs two basic software packages installed.
+The absolute easiest way to install and run the app is using Docker. It handles **everything** for you behind the scenes. 
+*Note: You do NOT need to install Node.js, npm, Python, or SQLite on the server yourself. Docker creates isolated "containers" that already have these tools built-in, keeping your server completely clean.*
 
-1. **Install Python**:
-   - Download Python (latest 3.x version) from [python.org](https://www.python.org/downloads/windows/).
-   - **CRITICAL:** During installation, make sure to check the box that says **"Add Python to PATH"** before clicking Install.
-2. **Install Node.js**:
-   - Download Node.js (LTS version) from [nodejs.org](https://nodejs.org/).
-   - Install it with all the default settings.
+1. **Download the Code & Data**:
+   - On the Court Server, go to GitHub, download the project ZIP file, and extract all files into `C:\Mahkama_App`.
+   - **Migrate Your Data *(Optional - Only if keeping existing data)***: 
+     - If you want to keep the data you've already created, you must copy the **`backend\instance\`** (database) and **`backenduploads\`** (CVs/photos) folders from your personal computer into `C:\Mahkama_App\backend\` on the Court Server via USB.
+     - **If this is a completely fresh install and you want an empty database**, simply *skip this step*. The app will automatically create a fresh, blank database when it runs!
+2. **Run the App**:
+   - Right-click the **`start_app.bat`** file inside `C:\Mahkama_App` and select **"Run as Administrator"**.
+   - The script will check if Docker is installed. If it's missing, it will automatically download and install Docker Desktop for you (a computer restart may be required).
+   - Once Docker is running, the script will automatically install all requirements, set up the environment, and display a summary screen.
+   - The app will then be accessible on Port `5055`! (Skip to Phase 4 below).
 
 ---
 
