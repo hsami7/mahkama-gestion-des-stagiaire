@@ -90,22 +90,15 @@ export function InteractiveTour({ runManually, onCloseManual }: { runManually?: 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
-  // Check if tour should auto-start
+  // Tour only runs when manually triggered (e.g. from /guide button)
   useEffect(() => {
     if (runManually) {
       setIsOpen(true);
       setCurrentStepIndex(0);
-      return;
+    } else {
+      setIsOpen(false);
     }
-    const hasCompleted = localStorage.getItem(`tour_completed_${roleKey}`);
-    if (!hasCompleted && window.location.pathname === '/') {
-      // Auto start after brief delay on home dashboard
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [runManually, roleKey]);
+  }, [runManually]);
 
   const currentStep = tourSteps[currentStepIndex];
 
