@@ -1,66 +1,41 @@
-# React + TypeScript + Vite
+# Mahkama Intern Manager (نظام إدارة المتدربين)
 
-## Running the project
+This is a comprehensive management system for court interns, featuring automated document lifecycle management, integrated Google Forms, automated email notifications, and a dedicated intern portal.
 
-To run the full app (Flask backend + Vite frontend + Electron):
+## 🚀 Quick Start Setup (For the Court)
 
-```
-npm run electron:full
-```
+**For full deployment instructions, advanced configuration, and troubleshooting, please read the complete [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).**
 
-The backend must be running on http://localhost:5055 for login to work, otherwise you'll get a "Bad Gateway" / ECONNREFUSED error.
+### Step 1: Download & Extract
+The Court downloads the project ZIP from GitHub and extracts it to a permanent folder on the server (e.g. `C:\Mahkama_App`).
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+### Step 2: One-Click Startup (`start_app.bat`)
+Simply right-click **`start_app.bat`** and choose **"Run as administrator"**.
 
-Currently, two official plugins are available:
+`start_app.bat` handles everything automatically behind the scenes:
+- Automatically installs Docker if it's missing from your system.
+- Sets up the complete environment (Node.js, Python, Flask, SQLite) in an isolated container without cluttering your server.
+- Initializes the database and creates all necessary tables (`interns`, `users`, `attendance`, `documents`, etc.).
+- Automatically opens your web browser to the application once it's ready!
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### Step 3: Desktop App Launcher (Optional)
+If you prefer to use the application as a standalone desktop window rather than inside a web browser tab, simply double-click the **`start_desktop.bat`** file. It will automatically ensure the background server is running and launch the native desktop application.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠 For Developers
 
-## Expanding the Oxlint configuration
+To run the project manually in a development environment:
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+### Web Version
+1. Ensure Docker Desktop is running.
+2. Run `docker-compose up -d` to start the backend.
+3. Access the application at `http://localhost:5055`.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+### Desktop Version (Electron)
+1. Ensure the Docker backend is running as described above.
+2. Run `npm install` to install local dependencies.
+3. Run `npm run electron:dev` to launch the Electron window connected to the Docker backend.
 
 ## Google Forms Integration Setup
-
-To enable automatic Google Form generation using your personal Google account, you need to set up OAuth 2.0 in the Google Cloud Console.
-
-### 1. Create OAuth Credentials
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project or select an existing one.
-3. In the sidebar, navigate to **APIs & Services** > **Credentials**.
-4. Click **+ CREATE CREDENTIALS** > **OAuth client ID**.
-5. If prompted, configure your "OAuth consent screen" first (select "External" for user type).
-6. For Application type, select **Desktop app** (or Web application if preferred).
-7. Copy the generated **Client ID** and **Client Secret**.
-8. Paste them into the "إعدادات النظام" (Settings) page in this app.
-
-### 2. Add Test Users
-Because your app is in the "Testing" phase by default, you must explicitly add the Google accounts that are allowed to log in:
-1. In the Google Cloud Console sidebar, click on **Audience** (or **OAuth consent screen**).
-2. Scroll down to the **Test users** section.
-3. Click **+ Add users**.
-4. Enter the Gmail address(es) you want to use to generate forms.
-5. Click **Save**.
-
-Now, when you click "تسجيل الدخول إلى Google (لإنشاء النماذج)" in the app, it will successfully authenticate your account!
+To enable automatic Google Form generation using your personal Google account, you need to set up OAuth 2.0 in the Google Cloud Console. See the "Integrations" section inside the application dashboard for more details.
