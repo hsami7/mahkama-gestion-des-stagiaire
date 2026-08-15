@@ -98,11 +98,11 @@ export function InteractiveTour({ runManually, onCloseManual }: { runManually?: 
       return;
     }
     const hasCompleted = localStorage.getItem(`tour_completed_${roleKey}`);
-    if (!hasCompleted) {
-      // Auto start after brief delay
+    if (!hasCompleted && window.location.pathname === '/') {
+      // Auto start after brief delay on home dashboard
       const timer = setTimeout(() => {
         setIsOpen(true);
-      }, 1000);
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [runManually, roleKey]);
@@ -112,10 +112,6 @@ export function InteractiveTour({ runManually, onCloseManual }: { runManually?: 
   // Update element rect positioning
   useEffect(() => {
     if (!isOpen || !currentStep) return;
-
-    if (currentStep.path && window.location.pathname !== currentStep.path) {
-      navigate(currentStep.path);
-    }
 
     const updateRect = () => {
       if (currentStep.target) {
@@ -145,7 +141,12 @@ export function InteractiveTour({ runManually, onCloseManual }: { runManually?: 
 
   const handleNext = () => {
     if (currentStepIndex < tourSteps.length - 1) {
-      setCurrentStepIndex(prev => prev + 1);
+      const nextIdx = currentStepIndex + 1;
+      const nextStep = tourSteps[nextIdx];
+      if (nextStep?.path && window.location.pathname !== nextStep.path) {
+        navigate(nextStep.path);
+      }
+      setCurrentStepIndex(nextIdx);
     } else {
       handleFinish();
     }
