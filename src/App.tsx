@@ -14,7 +14,6 @@ import { ChangePassword } from './pages/ChangePassword';
 import { Profile } from './pages/Profile';
 import { Attendance } from './pages/Attendance';
 import { Timeline } from './pages/Timeline';
-import { Guide } from './pages/Guide';
 import PublicForm from './pages/PublicForm';
 
 function ProtectedRoute({ children, token }: { children: React.ReactNode, token: string | null }) {
@@ -69,7 +68,6 @@ function App() {
             <Route path="users" element={<UsersPermissions />} />
             <Route path="settings" element={<Settings />} />
             <Route path="change-password" element={<ChangePassword />} />
-            <Route path="guide" element={<Guide />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         )}

@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MagnifyingGlass, Bell, Users, CalendarCheck, FolderUser, BookOpen } from '@phosphor-icons/react';
+import { MagnifyingGlass, Bell, Users, CalendarCheck, FolderUser } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 
 const GLOBAL_SEARCH_ITEMS = [
   { id: 'interns', title: 'إدارة المتدربين (ملفات المتدربين)', keywords: ['تقييم', 'متدربين', 'ملفات', 'إدارة', 'interns', 'evaluation'], path: '/interns', icon: <FolderUser size={16} /> },
   { id: 'attendance', title: 'الحضور والانصراف', keywords: ['حضور', 'انصراف', 'غياب', 'attendance', 'time'], path: '/attendance', icon: <CalendarCheck size={16} /> },
-  { id: 'guide', title: 'دليل الاستخدام والشروحات المصورة', keywords: ['دليل', 'شرح', 'مساعدة', 'guide', 'tour', 'جولة'], path: '/guide', icon: <BookOpen size={16} /> },
 ];
 
 export function Header({ title, missingCount, notifications = [], onReadNotification, onNotificationClick }: { title: string, missingCount?: number, notifications?: any[], onReadNotification?: (id: number) => void, onNotificationClick?: (n: any) => void }) {
