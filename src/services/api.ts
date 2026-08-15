@@ -52,15 +52,14 @@ export const api = {
         notify(`Backend returned ${response.status}: ${errMsg}. Logging out.`, 'error');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.dispatchEvent(new Event('storage'));
+        window.location.href = '/login';
       }
       if (response.status === 403 || response.status === 404) {
         const user = localStorage.getItem('user');
         if (user && JSON.parse(user).role === 'Intern') {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.dispatchEvent(new Event('storage'));
-          window.location.href = '/';
+          window.location.href = '/login';
         } else if (response.status === 403) {
           showForbiddenNotice();
         }
@@ -86,8 +85,7 @@ export const api = {
         if (user && JSON.parse(user).role === 'Intern') {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.dispatchEvent(new Event('storage'));
-          window.location.href = '/';
+          window.location.href = '/login';
         } else if (response.status === 403) {
           showForbiddenNotice();
         }
@@ -111,8 +109,7 @@ export const api = {
         if (user && JSON.parse(user).role === 'Intern') {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.dispatchEvent(new Event('storage'));
-          window.location.href = '/';
+          window.location.href = '/login';
         } else if (response.status === 403) {
           showForbiddenNotice();
         }
@@ -143,8 +140,7 @@ export const api = {
         if (user && JSON.parse(user).role === 'Intern') {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.dispatchEvent(new Event('storage'));
-          window.location.href = '/';
+          window.location.href = '/login';
         } else if (response.status === 403) {
           showForbiddenNotice();
         }
