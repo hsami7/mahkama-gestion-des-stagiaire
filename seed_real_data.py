@@ -17,7 +17,7 @@ def seed():
         print("Seeding Users...")
         admin = User(
             username='admin',
-            name='Hatim SAMI (مدير النظام)',
+            name='مدير النظام',
             email='admin@mahkama.ma',
             password=generate_password_hash('admin123'),
             role='Admin',
@@ -107,7 +107,7 @@ def seed():
             email='omar.tazi@uet.ac.ma',
             national_id='Z9871234',
             department='قسم المعلوميات والتجهيز',
-            encadrant='Hatim SAMI',
+            encadrant='مدير النظام',
             status='قيد المراجعة',
             source='منصة التسجيل',
             phone='0677112233',

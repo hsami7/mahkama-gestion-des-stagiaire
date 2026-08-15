@@ -56,6 +56,7 @@ export function Layout() {
       case '/settings': return 'الإعدادات';
       case '/attendance': return 'سجل الحضور اليومي';
       case '/timeline': return 'مخطط تغطية المتدربين';
+      case '/guide': return 'دليل الاستخدام والشروحات المصورة';
       default: return 'نظام إدارة المتدربين';
     }
   };

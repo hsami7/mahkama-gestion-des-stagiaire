@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Users, FileText, SquaresFour, Gear, Archive, SignOut, ShieldCheck, House, CalendarCheck, ChartLine, Key } from '@phosphor-icons/react';
+import { Users, FileText, SquaresFour, Gear, Archive, SignOut, ShieldCheck, House, CalendarCheck, ChartLine, Key, BookOpen } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { usePermissions } from '../context/PermissionContext';
 
@@ -43,6 +43,7 @@ export function Sidebar({ hasUnread }: { hasUnread?: boolean }) {
     { name: 'مخطط التغطية', path: '/timeline', icon: <ChartLine size={24} />, show: !isIntern && can('interns', 'view') },
     { name: 'المستخدمين والصلاحيات', path: '/users', icon: <ShieldCheck size={24} />, show: !isIntern && can('roles', 'view') },
     { name: 'بوابة المتدرب', path: '/', icon: <House size={24} />, show: isIntern },
+    { name: 'دليل الاستخدام', path: '/guide', icon: <BookOpen size={24} />, show: !isIntern },
     { name: 'الإعدادات', path: '/settings', icon: <Gear size={24} />, show: !isIntern && (isAdmin || can('system_settings', 'view') || can('activity_logs', 'view')) },
     { name: 'تغيير كلمة المرور', path: '/change-password', icon: <Key size={24} />, show: user?.role === 'Manager' },
   ];
