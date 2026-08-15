@@ -124,5 +124,7 @@ echo    ---^> ACCESS THE APP HERE: http://localhost:5055 ^<---
 echo.
 echo ===============================================================================
 echo.
+echo Opening application in your browser...
+start http://localhost:5055
 pause
 

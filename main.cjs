@@ -16,14 +16,10 @@ function createWindow() {
 
   win.maximize();
 
-  if (isDev) {
-    // In dev mode, load the Vite local server
+  // Load the application served on port 5055 by Docker/Waitress
+  win.loadURL('http://localhost:5055').catch(() => {
     win.loadURL('http://localhost:5174');
-    // win.webContents.openDevTools();
-  } else {
-    // In production, load the built React app
-    win.loadFile(path.join(__dirname, 'dist', 'index.html'));
-  }
+  });
 }
 
 app.whenReady().then(createWindow);
