@@ -81,6 +81,19 @@ The application is now live on the local network! Employees do **not** need to i
 
 ---
 
+## Phase 4B: Running the Desktop Application (Electron)
+
+If you prefer to run the application as a standalone Desktop App (instead of accessing it through a web browser), you can easily do so. The desktop app will connect to the same Docker database and server.
+
+1. **Install Node.js Dependencies**:
+   - Open a Command Prompt or Terminal in the `C:\Mahkama_App` folder.
+   - Run the command: `npm install` (You only need to do this once).
+2. **Launch the Desktop App**:
+   - In the same terminal, run: `npm run electron:dev`
+   - The application will automatically launch as a standalone desktop window, complete with system integration.
+
+---
+
 ## Phase 5: Configuring Integrations (Google & Microsoft)
 
 To make automated emails and Google Forms/Drive sync work, you must configure the integrations from the **Admin Dashboard** -> **Integrations Settings** page inside the app.
