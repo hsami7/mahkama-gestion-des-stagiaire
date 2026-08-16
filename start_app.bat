@@ -129,13 +129,20 @@ echo [3/3] Installing Packages and Building Application...
 echo This will automatically set up Python, Node.js, and all required packages.
 echo Sit back and relax, this might take a few minutes on the first run!
 echo.
-docker-compose up -d --build
+docker compose version >nul 2>&1
+if %errorlevel% equ 0 (
+    docker compose up -d --build
+) else (
+    docker-compose up -d --build
+)
 
 if %errorlevel% equ 0 goto BuildOK
 color 0C
 echo.
 echo [ERROR] Something went wrong during the build process.
 echo Make sure the Docker Desktop application is open and running in the system tray.
+echo If you see a "500 Internal Server Error" or API error, Docker's engine is stuck.
+echo Please restart Docker Desktop from the system tray, or restart your computer.
 pause
 exit /b 1
 
