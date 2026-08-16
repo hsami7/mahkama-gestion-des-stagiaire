@@ -200,12 +200,50 @@ def seed():
         )
         db.session.add(req1)
 
+        print("Seeding Forms...")
+        form1 = Form(
+            title='طلب تدريب صيفي 2026',
+            slug='summer-internship-2026',
+            form_data=json.dumps([
+                {"id": "q1", "label": "الاسم الكامل", "type": "text", "required": True, "maps_to": "name"},
+                {"id": "q2", "label": "البريد الإلكتروني", "type": "email", "required": True, "maps_to": "email"},
+                {"id": "q3", "label": "رقم الهاتف", "type": "text", "required": True, "maps_to": "phone"},
+                {"id": "q4", "label": "الجامعة", "type": "text", "required": True, "maps_to": "university"},
+                {"id": "q5", "label": "السيرة الذاتية", "type": "file", "required": True, "maps_to": "none"}
+            ]),
+            is_active=True,
+            created_at=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')
+        )
+        form2 = Form(
+            title='التسجيل للتدريب المهني (خريجين)',
+            slug='pro-internship-graduates',
+            form_data=json.dumps([
+                {"id": "q1", "label": "الاسم الكامل", "type": "text", "required": True, "maps_to": "name"},
+                {"id": "q2", "label": "البريد الإلكتروني", "type": "email", "required": True, "maps_to": "email"},
+                {"id": "q4", "label": "التخصص", "type": "text", "required": True, "maps_to": "specialty"},
+                {"id": "q5", "label": "نسخة من بطاقة التعريف", "type": "file", "required": True, "maps_to": "none"}
+            ]),
+            is_active=True,
+            created_at=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')
+        )
+        db.session.add_all([form1, form2])
+
         print("Seeding Attendance Logs...")
         today = date.today()
-        for i in range(10):
+        # Seed 45 days of attendance for realism
+        for i in range(45):
             d = today - timedelta(days=i)
-            a1 = Attendance(intern_id=intern1.id, date=d.strftime('%Y-%m-%d'), status='حاضر')
-            a2 = Attendance(intern_id=intern2.id, date=d.strftime('%Y-%m-%d'), status='حاضر' if i != 2 else 'غائب')
+            # Skip weekends (5=Saturday, 6=Sunday)
+            if d.weekday() >= 5:
+                continue
+            
+            # intern1 is always present except for 3 random days
+            a1_status = 'حاضر' if i not in [5, 18, 34] else 'غائب'
+            a1 = Attendance(intern_id=intern1.id, date=d.strftime('%Y-%m-%d'), status=a1_status)
+            
+            # intern2 has a few absenses
+            a2_status = 'حاضر' if i not in [2, 14, 15, 27] else 'غائب'
+            a2 = Attendance(intern_id=intern2.id, date=d.strftime('%Y-%m-%d'), status=a2_status)
             db.session.add_all([a1, a2])
 
         print("Seeding System Logs...")

@@ -38,8 +38,46 @@ echo.
 rem 2. Check for Docker
 echo [2/3] Checking Prerequisites (Docker)...
 docker --version >nul 2>&1
+if %errorlevel% neq 0 goto InstallDocker
+
+rem Check if Docker daemon is running
+docker info >nul 2>&1
 if %errorlevel% equ 0 goto DockerOK
 
+echo [INFO] Docker is installed, but Docker Desktop daemon is not running.
+echo [INFO] Launching Docker Desktop...
+
+if exist "C:\Program Files\Docker\Docker\Docker Desktop.exe" (
+    start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+) else (
+    echo [INFO] Please launch Docker Desktop from your Start Menu.
+)
+
+echo [INFO] Waiting for Docker engine to initialize...
+set /a attempts=0
+
+:WaitDaemon
+timeout /t 4 /nobreak >nul
+set /a attempts+=1
+docker info >nul 2>&1
+if %errorlevel% equ 0 goto DaemonReady
+if !attempts! lss 25 (
+    echo [INFO] Waiting for Docker engine... (!attempts!/25)
+    goto WaitDaemon
+)
+
+color 0C
+echo.
+echo [ERROR] Docker engine failed to start or connection timed out.
+echo Please start Docker Desktop manually, wait until it says "Engine running", then run this script again.
+pause
+exit /b 1
+
+:DaemonReady
+echo [OK] Docker engine is up and running.
+goto DockerOK
+
+:InstallDocker
 color 0E
 echo [INFO] Docker is not installed on this system.
 echo [INFO] Downloading Docker Desktop Installer (this may take a few minutes)...
@@ -127,4 +165,3 @@ echo.
 echo Opening application in your browser...
 start http://localhost:5055
 pause
-
