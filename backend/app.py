@@ -2588,10 +2588,11 @@ def get_document_templates():
 @jwt_required()
 @check_permission('doc_templates', 'add')
 def create_document_template():
-    label = (request.form.get('label') or (request.json or {}).get('label') or '').strip()
+    json_data = request.get_json(silent=True) or {}
+    label = (request.form.get('label') or json_data.get('label') or '').strip()
     if not label:
         return jsonify({"msg": "Label is required"}), 400
-    file_type = request.form.get('file_type') or (request.json or {}).get('file_type') or 'pdf'
+    file_type = request.form.get('file_type') or json_data.get('file_type') or 'pdf'
     file_path = None
     if 'file' in request.files:
         file = request.files['file']
@@ -2615,12 +2616,22 @@ def create_document_template():
 def update_document_template(tid):
     t = db.session.get(DocumentTemplate, tid)
     if not t: return jsonify({"msg": "Not found"}), 404
-    label = request.form.get('label') or (request.json or {}).get('label')
+    json_data = request.get_json(silent=True) or {}
+    label = request.form.get('label') or json_data.get('label')
     if label: t.label = label.strip()
-    if 'file_type' in (request.form or request.json or {}):
-        t.file_type = request.form.get('file_type') or (request.json or {}).get('file_type') or t.file_type
-    if 'is_active' in (request.form or request.json or {}):
-        t.is_active = request.form.get('is_active', type=int) if request.form else (request.json or {}).get('is_active', t.is_active)
+    
+    # Check keys safely
+    has_file_type = 'file_type' in request.form or 'file_type' in json_data
+    if has_file_type:
+        t.file_type = request.form.get('file_type') or json_data.get('file_type') or t.file_type
+        
+    has_is_active = 'is_active' in request.form or 'is_active' in json_data
+    if has_is_active:
+        if 'is_active' in request.form:
+            t.is_active = request.form.get('is_active', type=int)
+        else:
+            t.is_active = json_data.get('is_active', t.is_active)
+            
     if 'file' in request.files:
         file = request.files['file']
         if file.filename:
