@@ -20,7 +20,7 @@ echo ===========================================================================
 echo.
 
 rem 1. Check for Admin Privileges
-echo [1/3] Checking Permissions...
+echo [1/4] Checking Permissions...
 net session >nul 2>&1
 if %errorlevel% equ 0 goto AdminOK
 
@@ -35,8 +35,40 @@ exit /b 1
 echo [OK] Running as Administrator.
 echo.
 
-rem 2. Check for Docker
-echo [2/3] Checking Prerequisites (Docker)...
+rem 2. Check for WSL 2 (Prerequisite for Docker on Windows)
+echo [2/4] Checking Prerequisites (WSL 2)...
+if not exist "C:\Windows\System32\wsl.exe" (
+    echo [INFO] WSL 2 is not installed on this system.
+    echo [INFO] WSL 2 is required to run Docker Desktop on Windows.
+    echo [INFO] Installing WSL 2 (this may take a few minutes)...
+    wsl --install --no-distribution
+    
+    if !errorlevel! equ 0 (
+        color 0A
+        echo.
+        echo ===============================================================================
+        echo [SUCCESS] WSL 2 has been successfully installed!
+        echo.
+        echo A SYSTEM RESTART is required to finish setting up WSL 2.
+        echo Please save your work, restart your computer, and run this script again.
+        echo ===============================================================================
+        echo.
+        pause
+        exit /b 0
+    ) else (
+        color 0C
+        echo.
+        echo [ERROR] Failed to install WSL 2 automatically.
+        echo Please open PowerShell as Administrator and run 'wsl --install' manually.
+        pause
+        exit /b 1
+    )
+)
+echo [OK] WSL 2 is installed.
+echo.
+
+rem 3. Check for Docker
+echo [3/4] Checking Prerequisites (Docker)...
 docker --version >nul 2>&1
 if %errorlevel% neq 0 goto InstallDocker
 
@@ -124,8 +156,8 @@ exit /b 0
 echo [OK] Docker is installed and running.
 echo.
 
-rem 3. Build and start containers
-echo [3/3] Installing Packages and Building Application...
+rem 4. Build and start containers
+echo [4/4] Installing Packages and Building Application...
 echo This will automatically set up Python, Node.js, and all required packages.
 echo Sit back and relax, this might take a few minutes on the first run!
 echo.
