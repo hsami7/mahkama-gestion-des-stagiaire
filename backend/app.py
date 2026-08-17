@@ -49,11 +49,24 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     # Only apply if it's an sqlite3 connection
     if type(dbapi_connection).__module__ == "sqlite3":
         cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
-        cursor.execute("PRAGMA temp_store=MEMORY")
-        cursor.execute("PRAGMA mmap_size=30000000000")
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        except Exception as e:
+            # Fallback for WSL2/Docker Windows volume mounts where WAL fails with disk I/O error
+            print(f"WSL2/Docker Volume Mount detected (WAL mode failed: {e}). Falling back to journal_mode=DELETE")
+            try:
+                cursor.execute("PRAGMA journal_mode=DELETE")
+                cursor.execute("PRAGMA synchronous=FULL")
+            except Exception:
+                pass
+        
+        try:
+            cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
+            cursor.execute("PRAGMA temp_store=MEMORY")
+            cursor.execute("PRAGMA mmap_size=30000000000")
+        except Exception:
+            pass
         cursor.close()
 
 # Allow download endpoints (opened via window.open) to authenticate using ?token=...

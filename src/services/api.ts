@@ -41,12 +41,12 @@ export const api = {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       headers: getAuthHeaders(),
     });
+    const resData = await safeJson(response);
     if (!response.ok) {
       let errMsg = response.statusText;
-      try {
-        const errData = await response.json();
-        errMsg = errData.msg || errData.message || JSON.stringify(errData);
-      } catch (e) {}
+      if (typeof resData === 'object' && resData?.msg) {
+        errMsg = resData.msg;
+      }
       
       if (response.status === 401 || response.status === 422) {
         notify(`Backend returned ${response.status}: ${errMsg}. Logging out.`, 'error');
@@ -68,7 +68,15 @@ export const api = {
       err.status = response.status;
       throw err;
     }
-    return response.json();
+    
+    // Check for SPA HTML router fallback (200 OK with HTML)
+    if (typeof resData === 'object' && resData?.msg && (resData.msg.includes('<!DOCTYPE') || resData.msg.includes('<!doctype'))) {
+      const err = new Error('الخادم غير متاح أو واجه خطأ داخلي (مستند HTML غير متوقع)') as any;
+      err.status = 502;
+      throw err;
+    }
+    
+    return resData;
   },
   
   post: async (endpoint: string, data: any) => {
@@ -133,7 +141,7 @@ export const api = {
       },
       body: formData
     });
-    const resData = await response.json();
+    const resData = await safeJson(response);
     if (!response.ok) {
       if (response.status === 403 || response.status === 404) {
         const user = localStorage.getItem('user');
@@ -145,7 +153,7 @@ export const api = {
           showForbiddenNotice();
         }
       }
-      throw new Error(resData.msg || 'Upload failed');
+      throw new Error(typeof resData === 'object' && resData?.msg ? resData.msg : 'Upload failed');
     }
     return resData;
   },
@@ -155,11 +163,12 @@ export const api = {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
+    const resData = await safeJson(response);
     if (!response.ok) {
       if (response.status === 403) showForbiddenNotice();
-      throw new Error(`API Error: ${response.statusText}`);
+      throw new Error(`API Error: ${typeof resData === 'object' && resData?.msg ? resData.msg : response.statusText}`);
     }
-    return response.json();
+    return resData;
   },
 
   // --- Document Lifecycle ---
