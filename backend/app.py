@@ -4245,6 +4245,12 @@ def serve_react_app(path):
     else:
         return send_from_directory(app.static_folder, 'index.html')
 
+@app.errorhandler(404)
+def handle_404(e):
+    if request.path.startswith('/api'):
+        return jsonify({"msg": "Not Found"}), 404
+    return send_from_directory(app.static_folder, 'index.html')
+
 def setup_app():
     init_db()
     # Fix: records uploaded before the status-update bug was fixed
