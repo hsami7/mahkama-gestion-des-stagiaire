@@ -378,10 +378,6 @@ function DocumentTemplatesManager() {
     } catch { /* ignore */ }
   };
 
-  const API_BASE = (window as any).API_BASE || 'http://localhost:5055';
-  const token = localStorage.getItem('token');
-  const authHeaders = (token ? { 'Authorization': `Bearer ${token}` } : {}) as HeadersInit;
-
   const addTemplate = async () => {
     if (!label.trim()) return toast.warning('الرجاء إدخال اسم المستند');
     setLoading(true);
@@ -389,10 +385,7 @@ function DocumentTemplatesManager() {
       const fd = new FormData();
       fd.append('label', label.trim());
       if (file) fd.append('file', file);
-      const res = await fetch(`${API_BASE}/admin/document-templates`, {
-        method: 'POST', headers: authHeaders, body: fd
-      });
-      if (!res.ok) throw new Error((await res.json()).msg || 'فشل الإضافة');
+      await api.post('/admin/document-templates', fd);
       toast.success('تمت الإضافة');
       setLabel('');
       setFile(null);
@@ -407,10 +400,7 @@ function DocumentTemplatesManager() {
       const fd = new FormData();
       fd.append('label', editLabel.trim());
       if (editFile) fd.append('file', editFile);
-      const res = await fetch(`${API_BASE}/admin/document-templates/${editModal.id}`, {
-        method: 'PUT', headers: authHeaders, body: fd
-      });
-      if (!res.ok) throw new Error((await res.json()).msg || 'فشل التحديث');
+      await api.put(`/admin/document-templates/${editModal.id}`, fd);
       toast.success('تم التحديث');
       setEditModal(null);
       setEditFile(null);
@@ -517,7 +507,7 @@ function DocumentTemplatesManager() {
                 <label>الملف (اختياري)</label>
                 {editModal.file_path && (
                   <div style={{ fontSize:12, color:'var(--success)', marginBottom:6 }}>
-                    ✓ الملف الحالي: <a href={`${API_BASE}${editModal.file_path}`} target="_blank" rel="noreferrer" style={{color:'var(--gold-dark)'}}>عرض</a>
+                    ✓ الملف الحالي: <a href={editModal.file_path} target="_blank" rel="noreferrer" style={{color:'var(--gold-dark)'}}>عرض</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={e => setEditFile(e.target.files?.[0] || null)} style={{ width:'100%', padding:'6px', border:'1px solid var(--line)', borderRadius:6, fontSize:12 }} />
