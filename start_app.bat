@@ -157,7 +157,31 @@ echo [OK] Docker is installed and running.
 echo.
 
 rem 4. Build and start containers
-echo [4/4] Installing Packages and Building Application...
+echo [4/4] Starting Application...
+echo.
+
+rem Check if Docker backend container is already running
+docker ps --format "{{.Names}}" | findstr /i "mahkama_intern_manager" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [INFO] Application is already running in the background.
+    goto BuildOK
+)
+
+rem Check if the Docker image is already built
+docker images --format "{{.Repository}}" | findstr /i "internmanager-mahkama-app" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [INFO] Image found. Starting application...
+    docker compose version >nul 2>&1
+    if %errorlevel% equ 0 (
+        docker compose up -d
+    ) else (
+        docker-compose up -d
+    )
+    if %errorlevel% equ 0 goto BuildOK
+)
+
+rem If not built, perform build
+echo [INFO] Building and starting application for the first time...
 echo This will automatically set up Python, Node.js, and all required packages.
 echo Sit back and relax, this might take a few minutes on the first run!
 echo.

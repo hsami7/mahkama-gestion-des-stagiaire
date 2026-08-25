@@ -1145,6 +1145,33 @@ for (const [base, docs] of grouped) {
                 </div>
               </form>
             </div>
+
+            {/* About Section */}
+            <div className="card" style={{ padding: '24px 28px', marginTop: '24px', maxWidth: 600 }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--line)' }}>حول النظام (About)</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.9rem', lineHeight: '1.6' }}>
+                <div>
+                  <strong>اسم التطبيق:</strong> Intern Manager
+                </div>
+                <div>
+                  <strong>الإصدار:</strong> 1.0.0
+                </div>
+                <div>
+                  <strong>الوصف:</strong> نظام متكامل لإدارة ملفات المتدربين بوزارة العدل وتتبع وثائقهم وحضورهم اليومي ومزامنتها تلقائياً.
+                </div>
+                <div style={{ marginTop: '12px', paddingTop: '16px', borderTop: '1px solid var(--line-soft)', color: 'var(--slate)' }}>
+                  Built by{' '}
+                  <a 
+                    href="https://hatimsami.engineer/" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    style={{ color: 'var(--gold-dark)', fontWeight: 'bold', textDecoration: 'underline' }}
+                  >
+                    Hatim SAMI
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
 
         </div>

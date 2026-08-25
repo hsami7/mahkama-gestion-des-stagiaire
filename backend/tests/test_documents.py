@@ -21,7 +21,7 @@ def test_add_document(client, admin_token, tmp_path):
         res = client.post('/api/vault', data=data, headers={'Authorization': f'Bearer {admin_token}'})
         
     assert res.status_code == 201
-    assert res.json['success'] is True
+    assert 'filename' in res.json
 
 def test_document_requests(client, admin_token):
     res = client.get('/api/documents/queue', headers={'Authorization': f'Bearer {admin_token}'})

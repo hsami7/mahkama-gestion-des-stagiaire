@@ -56,14 +56,18 @@ export function Sidebar({ hasUnread }: { hasUnread?: boolean }) {
     navigate('/login');
   };
 
+  const displayName = user?.name && (user.name.includes('Hatim') || user.name.includes('Sami') || user.name.includes('SAMI'))
+    ? 'مدير النظام'
+    : (user?.name || 'مستخدم');
+
   return (
     <div className="sidebar">
       <div className="sb-brand" style={{ padding: '12px 8px 32px' }}>
         <div className="seal" style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: 'var(--gold-light)' }}>
-          {user?.name ? user.name.substring(0, 2) : '..'}
+          {displayName.substring(0, 2)}
         </div>
         <div>
-          <b style={{ fontSize: '15px' }}>{user?.name || 'مستخدم'}</b>
+          <b style={{ fontSize: '15px' }}>{displayName}</b>
           <small>{user?.role === 'Admin' ? 'مدير' : user?.role === 'Manager' ? 'مسؤل' : user?.role === 'Intern' ? 'متدرب' : 'مستخدم'}</small>
         </div>
       </div>
