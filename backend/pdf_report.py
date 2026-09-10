@@ -12,13 +12,26 @@ from datetime import datetime
 
 _UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 
+_FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+
 _FONT_CANDIDATES = [
+    os.path.join(_FONT_DIR, "Amiri-Regular.ttf"),
+    os.path.join(_FONT_DIR, "arial.ttf"),
+    os.path.join(_FONT_DIR, "DejaVuSans.ttf"),
+    "/usr/share/fonts/opentype/fonts-hosny-amiri/Amiri-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
     "C:/Windows/Fonts/arial.ttf",
     "C:/Windows/Fonts/tahoma.ttf",
     "C:/Windows/Fonts/segoeui.ttf",
-    os.path.join(os.path.dirname(__file__), "fonts", "arial.ttf"),
 ]
 _BOLD_CANDIDATES = [
+    os.path.join(_FONT_DIR, "Amiri-Bold.ttf"),
+    os.path.join(_FONT_DIR, "arialbd.ttf"),
+    os.path.join(_FONT_DIR, "DejaVuSans-Bold.ttf"),
+    "/usr/share/fonts/opentype/fonts-hosny-amiri/Amiri-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf",
     "C:/Windows/Fonts/arialbd.ttf",
     "C:/Windows/Fonts/tahomabd.ttf",
     "C:/Windows/Fonts/segoeuib.ttf",
@@ -58,6 +71,7 @@ def _register_font():
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.lib.fonts import addMapping
+    import glob
 
     regular = None
     bold = None
@@ -69,6 +83,20 @@ def _register_font():
                 break
             except Exception:
                 pass
+
+    if regular is None:
+        for pattern in ["/usr/share/fonts/**/Amiri-Regular.ttf", "/usr/share/fonts/**/DejaVuSans.ttf"]:
+            matches = glob.glob(pattern, recursive=True)
+            for m in matches:
+                try:
+                    pdfmetrics.registerFont(TTFont("ReportAr", m))
+                    regular = "ReportAr"
+                    break
+                except Exception:
+                    pass
+            if regular:
+                break
+
     for c in _BOLD_CANDIDATES:
         if os.path.exists(c):
             try:
@@ -77,6 +105,19 @@ def _register_font():
                 break
             except Exception:
                 pass
+
+    if bold is None:
+        for pattern in ["/usr/share/fonts/**/Amiri-Bold.ttf", "/usr/share/fonts/**/DejaVuSans-Bold.ttf"]:
+            matches = glob.glob(pattern, recursive=True)
+            for m in matches:
+                try:
+                    pdfmetrics.registerFont(TTFont("ReportArBold", m))
+                    bold = "ReportArBold"
+                    break
+                except Exception:
+                    pass
+            if bold:
+                break
 
     if regular is None:
         return "Helvetica", "Helvetica-Bold"
@@ -199,15 +240,32 @@ def build_filename(intern):
     return "%s_%s_Profile.pdf" % (reg, slug)
 
 
+_STATUS_BILINGUAL = {
+    "نشط": "نشط (Actif)",
+    "قيد المراجعة": "قيد المراجعة (En révision)",
+    "منتهي": "منتهي (Terminé)",
+    "مكتمل": "مكتمل (Complété)",
+    "مرفوض": "مرفوض (Rejeté)",
+}
+
+
+def _status_display(status):
+    s = (status or "").strip()
+    return _STATUS_BILINGUAL.get(s, s or "—")
+
+
 def _status_color(status):
     s = (status or "").strip()
-    mapping = {
-        "نشط": ("#1E7D34", "#E6F4EA"),
-        "قيد المراجعة": ("#B26A00", "#FFF4E0"),
-        "منتهي": ("#5A6B5A", "#EEF1EE"),
-        "مرفوض": ("#B3261E", "#FCE8E6"),
-    }
-    return mapping.get(s, (_BRAND, _BRAND_LIGHT))
+    for key, color_pair in [
+        ("نشط", ("#1E7D34", "#E6F4EA")),
+        ("قيد المراجعة", ("#B26A00", "#FFF4E0")),
+        ("منتهي", ("#5A6B5A", "#EEF1EE")),
+        ("مكتمل", ("#1E7D34", "#E6F4EA")),
+        ("مرفوض", ("#B3261E", "#FCE8E6")),
+    ]:
+        if key in s:
+            return color_pair
+    return (_BRAND, _BRAND_LIGHT)
 
 
 def _photo_bytes(intern):
@@ -363,8 +421,8 @@ def build_intern_pdf(interns, mode="summary"):
         leading=15, textColor=colors.HexColor(_MUTED),
     )
     badge_style = ParagraphStyle(
-        "Badge", fontName=font_bold, fontSize=10.5, alignment=TA_CENTER,
-        leading=15,
+        "Badge", fontName=font_bold, fontSize=9.5, alignment=TA_CENTER,
+        leading=13,
     )
     kv_label = ParagraphStyle(
         "KvLabel", fontName=font_name, fontSize=8.5, alignment=TA_RIGHT,
@@ -418,10 +476,10 @@ def build_intern_pdf(interns, mode="summary"):
         # --- 1. Header bar ------------------------------------------------
         header_right = [
             Paragraph(ar("متدرب - نظام إدارة المتدربين"), sys_title),
-            Paragraph(ar("بطاقة معلومات متدرب"), doc_kicker),
+            Paragraph(ar("بطاقة معلومات متدرب / Fiche de stage"), doc_kicker),
         ]
         header_left = [
-            Paragraph(ar("تاريخ التصدير"), export_date_style),
+            Paragraph(ar("تاريخ التصدير / Date"), export_date_style),
             Paragraph(export_date, export_date_style),
         ]
         header = Table(
@@ -442,11 +500,12 @@ def build_intern_pdf(interns, mode="summary"):
         # --- 3. Hero section ---------------------------------------------
         status = intern.status or "—"
         fg, bg = _status_color(status)
+        badge_text = _status_display(status)
         badge = Table(
             [[Paragraph(
-                '<font color="%s">%s</font>' % (fg, ar(status)), badge_style,
+                '<font color="%s">%s</font>' % (fg, ar(badge_text)), badge_style,
             )]],
-            colWidths=[3.4 * cm],
+            colWidths=[4.8 * cm],
         )
         badge.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(bg)),
@@ -490,7 +549,7 @@ def build_intern_pdf(interns, mode="summary"):
 
         ids = Table(
             [[id_cell("رقم الهوية الوطنية (CIN)", intern.national_id),
-              id_cell("رقم التسجيل", "INT-%04d" % intern.id)]],
+              id_cell("رقم التسجيل (N° d'enregistrement)", "INT-%04d" % intern.id)]],
             colWidths=[content_w / 2.0, content_w / 2.0],
         )
         ids.setStyle(TableStyle([
@@ -507,21 +566,24 @@ def build_intern_pdf(interns, mode="summary"):
         elements.append(Spacer(1, 18))
 
         # --- 4. Structured data grid (4 columns) -------------------------
-        elements.append(Paragraph(ar("البيانات التفصيلية"), section_style))
+        elements.append(Paragraph(ar("البيانات التفصيلية / Informations Détaillées"), section_style))
         elements.append(Spacer(1, 6))
 
         # pairs: (label, value, is_arabic_value)
+        # Organized in 2-column RTL layout: Right column (col 1), Left column (col 0)
         pairs = [
-            ("البريد الإلكتروني", val(intern.email), False),
-            ("رقم الهاتف", val(intern.phone), False),
-            ("تاريخ الازدياد", val(intern.date_of_birth), False),
-            ("العنوان", intern.address, True),
-            ("تاريخ البدء", val(intern.start_date), False),
-            ("تاريخ الانتهاء", val(intern.end_date), False),
-            ("الجامعة / المعهد", intern.university, True),
-            ("القسم", intern.department, True),
-            ("المؤطر (المشرف)", intern.encadrant, True),
-            ("الحالة", intern.status, True),
+            ("البريد الإلكتروني / Email", val(intern.email), False),
+            ("رقم الهاتف / Téléphone", val(intern.phone), False),
+            ("تاريخ الازدياد / Date de naissance", val(intern.date_of_birth), False),
+            ("العنوان / Adresse", intern.address, True),
+            ("تاريخ البدء / Date de début", val(intern.start_date), False),
+            ("تاريخ الانتهاء / Date de fin", val(intern.end_date), False),
+            ("الجامعة أو المعهد / Établissement", intern.university, True),
+            ("التخصص / Spécialité", intern.specialty, True),
+            ("القسم / Département", intern.department, True),
+            ("المؤطر / Encadrant", intern.encadrant, True),
+            ("الحالة / Statut", _status_display(intern.status), True),
+            ("", "", False),
         ]
 
         def make_cell(label, value, is_ar):
@@ -556,17 +618,17 @@ def build_intern_pdf(interns, mode="summary"):
         elements.append(Spacer(1, 18))
 
         # --- 5. Document vault summary -----------------------------------
-        elements.append(Paragraph(ar("المستندات (خزنة الوثائق)"), section_style))
+        elements.append(Paragraph(ar("المستندات / Documents joints"), section_style))
         elements.append(Spacer(1, 6))
         entries = _doc_entries(intern)
         if entries:
             doc_rows = []
             for title in entries:
                 doc_rows.append([
-                    Paragraph(ar("مرفق متوفر ✓"), doc_tag_style),
-                    Paragraph(ar_nowrap(title), doc_title_style),
+                    Paragraph(ar("مرفق متوفر ✓ / Disponible"), doc_tag_style),
+                    Paragraph(ar(title), doc_title_style),
                 ])
-            dtable = Table(doc_rows, colWidths=[4.5 * cm, content_w - 4.5 * cm])
+            dtable = Table(doc_rows, colWidths=[5.0 * cm, content_w - 5.0 * cm])
             dtable.setStyle(TableStyle([
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 12),
@@ -580,11 +642,11 @@ def build_intern_pdf(interns, mode="summary"):
             ]))
             elements.append(dtable)
         else:
-            elements.append(Paragraph(ar("لا توجد مستندات مرفقة."), value_style))
+            elements.append(Paragraph(ar("لا توجد مستندات مرفقة / Aucun document joint."), value_style))
 
         elements.append(Spacer(1, 20))
         footer_line = (
-            "وثيقة مصدرة آلياً من نظام متدرب لإدارة المتدربين — تاريخ التصدير: "
+            "وثيقة مصدرة آلياً من نظام إدارة المتدربين (Document généré automatiquement) — تاريخ التصدير: "
             + export_date
         )
         elements.append(Paragraph(ar(footer_line), footer_style))

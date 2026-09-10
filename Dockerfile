@@ -13,6 +13,7 @@ WORKDIR /app
 # Install system dependencies if any are needed for PDF/Excel generation
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libcairo2-dev pkg-config \
+    fonts-hosny-amiri fonts-dejavu-core poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt ./backend/
