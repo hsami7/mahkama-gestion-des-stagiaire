@@ -1191,7 +1191,7 @@ def generate_daily_attendance_record():
         return jsonify({"msg": "Date is required"}), 400
         
     try:
-        from datetime import datetime
+        from datetime import datetime, date as dt_date
         dt = datetime.strptime(date_str, '%Y-%m-%d')
     except ValueError:
         return jsonify({"msg": "Invalid date format"}), 400
@@ -1203,6 +1203,8 @@ def generate_daily_attendance_record():
 
     template_path = os.path.join(os.path.dirname(__file__), '..', 'stagaires.docx')
     if not os.path.exists(template_path):
+        template_path = os.path.join(os.path.dirname(__file__), 'stagaires.docx')
+    if not os.path.exists(template_path):
         return jsonify({"msg": "Template file stagaires.docx not found"}), 404
 
     # Get active interns whose dates overlap with the selected date
@@ -1211,17 +1213,19 @@ def generate_daily_attendance_record():
     for intern in all_interns:
         if intern.start_date:
             try:
-                start_dt = datetime.strptime(intern.start_date, '%Y-%m-%d')
-                if dt < start_dt:
+                start_dt = intern.start_date if isinstance(intern.start_date, (datetime, dt_date)) else datetime.strptime(str(intern.start_date).strip(), '%Y-%m-%d')
+                start_date_val = start_dt.date() if isinstance(start_dt, datetime) else start_dt
+                if dt.date() < start_date_val:
                     continue
-            except ValueError:
+            except Exception:
                 pass
         if intern.end_date:
             try:
-                end_dt = datetime.strptime(intern.end_date, '%Y-%m-%d')
-                if dt > end_dt:
+                end_dt = intern.end_date if isinstance(intern.end_date, (datetime, dt_date)) else datetime.strptime(str(intern.end_date).strip(), '%Y-%m-%d')
+                end_date_val = end_dt.date() if isinstance(end_dt, datetime) else end_dt
+                if dt.date() > end_date_val:
                     continue
-            except ValueError:
+            except Exception:
                 pass
         active_interns.append(intern)
 

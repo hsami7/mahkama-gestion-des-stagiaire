@@ -27,9 +27,26 @@ const PermissionContext = createContext<PermissionContextValue>({
 
 export function PermissionProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const [role, setRole] = useState<string | null>(null);
-  const [permissions, setPermissions] = useState<PermissionMap | null>(null);
-  const [ready, setReady] = useState(false);
+  const [role, setRole] = useState<string | null>(() => {
+    try {
+      const u = localStorage.getItem('user');
+      return u ? JSON.parse(u).role : null;
+    } catch { return null; }
+  });
+  const [permissions, setPermissions] = useState<PermissionMap | null>(() => {
+    try {
+      const u = localStorage.getItem('user');
+      const parsed = u ? JSON.parse(u) : null;
+      if (parsed?.role === 'Admin') return ADMIN_PERMISSIONS;
+      return null;
+    } catch { return null; }
+  });
+  const [ready, setReady] = useState(() => {
+    try {
+      const u = localStorage.getItem('user');
+      return Boolean(u && localStorage.getItem('token'));
+    } catch { return false; }
+  });
   const refreshRef = useRef<() => Promise<void>>(async () => {});
 
   const isAdmin = role === 'Admin';
@@ -43,6 +60,11 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       setReady(true);
       return;
     }
+    if (cached?.role === 'Admin') {
+      setRole('Admin');
+      setPermissions(ADMIN_PERMISSIONS);
+      setReady(true);
+    }
     if (!localStorage.getItem('token')) {
       setRole(null);
       setPermissions(null);
@@ -55,7 +77,12 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       setPermissions(me.role === 'Admin' ? ADMIN_PERMISSIONS : mergePermissions(me.permissions));
       setReady(true);
     } catch {
-      // Keep last known state; token/logout handling lives in api.ts.
+      // Keep last known state; fallback to cached role
+      if (cached?.role === 'Admin') {
+        setRole('Admin');
+        setPermissions(ADMIN_PERMISSIONS);
+        setReady(true);
+      }
     }
   }, []);
 
@@ -91,6 +118,10 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     ready,
     can: (module, action) => {
       if (role === 'Admin') return true;
+      try {
+        const u = localStorage.getItem('user');
+        if (u && JSON.parse(u).role === 'Admin') return true;
+      } catch {}
       if (!permissions) return false;
       return Boolean(permissions[module]?.[action]);
     },

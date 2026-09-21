@@ -3,6 +3,7 @@ import { FileText, CheckCircle, WarningCircle, Plus, Eye, X, UserCirclePlus, Cha
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useToast } from '../components/Toast';
+import { usePermissions } from '../context/PermissionContext';
 import Avatar from '../components/Avatar';
 
 function formatDate(d: string | undefined | null): string {
@@ -232,6 +233,7 @@ export function Dashboard() {
   const user = userStr ? JSON.parse(userStr) : null;
   const isAdmin = user?.role === 'Admin';
 
+  const { ready } = usePermissions();
   const [interns, setInterns] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectedSub, setSelectedSub] = useState<any>(null);
@@ -240,26 +242,33 @@ export function Dashboard() {
   const [zoomPhoto, setZoomPhoto] = useState<{ src: string; name: string } | null>(null);
 
   const loadInterns = async () => {
-    try { setInterns(await api.get('/interns')); } catch (e) { console.error(e); }
+    try {
+      const data = await api.get('/interns');
+      if (Array.isArray(data)) setInterns(data);
+    } catch (e) {
+      console.error('Failed to load interns:', e);
+    }
   };
 
   const loadSubmissions = async () => {
     try {
       const raw = await api.get('/submissions?status=pending');
-      const parsed = raw.map((r: any) => {
-        if (typeof r.submitted_data === 'string') {
-          try { r.submitted_data = JSON.parse(r.submitted_data); } catch (e) { r.submitted_data = {}; }
-        }
-        return r;
-      });
-      setSubmissions(parsed);
-    } catch (e) { console.error(e); }
+      if (Array.isArray(raw)) {
+        const parsed = raw.map((r: any) => {
+          if (typeof r.submitted_data === 'string') {
+            try { r.submitted_data = JSON.parse(r.submitted_data); } catch (e) { r.submitted_data = {}; }
+          }
+          return r;
+        });
+        setSubmissions(parsed);
+      }
+    } catch (e) { console.error('Failed to load submissions:', e); }
   };
 
   useEffect(() => {
     loadInterns();
     loadSubmissions();
-  }, []);
+  }, [ready]);
 
   const handleApprove = async (id: number) => {
     try {

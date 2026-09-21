@@ -32,18 +32,19 @@ export function Sidebar({ hasUnread }: { hasUnread?: boolean }) {
     return () => clearInterval(interval);
   }, [user?.role]);
   
+  const effectiveIsAdmin = user?.role === 'Admin' || isAdmin;
   const isIntern = user?.role === 'Intern';
 
   const baseNavItems = [
     { name: 'لوحة القيادة', path: '/', icon: <SquaresFour size={24} />, show: !isIntern },
-    { name: 'المتدربين', path: '/interns', icon: <Users size={24} />, show: !isIntern && can('interns', 'view') },
-    { name: 'منشئ النماذج', path: '/form-builder', icon: <FileText size={24} />, show: !isIntern && can('forms', 'view') },
-    { name: 'خزنة المستندات', path: '/vault', icon: <Archive size={24} />, show: !isIntern && can('vault', 'view') },
-    { name: 'سجل الحضور اليومي', path: '/attendance', icon: <CalendarCheck size={24} />, show: !isIntern && can('attendance', 'view') },
-    { name: 'مخطط التغطية', path: '/timeline', icon: <ChartLine size={24} />, show: !isIntern && can('interns', 'view') },
-    { name: 'المستخدمين والصلاحيات', path: '/users', icon: <ShieldCheck size={24} />, show: !isIntern && can('roles', 'view') },
+    { name: 'المتدربين', path: '/interns', icon: <Users size={24} />, show: !isIntern && (effectiveIsAdmin || can('interns', 'view')) },
+    { name: 'منشئ النماذج', path: '/form-builder', icon: <FileText size={24} />, show: !isIntern && (effectiveIsAdmin || can('forms', 'view')) },
+    { name: 'خزنة المستندات', path: '/vault', icon: <Archive size={24} />, show: !isIntern && (effectiveIsAdmin || can('vault', 'view')) },
+    { name: 'سجل الحضور اليومي', path: '/attendance', icon: <CalendarCheck size={24} />, show: !isIntern && (effectiveIsAdmin || can('attendance', 'view')) },
+    { name: 'مخطط التغطية', path: '/timeline', icon: <ChartLine size={24} />, show: !isIntern && (effectiveIsAdmin || can('interns', 'view')) },
+    { name: 'المستخدمين والصلاحيات', path: '/users', icon: <ShieldCheck size={24} />, show: !isIntern && (effectiveIsAdmin || can('roles', 'view')) },
     { name: 'بوابة المتدرب', path: '/', icon: <House size={24} />, show: isIntern },
-    { name: 'الإعدادات', path: '/settings', icon: <Gear size={24} />, show: !isIntern && (isAdmin || can('system_settings', 'view') || can('activity_logs', 'view')) },
+    { name: 'الإعدادات', path: '/settings', icon: <Gear size={24} />, show: !isIntern && (effectiveIsAdmin || can('system_settings', 'view') || can('activity_logs', 'view')) },
     { name: 'تغيير كلمة المرور', path: '/change-password', icon: <Key size={24} />, show: user?.role === 'Manager' },
   ];
 

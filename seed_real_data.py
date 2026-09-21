@@ -118,14 +118,50 @@ def seed():
             address='وسط المدينة، فاس'
         )
 
-        db.session.add_all([intern1, intern2, intern3])
+        intern4 = Intern(
+            name='تست',
+            name_fr='Test Intern',
+            email='Tes@gmail.com',
+            national_id='T123456',
+            department='قسم قضاء الأسرة',
+            encadrant='مدير النظام',
+            status='قيد المراجعة',
+            source='نماذج جوجل',
+            phone='0611223344',
+            start_date=date(2026, 6, 11),
+            end_date=date(2026, 9, 11),
+            university='جامعة سيدي محمد بن عبد الله',
+            specialty='قانون الأعمال',
+            address='فاس'
+        )
+
+        intern5 = Intern(
+            name='اميمة يابي',
+            name_fr='Oumayma Yabi',
+            email='oumayma.yabi@gmail.com',
+            national_id='Y987654',
+            department='كتابة النيابة العامة',
+            encadrant='مدير النظام',
+            status='قيد المراجعة',
+            source='نماذج جوجل',
+            phone='0655443322',
+            start_date=date(2026, 7, 31),
+            end_date=date(2026, 10, 31),
+            university='كلية العلوم القانونية والاقتصادية بفاس',
+            specialty='القانون الخاص',
+            address='فاس'
+        )
+
+        db.session.add_all([intern1, intern2, intern3, intern4, intern5])
         db.session.commit()
         
         # User accounts for interns
         u1 = User(username=intern1.email, name=intern1.name, email=intern1.email, password=generate_password_hash('password123'), role='Intern')
         u2 = User(username=intern2.email, name=intern2.name, email=intern2.email, password=generate_password_hash('password123'), role='Intern')
         u3 = User(username=intern3.email, name=intern3.name, email=intern3.email, password=generate_password_hash('password123'), role='Intern')
-        db.session.add_all([u1, u2, u3])
+        u4 = User(username=intern4.email, name=intern4.name, email=intern4.email, password=generate_password_hash('password123'), role='Intern')
+        u5 = User(username=intern5.email, name=intern5.name, email=intern5.email, password=generate_password_hash('password123'), role='Intern')
+        db.session.add_all([u1, u2, u3, u4, u5])
 
         print("Seeding Document Lifecycle Records...")
         # Document Center files for Youssef El Idrissi
